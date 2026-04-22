@@ -55,6 +55,16 @@ class Database:
                 )
             """)
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS webhook_events (
+                    event_id    TEXT PRIMARY KEY,
+                    email       TEXT NOT NULL,
+                    product_key TEXT NOT NULL,
+                    payment_system TEXT,
+                    payload     TEXT,
+                    processed_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sent_reminders (
                     user_id     INTEGER,
                     days_before INTEGER,
@@ -265,6 +275,14 @@ class Database:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
+    async def get_user_by_email(self, email: str) -> Optional[Dict]:
+        normalized = email.strip().lower()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM users WHERE LOWER(email) = ?", (normalized,)) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
     async def register_user(self, user_id: int, username: Optional[str], first_name: Optional[str], lang: str = "ru"):
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("""
@@ -285,8 +303,22 @@ class Database:
             await conn.commit()
 
     async def set_user_email(self, user_id: int, email: str):
+        email = email.strip().lower()
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("UPDATE users SET email = ? WHERE user_id = ?", (email, user_id))
+            await conn.commit()
+
+    async def webhook_event_exists(self, event_id: str) -> bool:
+        async with aiosqlite.connect(self.db_path) as conn:
+            async with conn.execute("SELECT 1 FROM webhook_events WHERE event_id = ?", (event_id,)) as cur:
+                return await cur.fetchone() is not None
+
+    async def save_webhook_event(self, event_id: str, email: str, product_key: str, payment_system: str, payload: str):
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT OR IGNORE INTO webhook_events (event_id, email, product_key, payment_system, payload)
+                VALUES (?, ?, ?, ?, ?)
+            """, (event_id, email.strip().lower(), product_key, payment_system, payload))
             await conn.commit()
 
     # ─── GIVEAWAY ───

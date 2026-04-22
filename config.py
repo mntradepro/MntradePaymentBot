@@ -15,6 +15,12 @@ class Config:
     CHAT_LINK: str = os.getenv("CHAT_LINK", "https://t.me/+xxxx")
     CRYPTO_WALLET: str = os.getenv("CRYPTO_WALLET", "0xYourBEP20WalletHere")
 
+    # Website purchase webhook
+    WEBHOOK_HOST: str = os.getenv("WEBHOOK_HOST", "0.0.0.0")
+    WEBHOOK_PORT: int = int(os.getenv("WEBHOOK_PORT", "8080"))
+    WEBHOOK_PATH: str = os.getenv("WEBHOOK_PATH", "/webhook/purchase")
+    WEBHOOK_SECRET: str = os.getenv("WEBHOOK_SECRET", "")
+
     # Support kontakts — @username vai grupa
     SUPPORT_CONTACT: str = os.getenv("SUPPORT_CONTACT", "@YourSupportBot")
 
@@ -95,9 +101,9 @@ class Config:
         },
     })
 
-    # Referral komisijas procenti
-    REFERRAL_COMMISSION_COURSES: int = 15  # 15% par kursiem
-    REFERRAL_COMMISSION_CHAT: int = 20     # 20% par chat subscription
+    # Referral bonus days. Referrals no longer earn money or discounts.
+    REFERRAL_COMMISSION_COURSES: int = 0
+    REFERRAL_COMMISSION_CHAT: int = 0
     
     # Minimālā withdrawal summa USD
     MIN_WITHDRAWAL_AMOUNT: float = 50.0
@@ -123,8 +129,8 @@ class Config:
         "active": {
             "min_months": 3,
             "max_months": 6,
-            "chat_discount": 5,
-            "course_discount": 5,
+            "chat_discount": 0,
+            "course_discount": 0,
             "bonus_days": 5,
             "tag": "Active Trader",
             "emoji": "🔥",
@@ -132,8 +138,8 @@ class Config:
         "pro": {
             "min_months": 6,
             "max_months": 12,
-            "chat_discount": 7,
-            "course_discount": 7,
+            "chat_discount": 0,
+            "course_discount": 0,
             "bonus_days": 10,
             "tag": "Pro Trader",
             "emoji": "⭐",
@@ -141,8 +147,8 @@ class Config:
         "elite": {
             "min_months": 12,
             "max_months": 13,
-            "chat_discount": 10,
-            "course_discount": 10,
+            "chat_discount": 0,
+            "course_discount": 0,
             "bonus_days": 15,
             "free_course": "powerup",
             "tag": "Elite Trader",
@@ -151,8 +157,8 @@ class Config:
         "master": {
             "min_months": 13,
             "max_months": 18,
-            "chat_discount": 15,
-            "course_discount": 15,
+            "chat_discount": 0,
+            "course_discount": 0,
             "bonus_days": 20,
             "tag": "Master Trader",
             "emoji": "💎",
@@ -160,8 +166,8 @@ class Config:
         "legend": {
             "min_months": 18,
             "max_months": 999,
-            "chat_discount": 20,
-            "course_discount": 20,
+            "chat_discount": 0,
+            "course_discount": 0,
             "bonus_days": 30,
             "tag": "Legend Trader",
             "emoji": "🔱",

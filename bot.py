@@ -1,11 +1,17 @@
 import asyncio
+import hashlib
+import hmac
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiohttp import web
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import config
@@ -161,6 +167,21 @@ TEXTS = {
     }
 }
 
+TEXTS["ru"]["referral_info"] = (
+    "👥 *Реферальная программа*\n\n"
+    f"🎁 За каждого друга, который оформит покупку: *+{REFERRAL_BONUS_DAYS} дней* бесплатного доступа.\n\n"
+    "📌 Твоя ссылка:\n`{ref_link}`\n\n"
+    "📊 Приглашено: *{count}*\n🎁 Получено бонусов: *{bonuses}*"
+)
+TEXTS["en"]["referral_info"] = (
+    "👥 *Referral Program*\n\n"
+    f"🎁 For every friend who makes a purchase: *+{REFERRAL_BONUS_DAYS} free days*.\n\n"
+    "📌 Your link:\n`{ref_link}`\n\n"
+    "📊 Invited: *{count}*\n🎁 Bonuses received: *{bonuses}*"
+)
+TEXTS["ru"]["referral_welcome"] = "👋 Тебя пригласил друг!\n\n🎁 Когда ты оформишь покупку, друг получит *+10 дней* доступа.\n\n🔐 Выбери продукт:"
+TEXTS["en"]["referral_welcome"] = "👋 Invited by a friend!\n\n🎁 When you make a purchase, your friend gets *+10 free days*.\n\n🔐 Choose a product:"
+
 def t(lang, key, **kw):
     text = TEXTS.get(lang, TEXTS["ru"]).get(key, key)
     return text.format(**kw) if kw else text
@@ -251,9 +272,8 @@ def payment_keyboard(plan_key, lang):
     b = InlineKeyboardBuilder()
     b.button(text=t(lang, "btn_paid"), callback_data=f"check_{plan_key}")
     b.button(text=t(lang, "btn_qr"), callback_data=f"qr_{plan_key}")
-    b.button(text="🎟 " + ("Промокод" if lang == "ru" else "Promo code"), callback_data=f"promo_for_plan_{plan_key}")
     b.button(text=t(lang, "btn_back"), callback_data="back_plans")
-    b.adjust(2, 1, 1)
+    b.adjust(2, 1)
     return b.as_markup()
 
 def referral_keyboard(lang):
@@ -267,7 +287,6 @@ def referral_keyboard(lang):
 def referral_keyboard_with_earnings(lang):
     """Referral keyboard ar earnings"""
     b = InlineKeyboardBuilder()
-    b.button(text="💰 " + ("Доходы" if lang == "ru" else "Earnings"), callback_data="ref_earnings_page")
     b.button(text="👥 " + ("Мои рефералы" if lang == "ru" else "My referrals"), callback_data="ref_my_list")
     b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
     b.adjust(1)
@@ -275,6 +294,9 @@ def referral_keyboard_with_earnings(lang):
 
 
 # ─── FIRST-TIME LANGUAGE SELECTION ───
+
+class RegistrationEmailState(StatesGroup):
+    waiting_email = State()
 
 def _first_time_lang_keyboard(ref_param=None):
     """Valodas izvēle jaunajiem lietotājiem"""
@@ -286,7 +308,7 @@ def _first_time_lang_keyboard(ref_param=None):
 
 
 @dp.callback_query(F.data.startswith("first_lang_"))
-async def first_lang_selected(callback: CallbackQuery):
+async def first_lang_selected(callback: CallbackQuery, state: FSMContext):
     """Jauns lietotājs izvēlējās valodu — startē onboarding"""
     lang = callback.data.replace("first_lang_", "")
     if lang not in ("ru", "en"):
@@ -301,9 +323,37 @@ async def first_lang_selected(callback: CallbackQuery):
     except:
         pass
     
-    # Startēt onboarding
-    await _send_onboarding(callback.message, lang, name)
+    if lang == "ru":
+        text = (
+            "📧 *Укажи свой e-mail*\n\n"
+            "К нему будет привязана подписка и доступ. После оплаты на сайте бот сверит покупку по этому e-mail.\n\n"
+            "_Отправь e-mail одним сообщением:_"
+        )
+    else:
+        text = (
+            "📧 *Enter your e-mail*\n\n"
+            "Your subscription and access will be linked to it. After website payment the bot will verify the purchase by this e-mail.\n\n"
+            "_Send your e-mail as one message:_"
+        )
+    await state.set_state(RegistrationEmailState.waiting_email)
+    await state.update_data(reg_lang=lang, reg_name=name)
+    await callback.message.answer(text, parse_mode="Markdown")
     await callback.answer()
+
+
+@dp.message(RegistrationEmailState.waiting_email)
+async def registration_receive_email(message: Message, state: FSMContext):
+    email = (message.text or "").strip().lower()
+    data = await state.get_data()
+    lang = data.get("reg_lang", "ru")
+    name = data.get("reg_name", md_escape(message.from_user.first_name))
+    if "@" not in email or "." not in email or len(email) < 5:
+        await message.answer("❌ " + ("Неверный e-mail. Попробуй ещё:" if lang == "ru" else "Invalid e-mail. Try again:"))
+        return
+    await db.set_user_email(message.from_user.id, email)
+    await state.clear()
+    await message.answer(("✅ E-mail сохранён." if lang == "ru" else "✅ E-mail saved."), parse_mode="Markdown")
+    await _send_onboarding(message, lang, name)
 
 
 # ─── ONBOARDING FLOW ───
@@ -1371,7 +1421,6 @@ async def _show_course_payment(callback, course_key, email, lang):
     
     b = InlineKeyboardBuilder()
     b.button(text="✅ " + ("Я оплатил" if lang == "ru" else "I paid"), callback_data=f"check_course_{course_key}")
-    b.button(text="🎟 " + ("Промокод" if lang == "ru" else "Promo code"), callback_data=f"promo_for_course_{course_key}")
     b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data=f"course_info_{course_key}")
     b.adjust(1)
     
@@ -1534,7 +1583,6 @@ async def course_selected(callback: CallbackQuery):
         )
     b = InlineKeyboardBuilder()
     b.button(text="✅ " + ("Я оплатил" if lang == "ru" else "I paid"), callback_data=f"check_course_{course_key}")
-    b.button(text="🎟 " + ("Промокод" if lang == "ru" else "Promo code"), callback_data=f"promo_for_course_{course_key}")
     b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="courses_crypto")
     b.adjust(1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1574,7 +1622,7 @@ async def check_course_payment(callback: CallbackQuery):
         # REFERRAL COMMISSION 15%
         # ═══════════════════════════════════════════════════════════════
         ref = await db.get_referral_by_referred(user_id)
-        if ref:
+        if ref and False:
             referrer_id = ref['referrer_id']
             commission = round(expected * (config.REFERRAL_COMMISSION_COURSES / 100), 2)
             
@@ -1709,6 +1757,14 @@ async def plan_selected(callback: CallbackQuery):
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
+    if not (user and user.get("email")):
+        await callback.message.edit_text(
+            "📧 " + ("Сначала укажи e-mail в настройках. Он нужен для привязки доступа." if lang == "ru" else "Please set your e-mail in Settings first. It is needed to link your access."),
+            reply_markup=main_menu_keyboard(lang),
+            parse_mode="Markdown"
+        )
+        await callback.answer()
+        return
     saved = await db.get_setting(f"price_{plan_key}")
     base = float(saved) if saved else plan['price_usdt']
     
@@ -1792,6 +1848,21 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
             bexp = (rb if rb > now else now) + timedelta(days=REFERRAL_BONUS_DAYS)
             await db.activate_subscription(user_id=ref["referrer_id"], username=referrer.get("username"), plan_key=referrer.get("plan_key") or "referral_bonus", plan_name=f"Referral Bonus +{REFERRAL_BONUS_DAYS}d", expires_at=bexp, tx_hash=f"ref_bonus_{user_id}_{int(now.timestamp())}")
             await db.mark_referral_bonus_given(user_id)
+            ref_lang = referrer.get("lang", "ru")
+            ref_text = (
+                f"🎁 *Бонус за друга!*\n\nТвой реферал оформил подписку.\nТебе добавлено *+{REFERRAL_BONUS_DAYS} дней* бесплатного доступа."
+                if ref_lang == "ru"
+                else f"🎁 *Referral bonus!*\n\nYour referral purchased a subscription.\nYou received *+{REFERRAL_BONUS_DAYS} free days*."
+            )
+            try:
+                await bot.send_message(ref["referrer_id"], ref_text, parse_mode="Markdown")
+            except Exception as e:
+                logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
+            uname = f"@{username}" if username else f"ID {user_id}"
+            for aid in config.ADMIN_IDS:
+                try: await bot.send_message(aid, f"ðŸ’° *Jauns maksÄjums!*\n\nðŸ‘¤ {uname} (`{user_id}`)\nðŸ“¦ *{plan_name_loc}*\nðŸ’µ *{amount} USDT*\nðŸ“… LÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*\nðŸ”– TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
+                except: pass
+            return new_exp, plan_name_loc
             
             # 2. Give 20% commission (chat subscription)
             commission = round(amount * (config.REFERRAL_COMMISSION_CHAT / 100), 2)
@@ -2220,7 +2291,6 @@ async def run_monthly_giveaway():
 # Modificētā referral_keyboard ar earnings support
 def referral_keyboard_with_earnings(lang):
     b = InlineKeyboardBuilder()
-    b.button(text="💰 " + ("Доходы" if lang == "ru" else "Earnings"), callback_data="ref_earnings_page")
     b.button(text="👥 " + ("Мои рефералы" if lang == "ru" else "My referrals"), callback_data="ref_my_list")
     b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
     b.adjust(1)
@@ -2616,9 +2686,22 @@ Thank you for {consecutive_months} months of loyalty! 🏆"""
         
         text += "\n\n💡 *Keep renewing - maintain your status!*"
     
+    if lang == 'ru':
+        text = (
+            f"📊 *Твой прогресс лояльности*\n\n"
+            f"{emoji} *{tag.upper()}*\n"
+            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} месяцев\n\n"
+            "🎁 Чем дольше активна подписка, тем больше бесплатных дней ты получаешь."
+        )
+    else:
+        text = (
+            f"📊 *Your Loyalty Progress*\n\n"
+            f"{emoji} *{tag.upper()}*\n"
+            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} months\n\n"
+            "🎁 The longer your subscription stays active, the more free bonus days you unlock."
+        )
+
     b = InlineKeyboardBuilder()
-    b.button(text="💳 " + ("Мои промокоды" if lang == 'ru' else "My Promo Codes"), 
-             callback_data="my_promo_codes")
     b.button(text="💎 " + ("Продлить" if lang == 'ru' else "Renew"), 
              callback_data="vip_chat_plans")
     b.adjust(1)
@@ -2767,10 +2850,23 @@ async def loyalty_status_callback(callback: CallbackQuery):
                 f"🙏 Thank you for *{consecutive_months}* months with us! 🏆"
             )
     
+    if lang == 'ru':
+        text = (
+            f"🏆 *Твой уровень лояльности*\n\n"
+            f"{emoji} *{tag.upper()}*\n"
+            f"{bar} *{progress_pct}%*\n\n"
+            "🎁 Лояльность теперь даёт бонусные бесплатные дни за длительную активную подписку."
+        )
+    else:
+        text = (
+            f"🏆 *Your Loyalty Level*\n\n"
+            f"{emoji} *{tag.upper()}*\n"
+            f"{bar} *{progress_pct}%*\n\n"
+            "🎁 Loyalty now rewards long active subscriptions with free bonus days."
+        )
+
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     b = InlineKeyboardBuilder()
-    b.button(text="💳  " + ("Мои промокоды" if lang == 'ru' else "My Promo Codes"), 
-             callback_data="my_promo_codes")
     b.button(text="📋  " + ("Все уровни и бонусы" if lang == 'ru' else "All levels & rewards"),
              callback_data="loyalty_tiers_info")
     # Course upsell poga priekš Rookie/Active
@@ -3190,8 +3286,115 @@ async def survey_custom_text(message: Message, state: FSMContext):
 
 
 
+def _verify_webhook_request(raw_body: bytes, request: web.Request) -> bool:
+    if not config.WEBHOOK_SECRET:
+        return True
+    provided_secret = request.headers.get("X-Webhook-Secret", "")
+    if hmac.compare_digest(provided_secret, config.WEBHOOK_SECRET):
+        return True
+    provided_sig = request.headers.get("X-Webhook-Signature", "")
+    expected_sig = hmac.new(config.WEBHOOK_SECRET.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(provided_sig, expected_sig)
+
+
+def _webhook_plan_from_payload(payload: dict):
+    product_key = str(payload.get("product_key") or payload.get("product") or "").strip()
+    days_raw = payload.get("subscription_days") or payload.get("days") or payload.get("duration_days")
+    if product_key in config.PLANS:
+        plan = dict(config.PLANS[product_key])
+    else:
+        if not days_raw:
+            return None, None, "unknown_product"
+        plan = {
+            "name": {"ru": product_key or "Website subscription", "en": product_key or "Website subscription"},
+            "days": int(days_raw),
+            "price_usdt": float(payload.get("amount") or 0),
+            "emoji": "🌐",
+        }
+    if days_raw:
+        plan["days"] = int(days_raw)
+    return product_key or "website_subscription", plan, None
+
+
+async def website_purchase_webhook(request: web.Request):
+    raw_body = await request.read()
+    if not _verify_webhook_request(raw_body, request):
+        return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        return web.json_response({"ok": False, "error": "invalid_json"}, status=400)
+
+    email = str(payload.get("email") or payload.get("user_email") or "").strip().lower()
+    payment_system = str(payload.get("payment_system") or payload.get("payment_method") or "").strip()
+    event_id = str(payload.get("event_id") or payload.get("order_id") or payload.get("payment_id") or "").strip()
+    amount = float(payload.get("amount") or payload.get("amount_usd") or payload.get("amount_usdt") or 0)
+    product_key, plan, plan_error = _webhook_plan_from_payload(payload)
+
+    if not email or "@" not in email:
+        return web.json_response({"ok": False, "error": "email_required"}, status=400)
+    if plan_error:
+        return web.json_response({"ok": False, "error": plan_error}, status=400)
+    if not event_id:
+        event_id = hashlib.sha256(raw_body).hexdigest()
+    event_key = f"{payment_system or 'website'}:{event_id}"
+    tx_hash = f"webhook:{event_key}"
+
+    if await db.webhook_event_exists(event_key):
+        return web.json_response({"ok": True, "duplicate": True})
+
+    user = await db.get_user_by_email(email)
+    if not user:
+        for aid in config.ADMIN_IDS:
+            try:
+                await bot.send_message(aid, f"⚠️ *Webhook purchase without bot user*\n\n📧 `{email}`\n📦 `{product_key}`\n💳 `{payment_system}`", parse_mode="Markdown")
+            except Exception:
+                pass
+        return web.json_response({"ok": False, "error": "email_not_registered"}, status=404)
+
+    lang = user.get("lang", "ru")
+    username = user.get("username") or ""
+    await db.save_webhook_event(event_key, email, product_key, payment_system, json.dumps(payload, ensure_ascii=False))
+    new_exp, plan_name = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
+
+    try:
+        try:
+            link = await bot.create_chat_invite_link(config.CHAT_ID, member_limit=1, expire_date=int((new_exp + timedelta(days=7)).timestamp()))
+            invite = t(lang, "invite", link=link.invite_link)
+        except Exception:
+            invite = f"\n\n📢 {config.CHAT_LINK}"
+        await bot.send_message(user["user_id"], t(lang, "paid_ok", name=plan_name, expires=new_exp.strftime("%d.%m.%Y"), tx=event_id[:20]) + invite, parse_mode="Markdown")
+    except Exception as e:
+        logger.warning(f"Failed to notify webhook buyer {user['user_id']}: {e}")
+
+    return web.json_response({
+        "ok": True,
+        "telegram_user_id": user["user_id"],
+        "email": email,
+        "product_key": product_key,
+        "expires_at": new_exp.isoformat(),
+    })
+
+
+async def webhook_health(request: web.Request):
+    return web.json_response({"ok": True})
+
+
+async def start_webhook_server():
+    app = web.Application()
+    app.router.add_get("/health", webhook_health)
+    app.router.add_post(config.WEBHOOK_PATH, website_purchase_webhook)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, config.WEBHOOK_HOST, config.WEBHOOK_PORT)
+    await site.start()
+    logger.info(f"Webhook server started on {config.WEBHOOK_HOST}:{config.WEBHOOK_PORT}{config.WEBHOOK_PATH}")
+    return runner
+
+
 async def main():
     await db.init()
+    webhook_runner = await start_webhook_server()
     
     # ═══════════════════════════════════════════════════════════════
     # LOYALTY SYSTEM INITIALIZATION
@@ -3242,7 +3445,10 @@ async def main():
     scheduler.add_job(run_monthly_giveaway, 'cron', day=1, hour=12, minute=0)
     scheduler.start()
     logger.info("Bot started!")
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await webhook_runner.cleanup()
 
 if __name__ == "__main__":
     asyncio.run(main())
