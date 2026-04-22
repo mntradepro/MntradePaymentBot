@@ -37,6 +37,8 @@ TEXTS = {
     "ru": {
         "welcome": "👋 Привет, {name}!\n\n🔐 Это эксклюзивный платный чат трейдеров.\n\n📋 *Выбери свой тарифный план:*",
         "active_sub": "👋 Привет, {name}!\n\n✅ Подписка активна до *{expires}*\n📦 Тариф: *{plan}*\n⏳ Осталось: *{days}* дн.",
+        "inactive_welcome": "👋 Привет, {name}!\n\n❌ Сейчас у тебя нет активной подписки.\n\n👥 Приглашай друзей и получай бесплатный доступ к чату и курсам!\n\n📋 *Выбери продукт:*",
+        "inactive_welcome_note": "❌ Сейчас у тебя нет активной подписки.\n\n👥 Приглашай друзей и получай бесплатный доступ к чату и курсам!",
         "choose_plan": "📋 *Выбери свой тарифный план:*",
         "payment_title": "{emoji} *{name}*\n\n💰 Цена: *{price}* ({usdt} USDT)\n📅 Срок: *{days} дней*\n\n━━━━━━━━━━━━━━━━\n📤 Отправь ровно *{usdt} USDT (BEP-20)* на:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Важно:\n• Только *USDT BEP-20* (сеть BSC)\n• Сумма: *{usdt} USDT*\n• После отправки нажми кнопку ниже",
         "paid_ok": "✅ *Платёж подтверждён!*\n\n📦 Тариф: *{name}*\n📅 Активен до: *{expires}*\n🔖 TX: `{tx}`",
@@ -106,6 +108,8 @@ TEXTS = {
     "en": {
         "welcome": "👋 Hello, {name}!\n\n🔐 This is an exclusive paid traders chat.\n\n📋 *Choose your subscription plan:*",
         "active_sub": "👋 Hello, {name}!\n\n✅ Subscription active until *{expires}*\n📦 Plan: *{plan}*\n⏳ Days left: *{days}*",
+        "inactive_welcome": "👋 Hello, {name}!\n\n❌ You do not have an active subscription right now.\n\n👥 Invite friends and get free access to the chat and courses!\n\n📋 *Choose a product:*",
+        "inactive_welcome_note": "❌ You do not have an active subscription right now.\n\n👥 Invite friends and get free access to the chat and courses!",
         "choose_plan": "📋 *Choose your subscription plan:*",
         "payment_title": "{emoji} *{name}*\n\n💰 Price: *{price}* ({usdt} USDT)\n📅 Duration: *{days} days*\n\n━━━━━━━━━━━━━━━━\n📤 Send exactly *{usdt} USDT (BEP-20)* to:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Only *USDT BEP-20* (BSC)\n• Amount: *{usdt} USDT*\n• Press button after sending",
         "paid_ok": "✅ *Payment confirmed!*\n\n📦 Plan: *{name}*\n📅 Active until: *{expires}*\n🔖 TX: `{tx}`",
@@ -192,6 +196,8 @@ TEXTS["lv"] = {
     **TEXTS["en"],
     "welcome": "👋 Sveiks, {name}!\n\n🔐 Šis ir slēgts maksas treideru community.\n\n📋 *Izvēlies abonementa plānu:*",
     "active_sub": "👋 Sveiks, {name}!\n\n✅ Abonements aktīvs līdz *{expires}*\n📦 Plāns: *{plan}*\n⏳ Atlikušas dienas: *{days}*",
+    "inactive_welcome": "👋 Sveiks, {name}!\n\n❌ Tev šobrīd nav aktīva abonementa.\n\n👥 Uzaicini draugus un dabū bezmaksas piekļuvi chatam un kursiem!\n\n📋 *Izvēlies produktu:*",
+    "inactive_welcome_note": "❌ Tev šobrīd nav aktīva abonementa.\n\n👥 Uzaicini draugus un dabū bezmaksas piekļuvi chatam un kursiem!",
     "choose_plan": "📋 *Izvēlies abonementa plānu:*",
     "payment_title": "{emoji} *{name}*\n\n💰 Cena: *{price}* ({usdt} USDT)\n📅 Termiņš: *{days} dienas*\n\n━━━━━━━━━━━━━━━━\n📤 Nosūti tieši *{usdt} USDT (BEP-20)* uz:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Tikai *USDT BEP-20* (BSC)\n• Summa: *{usdt} USDT*\n• Pēc maksājuma nospied pogu zemāk",
     "paid_ok": "✅ *Maksājums apstiprināts!*\n\n📦 Plāns: *{name}*\n📅 Aktīvs līdz: *{expires}*\n🔖 TX: `{tx}`",
@@ -217,6 +223,16 @@ TEXTS["lv"] = {
 def t(lang, key, **kw):
     text = TEXTS.get(lang, TEXTS["ru"]).get(key, key)
     return text.format(**kw) if kw else text
+
+async def inactive_welcome_text(lang, name):
+    custom_welcome = await db.get_setting(f"welcome_{lang}")
+    if custom_welcome:
+        return (
+            custom_welcome.replace("{name}", name)
+            + "\n\n"
+            + t(lang, "inactive_welcome_note")
+        )
+    return t(lang, "inactive_welcome", name=name)
 
 def md_escape(text):
     if not text: return ""
@@ -707,11 +723,7 @@ async def cmd_start(message: Message, state: FSMContext):
         if referral:
             await message.answer(t(lang, "referral_welcome"), reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
         else:
-            custom_welcome = await db.get_setting(f"welcome_{lang}")
-            if custom_welcome:
-                welcome_text = custom_welcome.replace("{name}", name)
-            else:
-                welcome_text = t(lang, "welcome", name=name)
+            welcome_text = await inactive_welcome_text(lang, name)
             await message.answer(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
 
 @dp.callback_query(F.data.startswith("lang_"))
@@ -725,11 +737,7 @@ async def lang_selected(callback: CallbackQuery):
         expires_dt = datetime.fromisoformat(user["expires_at"]); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
         # Custom welcome no DB (tāpat kā cmd_start)
-        custom_welcome = await db.get_setting(f"welcome_{lang}")
-        if custom_welcome:
-            welcome_text = custom_welcome.replace("{name}", name)
-        else:
-            welcome_text = t(lang, "welcome", name=name)
+        welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
@@ -882,11 +890,7 @@ async def ref_back_start(callback: CallbackQuery):
     if user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
         expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
-        custom_welcome = await db.get_setting(f"welcome_{lang}")
-        if custom_welcome:
-            welcome_text = custom_welcome.replace("{name}", name)
-        else:
-            welcome_text = t(lang, "welcome", name=name)
+        welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
@@ -1067,11 +1071,7 @@ async def settings_back(callback: CallbackQuery):
         expires = datetime.fromisoformat(user['expires_at']).strftime("%d.%m.%Y")
         expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
-        custom_welcome = await db.get_setting(f"welcome_{lang}")
-        if custom_welcome:
-            welcome_text = custom_welcome.replace("{name}", name)
-        else:
-            welcome_text = t(lang, "welcome", name=name)
+        welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
@@ -2235,11 +2235,7 @@ async def back_to_main_menu(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
         # Neaktīviem - main_menu
-        custom_welcome = await db.get_setting(f"welcome_{lang}")
-        if custom_welcome:
-            welcome_text = custom_welcome.replace("{name}", name)
-        else:
-            welcome_text = t(lang, "welcome", name=name)
+        welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
     
     await callback.answer()
@@ -3396,11 +3392,7 @@ async def start_back_callback(callback: CallbackQuery):
         welcome_text = t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=days_left) + loyalty_line
         await callback.message.edit_text(welcome_text, reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
-        custom_welcome = await db.get_setting(f"welcome_{lang}")
-        if custom_welcome:
-            welcome_text = custom_welcome.replace("{name}", name)
-        else:
-            welcome_text = t(lang, "welcome", name=name)
+        welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
