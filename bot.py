@@ -813,14 +813,14 @@ async def cmd_language(message: Message):
 async def cmd_support(message: Message):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    await message.answer(t(lang, "support", contact=config.SUPPORT_CONTACT), parse_mode="Markdown")
+    await message.answer(t(lang, "support", contact=config.SUPPORT_CONTACT))
 
 @dp.callback_query(F.data == "user_support")
 async def cb_support(callback: CallbackQuery):
+    await callback.answer()
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    await callback.message.answer(t(lang, "support", contact=config.SUPPORT_CONTACT), parse_mode="Markdown")
-    await callback.answer()
+    await callback.message.answer(t(lang, "support", contact=config.SUPPORT_CONTACT))
 
 @dp.message(Command("status"))
 async def cmd_status(message: Message):
