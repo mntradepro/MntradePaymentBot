@@ -270,6 +270,10 @@ def back_button_text(lang):
 def paid_button_text(lang):
     return "✅ " + ui_text(lang, "Es samaksāju", "Я оплатил", "I paid")
 
+def menu_button(emoji, label, width=34):
+    text = f"{emoji}  {label}"
+    return text + ("\u00a0" * max(0, width - len(text)))
+
 def md_escape(text):
     if not text: return ""
     for ch in ['*','_','`','[',']']: text = text.replace(ch, f'\\{ch}')
@@ -305,29 +309,29 @@ def main_menu_keyboard(lang):
     """Galvenā izvēlne — vienots dizains"""
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text="💎  VIP Treideru čats", callback_data="vip_chat_plans")
-        b.button(text="📚  MNtradepro kursi", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Uzaicini draugu", callback_data="ref_main")
-        b.button(text="🎟  Ikmēneša izloze", callback_data="giveaway_join")
-        b.button(text="⚙️  Iestatījumi", callback_data="user_settings")
-        b.button(text="📩  Atbalsts", callback_data="user_support")
+        b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
+        b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text="💎  VIP чат трейдеров", callback_data="vip_chat_plans")
-        b.button(text="📚  Курсы MNtradepro Academy", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Приглашай и зарабатывай", callback_data="ref_main")
-        b.button(text="🎟  Розыгрыш призов", callback_data="giveaway_join")
-        b.button(text="⚙️  Настройки", callback_data="user_settings")
-        b.button(text="📩  Поддержка", callback_data="user_support")
+        b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
+        b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
-        b.button(text="💎  VIP Traders Chat", callback_data="vip_chat_plans")
-        b.button(text="📚  MNtradepro Courses", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Invite & Earn", callback_data="ref_main")
-        b.button(text="🎟  Monthly Giveaway", callback_data="giveaway_join")
-        b.button(text="⚙️  Settings", callback_data="user_settings")
-        b.button(text="📩  Support", callback_data="user_support")
+        b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
+        b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
@@ -359,32 +363,32 @@ def active_keyboard(lang):
     """Keyboard aktīvajiem abonentiem — vienots dizains"""
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text="🔄  Mainīt / pagarināt plānu", callback_data="vip_chat_plans")
-        b.button(text="💎  Mans lojalitātes līmenis", callback_data="loyalty_status")
-        b.button(text="📚  MNtradepro kursi", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Uzaicini draugu", callback_data="ref_main")
-        b.button(text="🎟  Ikmēneša izloze", callback_data="giveaway_join")
-        b.button(text="⚙️  Iestatījumi", callback_data="user_settings")
-        b.button(text="📩  Atbalsts", callback_data="user_support")
+        b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
+        b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text="🔄  Сменить / продлить тариф", callback_data="vip_chat_plans")
-        b.button(text="💎  Мой уровень лояльности", callback_data="loyalty_status")
-        b.button(text="📚  Курсы MNtradepro Academy", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Приглашай и зарабатывай", callback_data="ref_main")
-        b.button(text="🎟  Розыгрыш призов", callback_data="giveaway_join")
-        b.button(text="⚙️  Настройки", callback_data="user_settings")
-        b.button(text="📩  Поддержка", callback_data="user_support")
+        b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
+        b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
-        b.button(text="🔄  Change / Renew Plan", callback_data="vip_chat_plans")
-        b.button(text="💎  My Loyalty Level", callback_data="loyalty_status")
-        b.button(text="📚  MNtradepro Courses", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Invite & Earn", callback_data="ref_main")
-        b.button(text="🎟  Monthly Giveaway", callback_data="giveaway_join")
-        b.button(text="⚙️  Settings", callback_data="user_settings")
-        b.button(text="📩  Support", callback_data="user_support")
+        b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
+        b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
@@ -570,29 +574,29 @@ def _urgency_keyboard(lang):
     """Keyboard ar urgency — Pagarināt tagad pogu augšā"""
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text="🚨  Pagarināt tagad!", callback_data="vip_chat_plans")
-        b.button(text="💎  Mans lojalitātes līmenis", callback_data="loyalty_status")
-        b.button(text="📚  MNtradepro kursi", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Uzaicini draugu", callback_data="ref_main")
-        b.button(text="⚙️  Iestatījumi", callback_data="user_settings")
-        b.button(text="📩  Atbalsts", callback_data="user_support")
+        b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text="🚨  Продлить сейчас!", callback_data="vip_chat_plans")
-        b.button(text="💎  Мой уровень лояльности", callback_data="loyalty_status")
-        b.button(text="📚  Курсы MNtradepro Academy", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Приглашай и зарабатывай", callback_data="ref_main")
-        b.button(text="⚙️  Настройки", callback_data="user_settings")
-        b.button(text="📩  Поддержка", callback_data="user_support")
+        b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
-        b.button(text="🚨  Renew Now!", callback_data="vip_chat_plans")
-        b.button(text="💎  My Loyalty Level", callback_data="loyalty_status")
-        b.button(text="📚  MNtradepro Courses", callback_data="courses_menu")
-        b.button(text="📡  Tirgus Skaneris/AI signāli", url="https://t.me/promarketscanner")
-        b.button(text="👥  Invite & Earn", callback_data="ref_main")
-        b.button(text="⚙️  Settings", callback_data="user_settings")
-        b.button(text="📩  Support", callback_data="user_support")
+        b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
@@ -821,6 +825,19 @@ async def cb_support(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     await callback.message.answer(t(lang, "support", contact=config.SUPPORT_CONTACT))
+
+@dp.callback_query(F.data == "market_scanner")
+async def cb_market_scanner(callback: CallbackQuery):
+    await callback.answer()
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "ru") if user else "ru"
+    text = ui_text(
+        lang,
+        "📡 Tirgus Skaneris/AI signāli:\nhttps://t.me/promarketscanner",
+        "📡 Tirgus Skaneris/AI signāli:\nhttps://t.me/promarketscanner",
+        "📡 Tirgus Skaneris/AI signāli:\nhttps://t.me/promarketscanner",
+    )
+    await callback.message.answer(text)
 
 @dp.message(Command("status"))
 async def cmd_status(message: Message):
