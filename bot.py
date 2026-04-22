@@ -232,6 +232,10 @@ def chat_link_for_lang(lang):
 async def checkout_url_for_lang(lang):
     return (await db.get_setting(f"checkout_url_{lang}")) or ""
 
+
+async def checkout_url_for_course(course_key):
+    return (await db.get_setting(f"course_checkout_url_{course_key}")) or ""
+
 _active_payment_sessions = {}
 PAYMENT_TIMEOUT_SEC = 15 * 60
 PAYMENT_POLL_INTERVAL = 10
@@ -1496,16 +1500,25 @@ async def course_info_menu(callback: CallbackQuery):
             "Choose payment method:"
         )
     
-    courses_url = "https://www.mntradepro.com/ru" if ui_lang == "ru" else "https://www.mntradepro.com"
+    checkout_url = await checkout_url_for_course(course_key)
     
     b = InlineKeyboardBuilder()
-    b.button(text="💳 " + ("Pirkt ar karti / banku" if ui_lang == "lv" else "Купить картой / банком"), url=courses_url)
-    b.button(text="🪙 " + ("Maksāt ar crypto" if ui_lang == "lv" else "Оплатить криптой"), callback_data=f"course_crypto_{course_key}")
+    if checkout_url:
+        b.button(text="💳 " + ("Pirkt ar karti / banku" if ui_lang == "lv" else "Купить картой / банком"), url=checkout_url)
+        b.button(text="🪙 " + ("Maksāt ar crypto" if ui_lang == "lv" else "Оплатить криптой"), url=checkout_url)
+    else:
+        b.button(text="💳 " + ("Pirkt ar karti / banku" if ui_lang == "lv" else "Купить картой / банком"), callback_data=f"course_checkout_missing_{course_key}")
+        b.button(text="🪙 " + ("Maksāt ar crypto" if ui_lang == "lv" else "Оплатить криптой"), callback_data=f"course_checkout_missing_{course_key}")
     b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_menu")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
     await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("course_checkout_missing_"))
+async def course_checkout_missing(callback: CallbackQuery):
+    await callback.answer("Checkout links šim kursam vēl nav iestatīts admin panelī.", show_alert=True)
 
 
 @dp.callback_query(F.data.startswith("course_crypto_"))

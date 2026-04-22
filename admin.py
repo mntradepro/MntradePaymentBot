@@ -1067,16 +1067,25 @@ async def adm_edit_prices(callback: CallbackQuery):
         return
     lv_url = await db.get_setting("checkout_url_lv") or "— nav iestatīts"
     ru_url = await db.get_setting("checkout_url_ru") or "— nav iestatīts"
+    course_lines = []
     builder = InlineKeyboardBuilder()
     builder.button(text="🇱🇻 Latviešu checkout links", callback_data="adm_checkout_lv")
     builder.button(text="🇷🇺 Русский checkout links", callback_data="adm_checkout_ru")
+    for key, course in config.COURSES.items():
+        name = course["name"].get("lv") if isinstance(course.get("name"), dict) else course.get("name", key)
+        url = await db.get_setting(f"course_checkout_url_{key}") or "— nav iestatīts"
+        course_lines.append(f"• {name}: `{url}`")
+        builder.button(text=f"📚 {name}", callback_data=f"adm_checkout_course_{key}")
     builder.button(text="🔙 Atpakaļ", callback_data="adm_main")
     builder.adjust(1)
     await callback.message.edit_text(
-        "🔗 *Checkout linki VIP čatiem*\n\n"
-        "Šie linki ir pogām, kur lietotājs izvēlas VIP čatu. Pirkums notiek mājaslapā, un pēc tam mājaslapa sūta webhook botam.\n\n"
+        "🔗 *Checkout linki*\n\n"
+        "Šie linki tiek izmantoti pogām, kur lietotājs tiek virzīts uz mājaslapas checkout. Pēc apmaksas mājaslapa sūta webhook botam.\n\n"
+        "*VIP čati:*\n"
         f"🇱🇻 LV: `{lv_url}`\n"
-        f"🇷🇺 RU: `{ru_url}`",
+        f"🇷🇺 RU: `{ru_url}`\n\n"
+        "*Kursi:*\n"
+        + "\n".join(course_lines),
         reply_markup=builder.as_markup(),
         parse_mode="Markdown"
     )
@@ -1087,15 +1096,27 @@ async def adm_edit_prices(callback: CallbackQuery):
 async def adm_checkout_select(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
-    lang_code = callback.data.replace("adm_checkout_", "")
-    if lang_code not in ("lv", "ru"):
+    checkout_code = callback.data.replace("adm_checkout_", "")
+    if checkout_code in ("lv", "ru"):
+        setting_key = f"checkout_url_{checkout_code}"
+        title = f"VIP checkout links ({checkout_code.upper()})"
+    elif checkout_code.startswith("course_"):
+        course_key = checkout_code.replace("course_", "")
+        course = config.COURSES.get(course_key)
+        if not course:
+            await callback.answer("Nav", show_alert=True)
+            return
+        name = course["name"].get("lv") if isinstance(course.get("name"), dict) else course.get("name", course_key)
+        setting_key = f"course_checkout_url_{course_key}"
+        title = f"Kursa checkout links: {name}"
+    else:
         await callback.answer("Nav", show_alert=True)
         return
-    current = await db.get_setting(f"checkout_url_{lang_code}") or "— nav iestatīts"
+    current = await db.get_setting(setting_key) or "— nav iestatīts"
     await state.set_state(EditState.waiting_checkout_url)
-    await state.update_data(checkout_lang=lang_code)
+    await state.update_data(checkout_setting_key=setting_key, checkout_title=title)
     await callback.message.edit_text(
-        f"🔗 *Checkout links ({lang_code.upper()})*\n\n"
+        f"🔗 *{title}*\n\n"
         f"Pašreizējais:\n`{current}`\n\n"
         "Ievadi jauno mājaslapas checkout linku:\n/cancel",
         parse_mode="Markdown"
@@ -1116,10 +1137,11 @@ async def adm_receive_checkout_url(message: Message, state: FSMContext):
         await message.answer("❌ Ievadi pilnu linku, piemēram `https://...`", parse_mode="Markdown")
         return
     data = await state.get_data()
-    lang_code = data.get("checkout_lang", "lv")
-    await db.set_setting(f"checkout_url_{lang_code}", url)
+    setting_key = data.get("checkout_setting_key") or "checkout_url_lv"
+    title = data.get("checkout_title") or setting_key
+    await db.set_setting(setting_key, url)
     await state.clear()
-    await message.answer(f"✅ Checkout links ({lang_code.upper()}) saglabāts:\n{url}", reply_markup=admin_menu_kb())
+    await message.answer(f"✅ {title} saglabāts:\n{url}", reply_markup=admin_menu_kb())
 
 
 @router.callback_query(F.data.startswith("adm_cprice_"))
