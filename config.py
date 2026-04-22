@@ -13,6 +13,14 @@ class Config:
     BOT_TOKEN: str = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
     CHAT_ID: int = int(os.getenv("CHAT_ID", "-1001234567890"))
     CHAT_LINK: str = os.getenv("CHAT_LINK", "https://t.me/+xxxx")
+    CHAT_IDS: Dict[str, int] = field(default_factory=lambda: {
+        lang: int(os.getenv(f"CHAT_ID_{lang.upper()}", os.getenv("CHAT_ID", "-1001234567890")))
+        for lang in ("lv", "en", "ru")
+    })
+    CHAT_LINKS: Dict[str, str] = field(default_factory=lambda: {
+        lang: os.getenv(f"CHAT_LINK_{lang.upper()}", os.getenv("CHAT_LINK", "https://t.me/+xxxx"))
+        for lang in ("lv", "en", "ru")
+    })
     CRYPTO_WALLET: str = os.getenv("CRYPTO_WALLET", "0xYourBEP20WalletHere")
 
     # Website purchase webhook
@@ -39,29 +47,29 @@ class Config:
 
     PLANS: Dict[str, Any] = field(default_factory=lambda: {
         "monthly": {
-            "name": {"ru": "1 Месяц", "en": "1 Month"},
-            "price_usd": "10$",
+            "name": {"ru": "1 Месяц", "en": "1 Month", "lv": "1 mēnesis"},
+            "price_usd": "10€",
             "price_usdt": 10.0,
             "days": 30,
             "emoji": "📅",
         },
         "halfyear": {
-            "name": {"ru": "Полгода", "en": "6 Months"},
-            "price_usd": "55$",
+            "name": {"ru": "Полгода", "en": "6 Months", "lv": "6 mēneši"},
+            "price_usd": "55€",
             "price_usdt": 55.0,
             "days": 180,
             "emoji": "⭐",
         },
         "yearly": {
-            "name": {"ru": "1 Год", "en": "1 Year"},
-            "price_usd": "100$",
+            "name": {"ru": "1 Год", "en": "1 Year", "lv": "1 gads"},
+            "price_usd": "100€",
             "price_usdt": 100.0,
             "days": 365,
             "emoji": "🔥",
         },
         "lifetime": {
-            "name": {"ru": "Навсегда", "en": "Lifetime"},
-            "price_usd": "500$",
+            "name": {"ru": "Навсегда", "en": "Lifetime", "lv": "Uz mūžu"},
+            "price_usd": "500€",
             "price_usdt": 500.0,
             "days": 36500,
             "emoji": "💎",
@@ -70,32 +78,32 @@ class Config:
 
     COURSES: Dict[str, Any] = field(default_factory=lambda: {
         "mini": {
-            "name": {"ru": "Мини курс", "en": "Mini Course"},
-            "price_usd": "25$",
+            "name": {"ru": "Мини курс", "en": "Mini Course", "lv": "Mini kurss"},
+            "price_usd": "25€",
             "price_usdt": 25.0,
             "emoji": "📘",
         },
         "basic": {
-            "name": {"ru": "Базовый курс", "en": "Basic Course"},
-            "price_usd": "75$",
+            "name": {"ru": "Базовый курс", "en": "Basic Course", "lv": "Pamata kurss"},
+            "price_usd": "75€",
             "price_usdt": 75.0,
             "emoji": "📗",
         },
         "full": {
-            "name": {"ru": "Полный курс", "en": "Full Course"},
-            "price_usd": "150$",
+            "name": {"ru": "Полный курс", "en": "Full Course", "lv": "Pilnais kurss"},
+            "price_usd": "150€",
             "price_usdt": 150.0,
             "emoji": "📕",
         },
         "autotrading": {
-            "name": {"ru": "Автотрейдинг курс", "en": "Autotrading Course"},
-            "price_usd": "200$",
+            "name": {"ru": "Автотрейдинг курс", "en": "Autotrading Course", "lv": "Autotrading kurss"},
+            "price_usd": "200€",
             "price_usdt": 200.0,
             "emoji": "🤖",
         },
         "vip": {
-            "name": {"ru": "VIP курс", "en": "VIP Course"},
-            "price_usd": "5000$",
+            "name": {"ru": "VIP курс", "en": "VIP Course", "lv": "VIP kurss"},
+            "price_usd": "5000€",
             "price_usdt": 5000.0,
             "emoji": "👑",
         },
@@ -201,6 +209,15 @@ class Config:
         if self.MEGANODE_API_KEY:
             logger.info(f"✅ MegaNode key: {self.MEGANODE_API_KEY[:8]}...")
         logger.info(f"CONFIG: wallet={self.CRYPTO_WALLET[:16]}... support={self.SUPPORT_CONTACT}")
+
+    def chat_id_for_lang(self, lang: str) -> int:
+        return self.CHAT_IDS.get(lang, self.CHAT_ID)
+
+    def chat_link_for_lang(self, lang: str) -> str:
+        return self.CHAT_LINKS.get(lang, self.CHAT_LINK)
+
+    def all_chat_ids(self) -> List[int]:
+        return list(dict.fromkeys([self.CHAT_ID, *self.CHAT_IDS.values()]))
 
 
 config = Config()

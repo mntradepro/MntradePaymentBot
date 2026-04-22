@@ -18,7 +18,7 @@ Example JSON sent by the website:
   "subscription_days": 30,
   "email": "client@example.com",
   "amount": 10.0,
-  "currency": "USD",
+  "currency": "EUR",
   "paid_at": "2026-04-22T15:30:00Z"
 }
 ```
