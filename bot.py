@@ -215,6 +215,29 @@ TEXTS["lv"] = {
     "referral_row_bonus": "✅ {name} — bonuss saņemts",
     "referral_row_pending": "⏳ {name} — gaida pirkumu",
     "referral_bonus_received": "🎉 *Bonuss saņemts!*\n\nTavs draugs veica pirkumu — tev *+10 dienas*!\n📅 Aktīvs līdz: *{expires}*",
+    "referral_earnings": "💰 *Referral ienākumi*\n\n💵 Pieejams izmaksai: *{balance}$*\n📊 Kopā nopelnīts: *{total}$*\n💸 Izmaksāts: *{withdrawn}$*\n\n━━━━━━━━━━━━━━━━\n\n🎯 *Kā tas strādā:*\n• Par katru kursa pirkumu no tava referral saņem *15% komisiju*\n• Minimālā izmaksas summa: *{min}$*\n• Izmaksas manuāli apstrādā administrācija",
+    "withdrawal_button": "💸 Izņemt līdzekļus",
+    "earnings_button": "📊 Ienākumu vēsture",
+    "withdrawal_history_button": "📜 Izmaksu vēsture",
+    "earnings_list": "📊 *Ienākumu vēsture*\n\n{list}\n\n💵 Kopā: *{total}$*",
+    "earnings_empty": "📊 *Ienākumu vēsture*\n\nPagaidām ienākumu nav.\nUzaicini draugus un pelni!",
+    "earnings_row": "• {date} — {name}\n  💰 {amount}$ → 15% = *{commission}$*",
+    "withdrawal_request": "💸 *Izmaksas pieprasījums*\n\n💵 Pieejams: *{balance}$*\n\n⚠️ Izmaksai nepieciešams:\n1. Norādīt e-pastu\n2. Norādīt crypto adresi (BEP-20)\n3. Minimums *{min}$*\n\n📧 _Atsūti savu e-pastu:_\n/cancel lai atceltu",
+    "withdrawal_enter_address": "💸 *Izmaksa*\n\n💵 Summa: *{amount}$*\n📧 E-pasts: {email}\n\n📋 Tagad atsūti maka adresi *(BEP-20 USDT)*:\n\n⚠️ Rūpīgi pārbaudi adresi!\n/cancel lai atceltu",
+    "withdrawal_confirm": "💸 *Izmaksas apstiprinājums*\n\n💵 Summa: *{amount}$*\n📧 E-pasts: {email}\n📋 Adrese: `{address}`\n\n⚠️ Pārbaudi visus datus!\nPēc apstiprinājuma pieprasījums tiks nosūtīts administrācijai.",
+    "withdrawal_submitted": "✅ *Pieprasījums nosūtīts!*\n\n💵 Summa: *{amount}$*\n📋 Adrese: `{address}`\n\n⏳ Pieprasījums tiks apstrādāts 24-48 stundu laikā.\n\nTu saņemsi paziņojumu par statusu.",
+    "withdrawal_approved": "🎉 *Izmaksa apstiprināta!*\n\n💵 Summa: *{amount}$*\n📋 Adrese: `{address}`\n\n✅ Līdzekļi drīz tiks nosūtīti.\n{notes}",
+    "withdrawal_rejected": "❌ *Izmaksa noraidīta*\n\n💵 Summa: *{amount}$*\n\n📝 Iemesls: {reason}",
+    "withdrawal_history": "📜 *Izmaksu vēsture*\n\n{list}",
+    "withdrawal_history_empty": "📜 *Izmaksu vēsture*\n\nPagaidām izmaksu nav.",
+    "withdrawal_row_pending": "⏳ {date} — *{amount}$* (gaida)",
+    "withdrawal_row_approved": "✅ {date} — *{amount}$* (apstiprināta)",
+    "withdrawal_row_rejected": "❌ {date} — *{amount}$* (noraidīta)",
+    "withdrawal_error_banned": "❌ Izmaksa nav pieejama.",
+    "withdrawal_error_pending": "⚠️ Tev jau ir aktīvs izmaksas pieprasījums.\nLūdzu sagaidi apstrādi.",
+    "withdrawal_error_min": "❌ Minimālā izmaksas summa: *{min}$*\nTavs atlikums: *{balance}$*",
+    "withdrawal_error_no_email": "❌ Izmaksai nepieciešams e-pasts.",
+    "withdrawal_error_rate_limit": "⚠️ Pārāk daudz pieprasījumu.\nPamēģini vēlāk.",
     "referral_welcome": "👋 Tevi uzaicināja draugs!\n\n🎁 Kad tu veiksi pirkumu, draugs saņems *+10 bezmaksas dienas*.\n\n🔐 Izvēlies produktu:",
     "help": "📖 *Komandas:*\n\n/start — Sākt\n/status — Statuss\n/renew — Pagarināt\n/referral — Referrals\n/language — Valoda\n/support — Atbalsts\n/id — Mans ID\n/loyalty — Lojalitāte\n/help — Palīdzība",
     "support": "📩 *Atbalsts*\n\nRaksti: {contact}\n\nApraksti problēmu un pievieno TX hash, ja tāds ir.",
@@ -233,6 +256,19 @@ async def inactive_welcome_text(lang, name):
             + t(lang, "inactive_welcome_note")
         )
     return t(lang, "inactive_welcome", name=name)
+
+def ui_text(lang, lv, ru, en):
+    if lang == "lv":
+        return lv
+    if lang == "ru":
+        return ru
+    return en
+
+def back_button_text(lang):
+    return "🔙 " + ui_text(lang, "Atpakaļ", "Назад", "Back")
+
+def paid_button_text(lang):
+    return "✅ " + ui_text(lang, "Es samaksāju", "Я оплатил", "I paid")
 
 def md_escape(text):
     if not text: return ""
@@ -301,8 +337,7 @@ def plans_keyboard(lang):
     b = InlineKeyboardBuilder()
     for code in VIP_CHANNEL_LANGS:
         b.button(text=VIP_CHANNEL_LABELS[code], callback_data=f"vip_checkout_{code}")
-    back_label = "🔙 Назад" if lang == "ru" else ("🔙 Atpakaļ" if lang == "lv" else "🔙 Back")
-    b.button(text=back_label, callback_data="back_to_main")
+    b.button(text=back_button_text(lang), callback_data="back_to_main")
     b.adjust(1)
     return b.as_markup()
 
@@ -315,8 +350,7 @@ async def vip_channel_keyboard(lang):
             b.button(text=VIP_CHANNEL_LABELS[code], url=url)
         else:
             b.button(text=VIP_CHANNEL_LABELS[code], callback_data=f"vip_checkout_{code}")
-    back_label = "🔙 Назад" if lang == "ru" else ("🔙 Atpakaļ" if lang == "lv" else "🔙 Back")
-    b.button(text=back_label, callback_data="back_to_main")
+    b.button(text=back_button_text(lang), callback_data="back_to_main")
     b.adjust(1)
     return b.as_markup()
 
@@ -364,17 +398,17 @@ def payment_keyboard(plan_key, lang):
 
 def referral_keyboard(lang):
     b = InlineKeyboardBuilder()
-    b.button(text="🔗 Mana referral saite" if lang == "lv" else ("🔗 My Ref Link" if lang == "en" else "🔗 Моя реф. ссылка"), callback_data="ref_my_link")
-    b.button(text="👥 Mani referrals" if lang == "lv" else ("👥 My Referrals" if lang == "en" else "👥 Мои рефералы"), callback_data="ref_my_list")
-    b.button(text="🔙 Atpakaļ" if lang == "lv" else ("🔙 Back" if lang == "en" else "🔙 Назад"), callback_data="ref_back_start")
+    b.button(text="🔗 " + ui_text(lang, "Mana referral saite", "Моя реф. ссылка", "My Ref Link"), callback_data="ref_my_link")
+    b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My Referrals"), callback_data="ref_my_list")
+    b.button(text=back_button_text(lang), callback_data="ref_back_start")
     b.adjust(2, 1)
     return b.as_markup()
 
 def referral_keyboard_with_earnings(lang):
     """Referral keyboard ar earnings"""
     b = InlineKeyboardBuilder()
-    b.button(text="👥 " + ("Mani referrals" if lang == "lv" else ("Мои рефералы" if lang == "ru" else "My referrals")), callback_data="ref_my_list")
-    b.button(text="🔙 " + ("Atpakaļ" if lang == "lv" else ("Назад" if lang == "ru" else "Back")), callback_data="settings_back")
+    b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My referrals"), callback_data="ref_my_list")
+    b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(1)
     return b.as_markup()
 
@@ -672,11 +706,15 @@ async def cmd_start(message: Message, state: FSMContext):
         if days_left <= 3 and days_left > 0:
             if lang == "ru":
                 urgency = f"\n\n⚠️ *Внимание! До окончания подписки {days_left} {'день' if days_left == 1 else 'дня'}!*"
+            elif lang == "lv":
+                urgency = f"\n\n⚠️ *Uzmanību! Līdz abonementa beigām palikušas {days_left} {'diena' if days_left == 1 else 'dienas'}!*"
             else:
                 urgency = f"\n\n⚠️ *Warning! Only {days_left} day{'s' if days_left != 1 else ''} left!*"
         elif days_left == 0:
             if lang == "ru":
                 urgency = "\n\n🚨 *Подписка заканчивается сегодня!*"
+            elif lang == "lv":
+                urgency = "\n\n🚨 *Abonements beidzas šodien!*"
             else:
                 urgency = "\n\n🚨 *Subscription expires today!*"
         
@@ -697,6 +735,11 @@ async def cmd_start(message: Message, state: FSMContext):
                         f"\n\n🎯 Следующий: {next_emoji} *{next_tag}* — {progress_pct}% пройдено\n"
                         f"🎁 +{next_bonus} дн. бесплатно, скидка {next_discount}%"
                     )
+                elif lang == "lv":
+                    next_tier_info = (
+                        f"\n\n🎯 Nākamais: {next_emoji} *{next_tag}* — {progress_pct}% pabeigts\n"
+                        f"🎁 +{next_bonus} bezmaksas dienas, {next_discount}% atlaide"
+                    )
                 else:
                     next_tier_info = (
                         f"\n\n🎯 Next: {next_emoji} *{next_tag}* — {progress_pct}% complete\n"
@@ -706,6 +749,8 @@ async def cmd_start(message: Message, state: FSMContext):
         
         if lang == "ru":
             loyalty_line = f"\n\n{tier_emoji} Уровень: *{tier_tag}*" + (f" ({tier_discount}% скидка)" if tier_discount > 0 else "")
+        elif lang == "lv":
+            loyalty_line = f"\n\n{tier_emoji} Līmenis: *{tier_tag}*" + (f" ({tier_discount}% atlaide)" if tier_discount > 0 else "")
         else:
             loyalty_line = f"\n\n{tier_emoji} Level: *{tier_tag}*" + (f" ({tier_discount}% discount)" if tier_discount > 0 else "")
         
@@ -947,9 +992,9 @@ async def user_settings(callback: CallbackQuery):
     b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
     b.button(text="🇬🇧 English", callback_data="settings_lang_en")
     b.button(text="🇱🇻 Latviešu", callback_data="settings_lang_lv")
-    email_btn = "📧 Ievadīt e-pastu" if lang == "lv" else ("📧 Указать e-mail" if lang == "ru" else "📧 Set e-mail")
+    email_btn = "📧 " + ui_text(lang, "Ievadīt e-pastu", "Указать e-mail", "Set e-mail")
     b.button(text=email_btn, callback_data="settings_email")
-    b.button(text="🔙 " + ("Atpakaļ" if lang == "lv" else ("Назад" if lang == "ru" else "Back")), callback_data="settings_back")
+    b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(2, 1, 1, 1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
     await callback.answer()
@@ -993,8 +1038,8 @@ async def settings_lang(callback: CallbackQuery):
     b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
     b.button(text="🇬🇧 English", callback_data="settings_lang_en")
     b.button(text="🇱🇻 Latviešu", callback_data="settings_lang_lv")
-    b.button(text="📧 " + ("Ievadīt e-pastu" if lang == "lv" else ("Указать e-mail" if lang == "ru" else "Set e-mail")), callback_data="settings_email")
-    b.button(text="🔙 " + ("Atpakaļ" if lang == "lv" else ("Назад" if lang == "ru" else "Back")), callback_data="settings_back")
+    b.button(text="📧 " + ui_text(lang, "Ievadīt e-pastu", "Указать e-mail", "Set e-mail"), callback_data="settings_email")
+    b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(2, 1, 1, 1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
     await callback.answer()
@@ -1040,7 +1085,7 @@ async def receive_email(message: Message, state: FSMContext):
         await state.clear()
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ("Atcelts" if lang == "lv" else ("Отменено" if lang == "ru" else "Cancelled")))
+        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
         return
     email = message.text.strip()
     # Vienkārša validācija
@@ -1109,6 +1154,13 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 f"🏆 Приз: *+{prize_days} дней* бесплатного доступа к чату!\n\n"
                 "📋 Оформи подписку и возвращайся!"
             )
+        elif lang == "lv":
+            text = (
+                "🎟 *Mēneša izloze*\n\n"
+                "⚠️ Lai piedalītos izlozē, nepieciešams *aktīvs abonements*.\n\n"
+                f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei čatam!\n\n"
+                "📋 Noformē abonementu un atgriezies!"
+            )
         else:
             text = (
                 "🎟 *Monthly Giveaway*\n\n"
@@ -1117,7 +1169,7 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 "📋 Subscribe and come back!"
             )
         b = InlineKeyboardBuilder()
-        b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
+        b.button(text=back_button_text(lang), callback_data="settings_back")
         await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
         await callback.answer()
         return
@@ -1134,6 +1186,17 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 "🎟 Участие в ежемесячном розыгрыше!\n\n"
                 "📧 _Отправь свой e-mail сообщением:_\n"
                 "/cancel для отмены"
+            )
+        elif lang == "lv":
+            text = (
+                "🎟 *Mēneša izloze*\n\n"
+                f"Katru mēnesi abonenti var laimēt *+{prize_days} dienas* bezmaksas piekļuvi!\n\n"
+                "⚠️ Lai piedalītos, jānorāda *e-pasts*.\n\n"
+                "🤔 *Kāpēc norādīt e-pastu?*\n"
+                "🎁 Atlaides abonementam un kursiem\n"
+                "🎟 Dalība ikmēneša izlozē!\n\n"
+                "📧 _Atsūti savu e-pastu ziņā:_\n"
+                "/cancel lai atceltu"
             )
         else:
             text = (
@@ -1165,6 +1228,15 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 f"🏆 Приз: *+{prize_days} дней* бесплатного доступа\n\n"
                 "🍀 Удачи!"
             )
+        elif lang == "lv":
+            text = (
+                "🎟 *Mēneša izloze*\n\n"
+                "✅ Tu jau piedalies šī mēneša izlozē!\n\n"
+                f"👥 Dalībnieki: *{count}*\n"
+                "📅 Izloze: *nākamā mēneša 1. datumā*\n"
+                f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei\n\n"
+                "🍀 Lai veicas!"
+            )
         else:
             text = (
                 "🎟 *Monthly Giveaway*\n\n"
@@ -1175,7 +1247,7 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 "🍀 Good luck!"
             )
         b = InlineKeyboardBuilder()
-        b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
+        b.button(text=back_button_text(lang), callback_data="settings_back")
         await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
         await callback.answer()
         return
@@ -1192,6 +1264,15 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
             f"🏆 Приз: *+{prize_days} дней* бесплатного доступа\n\n"
             "🍀 Удачи!"
         )
+    elif lang == "lv":
+        text = (
+            "🎟 *Mēneša izloze*\n\n"
+            "🎉 *Tu esi veiksmīgi reģistrēts!*\n\n"
+            f"👥 Dalībnieki: *{count}*\n"
+            "📅 Izloze: *nākamā mēneša 1. datumā*\n"
+            f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei\n\n"
+            "🍀 Lai veicas!"
+        )
     else:
         text = (
             "🎟 *Monthly Giveaway*\n\n"
@@ -1202,7 +1283,7 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
             "🍀 Good luck!"
         )
     b = InlineKeyboardBuilder()
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
+    b.button(text=back_button_text(lang), callback_data="settings_back")
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
     await callback.answer()
 
@@ -1213,13 +1294,13 @@ async def giveaway_receive_email(message: Message, state: FSMContext):
         await state.clear()
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ("Отменено" if lang == "ru" else "Cancelled"))
+        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
         return
     email = message.text.strip()
     if "@" not in email or "." not in email or len(email) < 5:
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ("Неверный формат e-mail. Попробуй ещё:" if lang == "ru" else "Invalid e-mail format. Try again:"))
+        await message.answer("❌ " + ui_text(lang, "Nepareizs e-pasta formāts. Pamēģini vēlreiz:", "Неверный формат e-mail. Попробуй ещё:", "Invalid e-mail format. Try again:"))
         return
 
     data = await state.get_data()
@@ -1242,6 +1323,15 @@ async def giveaway_receive_email(message: Message, state: FSMContext):
             "📅 Розыгрыш: *1 числа следующего месяца*\n"
             f"🏆 Приз: *+{prize_days} дней* бесплатного доступа\n\n"
             "🍀 Удачи!"
+        )
+    elif lang == "lv":
+        text = (
+            f"✅ E-pasts saglabāts: *{email}*\n\n"
+            "🎟 *Tu esi reģistrēts izlozei!*\n\n"
+            f"👥 Dalībnieki: *{count}*\n"
+            "📅 Izloze: *nākamā mēneša 1. datumā*\n"
+            f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei\n\n"
+            "🍀 Lai veicas!"
         )
     else:
         text = (
@@ -1278,6 +1368,8 @@ async def promo_enter(callback: CallbackQuery, state: FSMContext):
     await state.update_data(promo_target=target)
     if lang == "ru":
         text = "🎟 *Введи промокод:*\n\n/cancel для отмены"
+    elif lang == "lv":
+        text = "🎟 *Ievadi promokodu:*\n\n/cancel lai atceltu"
     else:
         text = "🎟 *Enter promo code:*\n\n/cancel to cancel"
     await callback.message.edit_text(text, parse_mode="Markdown")
@@ -1290,7 +1382,7 @@ async def promo_apply(message: Message, state: FSMContext):
         await state.clear()
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ("Отменено" if lang == "ru" else "Cancelled"))
+        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
         return
 
     code = message.text.strip().upper()
@@ -1305,19 +1397,19 @@ async def promo_apply(message: Message, state: FSMContext):
     # Pārbaudīt kodu DB
     promo = await db.get_promo_code(code)
     if not promo:
-        await message.answer("❌ " + ("Промокод не найден." if lang == "ru" else "Promo code not found."))
+        await message.answer("❌ " + ui_text(lang, "Promokods nav atrasts.", "Промокод не найден.", "Promo code not found."))
         return
 
     # Pārbaudīt derīgumu
     if promo.get("max_uses") and promo.get("max_uses") > 0 and promo.get("used_count", 0) >= promo["max_uses"]:
-        await message.answer("❌ " + ("Промокод исчерпан." if lang == "ru" else "Promo code exhausted."))
+        await message.answer("❌ " + ui_text(lang, "Promokods ir izlietots.", "Промокод исчерпан.", "Promo code exhausted."))
         return
 
     if promo.get("expires_at"):
         try:
             exp = datetime.fromisoformat(promo["expires_at"])
             if exp < datetime.utcnow():
-                await message.answer("❌ " + ("Промокод истёк." if lang == "ru" else "Promo code expired."))
+                await message.answer("❌ " + ui_text(lang, "Promokodam beidzies termiņš.", "Промокод истёк.", "Promo code expired."))
                 return
         except: pass
 
@@ -1329,10 +1421,10 @@ async def promo_apply(message: Message, state: FSMContext):
         # None = visiem, "all_courses" = visiem kursiem
         if promo_plan == "all_courses":
             if not is_course:
-                await message.answer("❌ " + ("Промокод только для курсов." if lang == "ru" else "Promo code is for courses only."))
+                await message.answer("❌ " + ui_text(lang, "Promokods der tikai kursiem.", "Промокод только для курсов.", "Promo code is for courses only."))
                 return
         elif promo_plan != target:
-            await message.answer("❌ " + ("Промокод не подходит для этого продукта." if lang == "ru" else "Promo code not valid for this product."))
+            await message.answer("❌ " + ui_text(lang, "Promokods neder šim produktam.", "Промокод не подходит для этого продукта.", "Promo code not valid for this product."))
             return
 
     discount = promo.get("discount_percent", 0)
@@ -1388,11 +1480,11 @@ async def promo_apply(message: Message, state: FSMContext):
 
     b = InlineKeyboardBuilder()
     if is_course:
-        b.button(text="✅ " + ("Я оплатил" if lang == "ru" else "I paid"), callback_data=f"check_{target}")
+        b.button(text=paid_button_text(lang), callback_data=f"check_{target}")
     else:
         pkey = target.replace("plan_", "") if target.startswith("plan_") else target
-        b.button(text="✅ " + ("Я оплатил" if lang == "ru" else "I paid"), callback_data=f"check_{pkey}")
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
+        b.button(text=paid_button_text(lang), callback_data=f"check_{pkey}")
+    b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(1)
     await message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
@@ -1840,7 +1932,7 @@ async def check_course_payment(callback: CallbackQuery):
     expected = float(pending["amount_usdt"])
 
     await callback.answer("⏳...")
-    msg = await callback.message.edit_text("⏳ *" + ("Проверяю..." if lang == "ru" else "Checking...") + "*", parse_mode="Markdown")
+    msg = await callback.message.edit_text("⏳ *" + ui_text(lang, "Pārbaudu...", "Проверяю...", "Checking...") + "*", parse_mode="Markdown")
 
     tx = await check_payment(config.CRYPTO_WALLET, expected, user_id)
     if tx:
@@ -1903,6 +1995,15 @@ async def check_course_payment(callback: CallbackQuery):
                 f"Ваши данные доступа к обучающей платформе будут "
                 f"отправлены после проверки и подтверждения оплаты."
             )
+        elif lang == "lv":
+            text = (
+                f"✅ *Maksājums apstiprināts!*\n\n"
+                f"📚 Kurss: *{name}*\n"
+                f"🔖 TX: `{tx}`\n\n"
+                f"🙏 Paldies par pirkumu!\n"
+                f"Piekļuves dati mācību platformai tiks nosūtīti "
+                f"pēc maksājuma pārbaudes un apstiprināšanas."
+            )
         else:
             text = (
                 f"✅ *Payment confirmed!*\n\n"
@@ -1954,8 +2055,8 @@ async def check_course_payment(callback: CallbackQuery):
         else:
             text = f"❌ *Payment not found*\n\nMake sure you sent *{expected} USDT (BEP-20)*"
         b = InlineKeyboardBuilder()
-        b.button(text="🔄 " + ("Проверить снова" if lang == "ru" else "Check again"), callback_data=f"check_course_{course_key}")
-        b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="courses_crypto")
+        b.button(text="🔄 " + ui_text(lang, "Pārbaudīt vēlreiz", "Проверить снова", "Check again"), callback_data=f"check_course_{course_key}")
+        b.button(text=back_button_text(lang), callback_data="courses_crypto")
         b.adjust(1)
         await msg.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
@@ -2560,8 +2661,8 @@ async def run_monthly_giveaway():
 # Modificētā referral_keyboard ar earnings support
 def referral_keyboard_with_earnings(lang):
     b = InlineKeyboardBuilder()
-    b.button(text="👥 " + ("Мои рефералы" if lang == "ru" else "My referrals"), callback_data="ref_my_list")
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
+    b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My referrals"), callback_data="ref_my_list")
+    b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(1)
     return b.as_markup()
 
