@@ -1,17 +1,25 @@
 import aiosqlite
 import logging
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
-DB_PATH = "/app/data/subscriptions.db"
+DB_PATH = os.getenv("DB_PATH") or os.getenv("DATABASE_PATH") or "/app/data/subscriptions.db"
 
 
 class Database:
     def __init__(self):
         self.db_path = DB_PATH
 
+    def _ensure_db_dir(self):
+        db_dir = Path(self.db_path).expanduser().parent
+        if str(db_dir) and str(db_dir) != ".":
+            db_dir.mkdir(parents=True, exist_ok=True)
+
     async def init(self):
+        self._ensure_db_dir()
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
