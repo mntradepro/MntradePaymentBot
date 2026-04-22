@@ -6,7 +6,16 @@ from pathlib import Path
 from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
-DB_PATH = os.getenv("DB_PATH") or os.getenv("DATABASE_PATH") or "/app/data/subscriptions.db"
+
+
+def _default_db_path() -> str:
+    # Railway persistent volumes are commonly mounted at /data. Prefer it when present.
+    if Path("/data").exists():
+        return "/data/subscriptions.db"
+    return "/app/data/subscriptions.db"
+
+
+DB_PATH = os.getenv("DB_PATH") or os.getenv("DATABASE_PATH") or _default_db_path()
 
 
 class Database:
@@ -17,6 +26,12 @@ class Database:
         db_dir = Path(self.db_path).expanduser().parent
         if str(db_dir) and str(db_dir) != ".":
             db_dir.mkdir(parents=True, exist_ok=True)
+        target = Path(self.db_path)
+        old_runtime_db = Path("/app/data/subscriptions.db")
+        if target == Path("/data/subscriptions.db") and old_runtime_db.exists() and not target.exists():
+            import shutil
+            shutil.copy2(old_runtime_db, target)
+            logger.info("Copied existing database from /app/data to /data volume")
 
     async def init(self):
         self._ensure_db_dir()

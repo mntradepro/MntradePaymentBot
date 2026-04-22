@@ -374,6 +374,10 @@ def _first_time_lang_keyboard(ref_param=None):
     return b.as_markup()
 
 
+def _is_registered_user(user):
+    return bool(user and (user.get("email") or "").strip())
+
+
 @dp.callback_query(F.data.startswith("first_lang_"))
 async def first_lang_selected(callback: CallbackQuery, state: FSMContext):
     """Jauns lietotājs izvēlējās valodu — startē onboarding"""
@@ -423,6 +427,7 @@ async def registration_receive_email(message: Message, state: FSMContext):
     if "@" not in email or "." not in email or len(email) < 5:
         await message.answer("❌ " + ("Nepareizs e-pasta formāts. Pamēģini vēlreiz:" if lang == "lv" else ("Неверный e-mail. Попробуй ещё:" if lang == "ru" else "Invalid e-mail. Try again:")))
         return
+    await db.set_user_lang(message.from_user.id, lang)
     await db.set_user_email(message.from_user.id, email)
     await state.clear()
     await message.answer(("✅ E-pasts saglabāts." if lang == "lv" else ("✅ E-mail сохранён." if lang == "ru" else "✅ E-mail saved.")), parse_mode="Markdown")
@@ -590,10 +595,11 @@ async def cmd_start(message: Message, state: FSMContext):
     user = await db.get_user(user_id)
     name = md_escape(message.from_user.first_name)
     lang = user.get("lang", auto_lang) if user else auto_lang
-    has_registered_email = bool((user or {}).get("email"))
+    has_registered_email = _is_registered_user(user)
     
     # Reģistrācija = DB ieraksts ar e-pastu. Ja e-pasts jau ir, neprasām to atkārtoti.
     if not has_registered_email:
+        # Ja TG ID jau eksistē DB, valodu vairs neprasām — tikai trūkstošo e-pastu.
         if existing_user:
             if lang == "lv":
                 text = (
