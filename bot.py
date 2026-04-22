@@ -1504,11 +1504,9 @@ async def course_info_menu(callback: CallbackQuery):
     
     b = InlineKeyboardBuilder()
     if checkout_url:
-        b.button(text="💳 " + ("Pirkt ar karti / banku" if ui_lang == "lv" else "Купить картой / банком"), url=checkout_url)
-        b.button(text="🪙 " + ("Maksāt ar crypto" if ui_lang == "lv" else "Оплатить криптой"), url=checkout_url)
+        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), url=checkout_url)
     else:
-        b.button(text="💳 " + ("Pirkt ar karti / banku" if ui_lang == "lv" else "Купить картой / банком"), callback_data=f"course_checkout_missing_{course_key}")
-        b.button(text="🪙 " + ("Maksāt ar crypto" if ui_lang == "lv" else "Оплатить криптой"), callback_data=f"course_checkout_missing_{course_key}")
+        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), callback_data=f"course_checkout_missing_{course_key}")
     b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_menu")
     b.adjust(1)
     
