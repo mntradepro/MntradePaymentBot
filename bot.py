@@ -1392,13 +1392,29 @@ async def promo_apply(message: Message, state: FSMContext):
 class CourseEmailState(StatesGroup):
     waiting_email = State()
 
+
+def _format_eur_price(value):
+    value = float(value)
+    return f"{value:.0f} EUR" if value == int(value) else f"{value} EUR"
+
+
+def _course_ui_lang(lang):
+    return "ru" if lang == "ru" else "lv"
+
+
 @dp.callback_query(F.data == "courses_menu")
 async def courses_menu(callback: CallbackQuery):
     """Kursu izvēlne - uzreiz rāda kursus"""
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
+    ui_lang = _course_ui_lang(lang)
     
-    if lang == "ru":
+    if ui_lang == "lv":
+        text = (
+            "📚 *MNtradepro kursi*\n\n"
+            "Izvēlies kursu, lai apskatītu detaļas un apmaksas iespējas:"
+        )
+    elif ui_lang == "ru":
         text = (
             "📚 *Курсы MNtradepro*\n\n"
             "Выбери курс, чтобы узнать детали и способы оплаты:"
@@ -1416,15 +1432,15 @@ async def courses_menu(callback: CallbackQuery):
         if saved_price:
             try:
                 p = float(saved_price)
-                price_str = f"{p:.0f}€" if p == int(p) else f"{p}€"
+                price_str = _format_eur_price(p)
             except:
                 price_str = course['price_usd']
         else:
             price_str = course['price_usd']
-        name = course['name'][lang] if isinstance(course['name'], dict) else course['name']
+        name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
         b.button(text=f"{course['emoji']} {name} — {price_str}", callback_data=f"course_info_{key}")
     
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="settings_back")
+    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="settings_back")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1442,14 +1458,22 @@ async def course_info_menu(callback: CallbackQuery):
     
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
+    ui_lang = _course_ui_lang(lang)
     
     saved_price = await db.get_setting(f"course_price_{course_key}")
     price = float(saved_price) if saved_price else course['price_usdt']
-    price_str = f"{price:.0f}€" if price == int(price) else f"{price}€"
+    price_str = _format_eur_price(price)
     
-    name = course['name'][lang] if isinstance(course['name'], dict) else course['name']
+    name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
     
-    if lang == "ru":
+    if ui_lang == "lv":
+        text = (
+            f"{course['emoji']} *{name}*\n\n"
+            f"💰 Cena: *{price_str}*\n\n"
+            "📖 Detalizēts kursa apraksts un programma ir pieejama MNtradepro mājaslapā.\n\n"
+            "Izvēlies apmaksas veidu:"
+        )
+    elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
             f"💰 Цена: *{price_str}*\n\n"
@@ -1466,12 +1490,12 @@ async def course_info_menu(callback: CallbackQuery):
             "Choose payment method:"
         )
     
-    courses_url = "https://www.mntradepro.com/ru" if lang == "ru" else "https://www.mntradepro.com"
+    courses_url = "https://www.mntradepro.com/ru" if ui_lang == "ru" else "https://www.mntradepro.com"
     
     b = InlineKeyboardBuilder()
-    b.button(text="💳 " + ("Купить картой / банком" if lang == "ru" else "Buy with card / bank"), url=courses_url)
-    b.button(text="🪙 " + ("Оплатить криптой" if lang == "ru" else "Pay with crypto"), callback_data=f"course_crypto_{course_key}")
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="courses_menu")
+    b.button(text="💳 " + ("Pirkt ar karti / banku" if ui_lang == "lv" else "Купить картой / банком"), url=courses_url)
+    b.button(text="🪙 " + ("Maksāt ar crypto" if ui_lang == "lv" else "Оплатить криптой"), callback_data=f"course_crypto_{course_key}")
+    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_menu")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1489,11 +1513,18 @@ async def course_crypto_selected(callback: CallbackQuery, state: FSMContext):
     
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
+    ui_lang = _course_ui_lang(lang)
     email = user.get("email", "") if user else ""
     
     # Pārbauda email
     if not email:
-        if lang == "ru":
+        if ui_lang == "lv":
+            text = (
+                "📚 *Kursa iegāde*\n\n"
+                "⚠️ Kursa iegādei nepieciešams *e-pasts* — tas tiks izmantots kā tavs piekļuves e-pasts.\n\n"
+                "📧 _Atsūti savu e-pastu:_\n/cancel lai atceltu"
+            )
+        elif ui_lang == "ru":
             text = (
                 "📚 *Покупка курса*\n\n"
                 "⚠️ Для покупки курса необходимо указать *e-mail* — "
@@ -1522,6 +1553,7 @@ async def _show_course_payment(callback, course_key, email, lang):
     course = config.COURSES.get(course_key)
     if not course:
         return
+    ui_lang = _course_ui_lang(lang)
     
     user_id = callback.from_user.id
     
@@ -1538,9 +1570,21 @@ async def _show_course_payment(callback, course_key, email, lang):
         unique_amount = await _get_unique_amount(pending_key, user_id, base_price)
         await db.set_pending_payment(user_id, pending_key, unique_amount)
     
-    name = course['name'][lang] if isinstance(course['name'], dict) else course['name']
+    name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
     
-    if lang == "ru":
+    if ui_lang == "lv":
+        text = (
+            f"{course['emoji']} *{name}*\n\n"
+            f"💰 Cena: *{unique_amount} USDT*\n"
+            f"📧 E-pasts: *{email}*\n\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"📤 Nosūti *{unique_amount} USDT (BEP-20)* uz:\n\n"
+            f"`{config.CRYPTO_WALLET}`\n\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"⚠️ Tikai *USDT BEP-20* (BSC tīkls)\n"
+            f"Pēc apmaksas nospied pogu zemāk"
+        )
+    elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
             f"💰 Цена: *{unique_amount} USDT*\n"
@@ -1566,8 +1610,8 @@ async def _show_course_payment(callback, course_key, email, lang):
         )
     
     b = InlineKeyboardBuilder()
-    b.button(text="✅ " + ("Я оплатил" if lang == "ru" else "I paid"), callback_data=f"check_course_{course_key}")
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data=f"course_info_{course_key}")
+    b.button(text="✅ " + ("Esmu apmaksājis" if ui_lang == "lv" else "Я оплатил"), callback_data=f"check_course_{course_key}")
+    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data=f"course_info_{course_key}")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1578,11 +1622,18 @@ async def _show_course_payment(callback, course_key, email, lang):
 async def courses_crypto(callback: CallbackQuery, state: FSMContext):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
+    ui_lang = _course_ui_lang(lang)
     email = user.get("email", "") if user else ""
 
     # E-pasts obligāts kursiem
     if not email:
-        if lang == "ru":
+        if ui_lang == "lv":
+            text = (
+                "📚 *Kursa iegāde*\n\n"
+                "⚠️ Kursa iegādei nepieciešams *e-pasts* — tas tiks izmantots kā tavs piekļuves e-pasts.\n\n"
+                "📧 _Atsūti savu e-pastu:_\n/cancel lai atceltu"
+            )
+        elif ui_lang == "ru":
             text = (
                 "📚 *Покупка курса*\n\n"
                 "⚠️ Для покупки курса необходимо указать *e-mail* — "
@@ -1615,7 +1666,10 @@ async def courses_crypto_after(callback: CallbackQuery):
 
 
 async def _show_courses_list(callback, lang):
-    if lang == "ru":
+    ui_lang = _course_ui_lang(lang)
+    if ui_lang == "lv":
+        text = "📚 *Izvēlies kursu:*"
+    elif ui_lang == "ru":
         text = "📚 *Выбери курс:*"
     else:
         text = "📚 *Choose a course:*"
@@ -1626,13 +1680,13 @@ async def _show_courses_list(callback, lang):
         if saved_price:
             try:
                 p = float(saved_price)
-                price_str = f"{p:.0f}€" if p == int(p) else f"{p}€"
+                price_str = _format_eur_price(p)
             except: price_str = course['price_usd']
         else:
             price_str = course['price_usd']
-        name = course['name'][lang] if isinstance(course['name'], dict) else course['name']
+        name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
         b.button(text=f"{course['emoji']} {name} — {price_str}", callback_data=f"course_{key}")
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="courses_menu")
+    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_menu")
     b.adjust(1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
@@ -1648,7 +1702,7 @@ async def course_receive_email(message: Message, state: FSMContext):
     if "@" not in email or "." not in email or len(email) < 5:
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ("Неверный e-mail. Попробуй:" if lang == "ru" else "Invalid e-mail. Try:"))
+        await message.answer("❌ " + ("Nepareizs e-pasts. Pamēģini vēlreiz:" if lang == "lv" else ("Неверный e-mail. Попробуй:" if lang == "ru" else "Invalid e-mail. Try:")))
         return
     
     data = await state.get_data()
@@ -1659,7 +1713,9 @@ async def course_receive_email(message: Message, state: FSMContext):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     
-    if lang == "ru":
+    if lang == "lv":
+        confirm_text = f"✅ E-pasts saglabāts: *{email}*"
+    elif lang == "ru":
         confirm_text = f"✅ E-mail сохранён: *{email}*"
     else:
         confirm_text = f"✅ E-mail saved: *{email}*"
@@ -1688,10 +1744,11 @@ async def course_selected(callback: CallbackQuery):
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
+    ui_lang = _course_ui_lang(lang)
     email = user.get("email", "") if user else ""
 
     if not email:
-        await callback.answer("⚠️ E-mail required!", show_alert=True)
+        await callback.answer("⚠️ Nepieciešams e-pasts!" if ui_lang == "lv" else "⚠️ Нужен e-mail!", show_alert=True)
         return
 
     # Cena no DB
@@ -1702,8 +1759,20 @@ async def course_selected(callback: CallbackQuery):
     unique_amount = await _get_unique_amount(f"course_{course_key}", user_id, base_price)
     await db.set_pending_payment(user_id, f"course_{course_key}", unique_amount)
 
-    name = course['name'][lang] if isinstance(course['name'], dict) else course['name']
-    if lang == "ru":
+    name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
+    if ui_lang == "lv":
+        text = (
+            f"{course['emoji']} *{name}*\n\n"
+            f"💰 Cena: *{unique_amount} USDT*\n"
+            f"📧 E-pasts: *{email}*\n\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"📤 Nosūti *{unique_amount} USDT (BEP-20)* uz:\n\n"
+            f"`{config.CRYPTO_WALLET}`\n\n"
+            f"━━━━━━━━━━━━━━━━\n"
+            f"⚠️ Tikai *USDT BEP-20* (BSC tīkls)\n"
+            f"Pēc apmaksas nospied pogu zemāk"
+        )
+    elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
             f"💰 Цена: *{unique_amount} USDT*\n"
@@ -1728,8 +1797,8 @@ async def course_selected(callback: CallbackQuery):
             f"After payment press the button below"
         )
     b = InlineKeyboardBuilder()
-    b.button(text="✅ " + ("Я оплатил" if lang == "ru" else "I paid"), callback_data=f"check_course_{course_key}")
-    b.button(text="🔙 " + ("Назад" if lang == "ru" else "Back"), callback_data="courses_crypto")
+    b.button(text="✅ " + ("Esmu apmaksājis" if ui_lang == "lv" else "Я оплатил"), callback_data=f"check_course_{course_key}")
+    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_crypto")
     b.adjust(1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
     await callback.answer()
@@ -1744,6 +1813,7 @@ async def check_course_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
+    ui_lang = _course_ui_lang(lang)
     email = user.get("email", "") if user else "?"
     username = callback.from_user.username or ""
 
@@ -1757,7 +1827,7 @@ async def check_course_payment(callback: CallbackQuery):
 
     tx = await check_payment(config.CRYPTO_WALLET, expected, user_id)
     if tx:
-        name = course['name'][lang] if isinstance(course['name'], dict) else course['name']
+        name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
         name_ru = course['name']['ru'] if isinstance(course['name'], dict) else course['name']
         await db.delete_pending_payment(user_id)
 
@@ -3620,6 +3690,22 @@ async def main():
                 p = float(sp); plan['price_usdt'] = p
                 plan['price_usd'] = f"{p:.0f}€" if p == int(p) else f"{p}€"
             except: pass
+    old_course_defaults = {
+        "mini": 25.0,
+        "basic": 75.0,
+        "full": 150.0,
+        "autotrading": 200.0,
+        "vip": 5000.0,
+    }
+    for ck, course in config.COURSES.items():
+        sp = await db.get_setting(f"course_price_{ck}")
+        if sp:
+            try:
+                saved_price = float(sp)
+                if saved_price == old_course_defaults.get(ck):
+                    await db.set_setting(f"course_price_{ck}", str(course["price_usdt"]))
+            except Exception:
+                pass
     from admin import router as admin_router
     dp.include_router(admin_router)
     scheduler.add_job(auto_check_pending_payments, 'interval', minutes=3)

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+# Deploy trigger: no behavior change.
 
 @dataclass
 class Config:
@@ -58,32 +59,32 @@ class Config:
     COURSES: Dict[str, Any] = field(default_factory=lambda: {
         "mini": {
             "name": {"ru": "Мини курс", "en": "Mini Course", "lv": "Mini kurss"},
-            "price_usd": "25€",
-            "price_usdt": 25.0,
+            "price_usd": "99 EUR",
+            "price_usdt": 99.0,
             "emoji": "📘",
         },
         "basic": {
             "name": {"ru": "Базовый курс", "en": "Basic Course", "lv": "Pamata kurss"},
-            "price_usd": "75€",
-            "price_usdt": 75.0,
+            "price_usd": "499 EUR",
+            "price_usdt": 499.0,
             "emoji": "📗",
         },
         "full": {
             "name": {"ru": "Полный курс", "en": "Full Course", "lv": "Pilnais kurss"},
-            "price_usd": "150€",
-            "price_usdt": 150.0,
+            "price_usd": "990 EUR",
+            "price_usdt": 990.0,
             "emoji": "📕",
         },
         "autotrading": {
             "name": {"ru": "Автотрейдинг курс", "en": "Autotrading Course", "lv": "Autotrading kurss"},
-            "price_usd": "200€",
-            "price_usdt": 200.0,
+            "price_usd": "499 EUR",
+            "price_usdt": 499.0,
             "emoji": "🤖",
         },
         "vip": {
-            "name": {"ru": "VIP курс", "en": "VIP Course", "lv": "VIP kurss"},
-            "price_usd": "5000€",
-            "price_usdt": 5000.0,
+            "name": {"ru": "VIP курс - приватный менторинг", "en": "VIP Course - private mentoring", "lv": "VIP Kurss - privāts mentorings"},
+            "price_usd": "4990 EUR",
+            "price_usdt": 4990.0,
             "emoji": "👑",
         },
     })

@@ -1133,7 +1133,7 @@ async def adm_course_price_select(callback: CallbackQuery, state: FSMContext):
     price = float(saved) if saved else course['price_usdt']
     await state.set_state(EditState.waiting_price)
     await state.update_data(price_plan_key=f"course_{ckey}", is_course=True)
-    await callback.message.edit_text(f"📚 *{name}*\n\nPašreizējā: *{price} USDT*\n\nIevadi jauno cenu:\n/cancel", parse_mode="Markdown")
+    await callback.message.edit_text(f"📚 *{name}*\n\nPašreizējā: *{price:g} EUR*\n\nIevadi jauno cenu:\n/cancel", parse_mode="Markdown")
     await callback.answer()
 
 
@@ -1182,10 +1182,10 @@ async def adm_receive_price(message: Message, state: FSMContext):
             await state.clear(); return
         old_price = course['price_usdt']
         course['price_usdt'] = new_price
-        course['price_usd'] = f"{new_price:.0f}$" if new_price == int(new_price) else f"{new_price}$"
+        course['price_usd'] = f"{new_price:.0f} EUR" if new_price == int(new_price) else f"{new_price} EUR"
         await db.set_setting(f"course_price_{ckey}", str(new_price))
         await state.clear()
-        await message.answer(f"✅ *Kursa cena mainīta!*\n\n{old_price} → *{new_price} USDT*", reply_markup=admin_menu_kb(), parse_mode="Markdown")
+        await message.answer(f"✅ *Kursa cena mainīta!*\n\n{old_price:g} EUR → *{new_price:g} EUR*", reply_markup=admin_menu_kb(), parse_mode="Markdown")
         return
 
     plan = config.PLANS.get(plan_key)
