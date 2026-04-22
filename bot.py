@@ -101,7 +101,7 @@ TEXTS = {
         "referral_welcome": "👋 Тебя пригласил друг!\n\n🎁 Подписка → друг получит *10 дней* + *20% комиссии*\n💰 Курс → друг получит *15% комиссии*\n\n🔐 Выбери план:",
         
         "help": "📖 *Команды:*\n\n/start — Начать\n/status — Статус\n/renew — Продлить\n/referral — Рефералы\n/language — Язык\n/support — Поддержка\n/id — Мой ID\n/loyalty — Лояльность\n/help — Справка",
-        "support": "📩 *Поддержка*\n\nНапиши нам: {contact}\n\nОпиши проблему и приложи TX хеш.",
+        "support": "📩 *Поддержка*\n\nЕсли есть вопросы, напиши: https://t.me/mntrade_support",
         "auto_found": "✅ *Платёж найден автоматически!*\n\n📦 Тариф: *{name}*\n📅 Активен до: *{expires}*\n🔖 TX: `{tx}`\n\n_Обнаружен фоновой проверкой._",
         "upsell": "💡 *Специальное предложение!*\n\nТвоя подписка *{plan}* скоро заканчивается.\n\n🔥 Перейди на *годовой план* — экономия *{save}%*!\n💰 Цена: *{yearly_price} USDT* вместо {monthly_x12}",
     },
@@ -172,7 +172,7 @@ TEXTS = {
         "referral_welcome": "👋 Invited by a friend!\n\n🎁 Subscription → friend gets *10 days* + *20% commission*\n💰 Course → friend gets *15% commission*\n\n🔐 Choose plan:",
         
         "help": "📖 *Commands:*\n\n/start — Start\n/status — Status\n/renew — Renew\n/referral — Referrals\n/language — Language\n/support — Support\n/id — My ID\n/loyalty — Loyalty\n/help — Help",
-        "support": "📩 *Support*\n\nContact: {contact}\n\nDescribe issue, include TX hash.",
+        "support": "📩 *Support*\n\nIf you have questions, write: https://t.me/mntrade_support",
         "auto_found": "✅ *Payment found automatically!*\n\n📦 Plan: *{name}*\n📅 Until: *{expires}*\n🔖 TX: `{tx}`\n\n_Detected by background check._",
         "upsell": "💡 *Special offer!*\n\nYour *{plan}* is ending soon.\n\n🔥 Upgrade to *yearly* — save *{save}%*!\n💰 Price: *{yearly_price} USDT* instead of {monthly_x12}",
     }
@@ -240,7 +240,7 @@ TEXTS["lv"] = {
     "withdrawal_error_rate_limit": "⚠️ Pārāk daudz pieprasījumu.\nPamēģini vēlāk.",
     "referral_welcome": "👋 Tevi uzaicināja draugs!\n\n🎁 Kad tu veiksi pirkumu, draugs saņems *+10 bezmaksas dienas*.\n\n🔐 Izvēlies produktu:",
     "help": "📖 *Komandas:*\n\n/start — Sākt\n/status — Statuss\n/renew — Pagarināt\n/referral — Referrals\n/language — Valoda\n/support — Atbalsts\n/id — Mans ID\n/loyalty — Lojalitāte\n/help — Palīdzība",
-    "support": "📩 *Atbalsts*\n\nRaksti: {contact}\n\nApraksti problēmu un pievieno TX hash, ja tāds ir.",
+    "support": "📩 *Atbalsts*\n\nJa rodas jautājumi raksti https://t.me/mntrade_support",
 }
 
 def t(lang, key, **kw):

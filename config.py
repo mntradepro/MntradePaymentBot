@@ -31,7 +31,7 @@ class Config:
     WEBHOOK_SECRET: str = os.getenv("WEBHOOK_SECRET", "")
 
     # Support kontakts — @username vai grupa
-    SUPPORT_CONTACT: str = os.getenv("SUPPORT_CONTACT", "@YourSupportBot")
+    SUPPORT_CONTACT: str = os.getenv("SUPPORT_CONTACT", "https://t.me/mntrade_support")
 
     # MegaNode (BSCTrace) — BEZMAKSAS: https://dashboard.nodereal.io
     MEGANODE_API_KEY: str = os.getenv("MEGANODE_API_KEY", "")
