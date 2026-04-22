@@ -27,7 +27,7 @@ Required fields:
 
 - `email`: must match the e-mail registered in the bot.
 - `payment_system`: payment provider used on the website, for example `stripe`, `paypal`, `bank`, `crypto`.
-- `product_key`: one of the bot plan keys such as `monthly`, `halfyear`, `yearly`, `lifetime`, or a custom key if `subscription_days` is provided.
+- `product_key`: use `monthly` for the 1-month VIP subscription, or a custom key if `subscription_days` is provided.
 - `subscription_days`: how many access days should be added. If `product_key` is a known bot plan and this field is missing, the bot uses the configured plan duration.
 
 Idempotency:

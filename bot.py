@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 REFERRAL_BONUS_DAYS = 10  # Chat subscription bonus
 SUPPORTED_LANGS = ("ru", "en", "lv")
 DEFAULT_LANG = "lv"
+VIP_CHANNEL_LANGS = ("lv", "ru")
+VIP_CHANNEL_LABELS = {
+    "lv": "🇱🇻 Latviešu",
+    "ru": "🇷🇺 Русский",
+}
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 scheduler = AsyncIOScheduler()
@@ -224,6 +229,9 @@ def chat_id_for_lang(lang):
 def chat_link_for_lang(lang):
     return config.chat_link_for_lang(lang) if hasattr(config, "chat_link_for_lang") else config.CHAT_LINK
 
+async def checkout_url_for_lang(lang):
+    return (await db.get_setting(f"checkout_url_{lang}")) or ""
+
 _active_payment_sessions = {}
 PAYMENT_TIMEOUT_SEC = 15 * 60
 PAYMENT_POLL_INTERVAL = 10
@@ -269,19 +277,26 @@ def main_menu_keyboard(lang):
 
 
 def plans_keyboard(lang):
-    """Tarifa plāni (parādās pēc VIP chat pogas spiešanas)"""
+    """VIP kanāla valodas izvēle. Pirkums notiek mājaslapā."""
     b = InlineKeyboardBuilder()
-    
-    # TARIFI (4 pogas)
-    for key, plan in config.PLANS.items():
-        name = plan['name'].get(lang, plan['name'].get("en")) if isinstance(plan['name'], dict) else plan['name']
-        b.button(text=f"{plan['emoji']} {name} — {plan['price_usd']}", callback_data=f"plan_{key}")
-    
-    # BACK poga
+    for code in VIP_CHANNEL_LANGS:
+        b.button(text=VIP_CHANNEL_LABELS[code], callback_data=f"vip_checkout_{code}")
     back_label = "🔙 Назад" if lang == "ru" else ("🔙 Atpakaļ" if lang == "lv" else "🔙 Back")
     b.button(text=back_label, callback_data="back_to_main")
-    
-    # VSE 1 KOLONNĀ
+    b.adjust(1)
+    return b.as_markup()
+
+
+async def vip_channel_keyboard(lang):
+    b = InlineKeyboardBuilder()
+    for code in VIP_CHANNEL_LANGS:
+        url = await checkout_url_for_lang(code)
+        if url:
+            b.button(text=VIP_CHANNEL_LABELS[code], url=url)
+        else:
+            b.button(text=VIP_CHANNEL_LABELS[code], callback_data=f"vip_checkout_{code}")
+    back_label = "🔙 Назад" if lang == "ru" else ("🔙 Atpakaļ" if lang == "lv" else "🔙 Back")
+    b.button(text=back_label, callback_data="back_to_main")
     b.adjust(1)
     return b.as_markup()
 
@@ -555,12 +570,13 @@ async def _send_referral_reminder(user_id, lang):
 # ─── HANDLERS ───
 
 @dp.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
     user_id = message.from_user.id
     args = message.text.split()
     ref_param = args[1] if len(args) > 1 else None
     tg_lang = (message.from_user.language_code or DEFAULT_LANG)[:2]
     auto_lang = tg_lang if tg_lang in SUPPORTED_LANGS else DEFAULT_LANG
+    existing_user = await db.get_user(user_id)
     await db.register_user(user_id, message.from_user.username, message.from_user.first_name, auto_lang)
     if ref_param and ref_param.startswith("ref_"):
         try:
@@ -574,22 +590,33 @@ async def cmd_start(message: Message):
     user = await db.get_user(user_id)
     name = md_escape(message.from_user.first_name)
     lang = user.get("lang", auto_lang) if user else auto_lang
+    has_registered_email = bool((user or {}).get("email"))
     
-    # Ja PILNĪGI jauns lietotājs — vispirms pajautāt valodu
-    is_brand_new = not user.get('plan_key') and not user.get('activated_at')
-    has_chosen_lang = user.get('lang') and user.get('lang') != auto_lang  # ir manuāli izvēlējies
-    # Pārbaudīt vai jau kādreiz ir bijis (ir created_at vecāks par 1 min)
-    first_time = is_brand_new
-    if first_time and user:
-        created = user.get('created_at', '')
-        if created:
-            try:
-                created_dt = datetime.fromisoformat(created)
-                first_time = (datetime.utcnow() - created_dt).total_seconds() < 60
-            except: pass
-    
-    if first_time and not ref_param:
-        # JAUNS USERS — parādīt valodas izvēli
+    # Reģistrācija = DB ieraksts ar e-pastu. Ja e-pasts jau ir, neprasām to atkārtoti.
+    if not has_registered_email:
+        if existing_user:
+            if lang == "lv":
+                text = (
+                    "📧 *Ievadi savu e-pastu*\n\n"
+                    "Pie šī e-pasta tiks piesaistīta piekļuve un mājaslapas pirkumi.\n\n"
+                    "_Atsūti e-pastu vienā ziņā:_"
+                )
+            elif lang == "ru":
+                text = (
+                    "📧 *Укажи свой e-mail*\n\n"
+                    "К нему будет привязан доступ и покупки с сайта.\n\n"
+                    "_Отправь e-mail одним сообщением:_"
+                )
+            else:
+                text = (
+                    "📧 *Enter your e-mail*\n\n"
+                    "Your access and website purchases will be linked to it.\n\n"
+                    "_Send your e-mail as one message:_"
+                )
+            await state.set_state(RegistrationEmailState.waiting_email)
+            await state.update_data(reg_lang=lang, reg_name=name)
+            await message.answer(text, parse_mode="Markdown")
+            return
         await message.answer(
             "🌐 Izvēlies valodu / Choose language / Выбери язык:",
             reply_markup=_first_time_lang_keyboard(ref_param)
@@ -667,13 +694,7 @@ async def cmd_start(message: Message):
     else:
         referral = await db.get_referral_by_referred(user_id) if ref_param else None
         
-        # Pārbaudīt vai ir JAUNS lietotājs (nav plan_key = nekad nav pircis)
-        is_brand_new = not user.get('plan_key') and not user.get('activated_at')
-        
-        if is_brand_new and not referral:
-            # ONBOARDING — 3 ziņu karuselis jaunajiem
-            await _send_onboarding(message, lang, name)
-        elif referral:
+        if referral:
             await message.answer(t(lang, "referral_welcome"), reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
         else:
             custom_welcome = await db.get_setting(f"welcome_{lang}")
@@ -754,7 +775,8 @@ async def cmd_status(message: Message):
 async def cmd_renew(message: Message):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    await message.answer(t(lang, "choose_plan"), reply_markup=plans_keyboard(lang), parse_mode="Markdown")
+    text = "💎 *Izvēlies VIP čatu:*" if lang == "lv" else ("💎 *Выбери VIP чат:*" if lang == "ru" else "💎 *Choose VIP chat:*")
+    await message.answer(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
 
 @dp.message(Command("referral"))
 async def cmd_referral(message: Message):
@@ -2069,13 +2091,47 @@ async def _confirm_payment(user_id, plan_key, plan, lang, msg, username):
 
 @dp.callback_query(F.data == "vip_chat_plans")
 async def show_vip_chat_plans(callback: CallbackQuery):
-    """Parāda VIP chat tarifus"""
+    """Parāda pieejamos VIP čatus. Pirkums notiek mājaslapā."""
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    
-    text = t(lang, "choose_plan")
-    await callback.message.edit_text(text, reply_markup=plans_keyboard(lang), parse_mode="Markdown")
+    if not (user and user.get("email")):
+        text = (
+            "📧 Vispirms iestati e-pastu. Pēc pirkuma mājaslapa sūtīs webhook, un bots piekļuvi atradīs tieši pēc šī e-pasta."
+            if lang == "lv" else
+            ("📧 Сначала укажи e-mail. После покупки сайт отправит webhook, и бот найдёт доступ именно по этому e-mail."
+             if lang == "ru" else
+             "📧 Please set your e-mail first. After purchase the website will send a webhook, and the bot will match access by this e-mail.")
+        )
+        await callback.message.edit_text(text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
+        await callback.answer()
+        return
+    text = (
+        "💎 *Izvēlies VIP čatu:*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski piesaistīs piekļuvi pēc tava e-pasta."
+        if lang == "lv" else
+        ("💎 *Выбери VIP чат:*\n\nПокупка происходит на сайте. После оплаты бот автоматически привяжет доступ по твоему e-mail."
+         if lang == "ru" else
+         "💎 *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
+    )
+    await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("vip_checkout_"))
+async def vip_checkout_missing_or_open(callback: CallbackQuery):
+    code = callback.data.replace("vip_checkout_", "")
+    user = await db.get_user(callback.from_user.id)
+    if not (user and user.get("email")):
+        await callback.answer("Vispirms iestati e-pastu botā.", show_alert=True)
+        return
+    url = await checkout_url_for_lang(code)
+    if url:
+        b = InlineKeyboardBuilder()
+        b.button(text="Atvērt checkout" if code == "lv" else "Открыть checkout", url=url)
+        b.adjust(1)
+        await callback.message.answer("Checkout links:", reply_markup=b.as_markup())
+        await callback.answer()
+        return
+    await callback.answer("Checkout links šai pogai vēl nav iestatīts admin panelī.", show_alert=True)
 
 
 @dp.callback_query(F.data == "back_to_main")
@@ -2106,7 +2162,8 @@ async def back_to_main_menu(callback: CallbackQuery):
 async def back_to_plans(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    await callback.message.edit_text(t(lang, "choose_plan"), reply_markup=plans_keyboard(lang), parse_mode="Markdown")
+    text = "💎 *Izvēlies VIP čatu:*" if lang == "lv" else ("💎 *Выбери VIP чат:*" if lang == "ru" else "💎 *Choose VIP chat:*")
+    await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("qr_"))

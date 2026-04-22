@@ -53,27 +53,6 @@ class Config:
             "days": 30,
             "emoji": "📅",
         },
-        "halfyear": {
-            "name": {"ru": "Полгода", "en": "6 Months", "lv": "6 mēneši"},
-            "price_usd": "55€",
-            "price_usdt": 55.0,
-            "days": 180,
-            "emoji": "⭐",
-        },
-        "yearly": {
-            "name": {"ru": "1 Год", "en": "1 Year", "lv": "1 gads"},
-            "price_usd": "100€",
-            "price_usdt": 100.0,
-            "days": 365,
-            "emoji": "🔥",
-        },
-        "lifetime": {
-            "name": {"ru": "Навсегда", "en": "Lifetime", "lv": "Uz mūžu"},
-            "price_usd": "500€",
-            "price_usdt": 500.0,
-            "days": 36500,
-            "emoji": "💎",
-        },
     })
 
     COURSES: Dict[str, Any] = field(default_factory=lambda: {

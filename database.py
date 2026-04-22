@@ -33,6 +33,9 @@ class Database:
                     expires_at   TEXT,
                     is_active    INTEGER DEFAULT 0,
                     tx_hash      TEXT,
+                    email        TEXT,
+                    email_registered_at TEXT,
+                    last_seen_at TEXT,
                     created_at   TEXT DEFAULT (datetime('now'))
                 )
             """)
@@ -62,6 +65,8 @@ class Database:
                     used_at TEXT DEFAULT (datetime('now'))
                 )
             """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_status_expires ON users(is_active, expires_at)")
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS webhook_events (
                     event_id    TEXT PRIMARY KEY,
@@ -120,6 +125,8 @@ class Database:
                 "ALTER TABLE users ADD COLUMN lang TEXT DEFAULT 'ru'",
                 "ALTER TABLE users ADD COLUMN is_friend INTEGER DEFAULT 0",
                 "ALTER TABLE users ADD COLUMN email TEXT",
+                "ALTER TABLE users ADD COLUMN email_registered_at TEXT",
+                "ALTER TABLE users ADD COLUMN last_seen_at TEXT",
             ]:
                 try:
                     await conn.execute(col_sql)
@@ -292,14 +299,16 @@ class Database:
                 return dict(row) if row else None
 
     async def register_user(self, user_id: int, username: Optional[str], first_name: Optional[str], lang: str = "ru"):
+        now = datetime.utcnow().isoformat()
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("""
-                INSERT INTO users (user_id, username, first_name, lang, is_active)
-                VALUES (?, ?, ?, ?, 0)
+                INSERT INTO users (user_id, username, first_name, lang, is_active, last_seen_at)
+                VALUES (?, ?, ?, ?, 0, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
                     username = COALESCE(excluded.username, username),
-                    first_name = COALESCE(excluded.first_name, first_name)
-            """, (user_id, username, first_name, lang))
+                    first_name = COALESCE(excluded.first_name, first_name),
+                    last_seen_at = excluded.last_seen_at
+            """, (user_id, username, first_name, lang, now))
             await conn.commit()
 
     async def set_user_lang(self, user_id: int, lang: str):
@@ -312,8 +321,16 @@ class Database:
 
     async def set_user_email(self, user_id: int, email: str):
         email = email.strip().lower()
+        now = datetime.utcnow().isoformat()
         async with aiosqlite.connect(self.db_path) as conn:
-            await conn.execute("UPDATE users SET email = ? WHERE user_id = ?", (email, user_id))
+            await conn.execute("""
+                INSERT INTO users (user_id, email, email_registered_at, is_active, last_seen_at)
+                VALUES (?, ?, ?, 0, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    email = excluded.email,
+                    email_registered_at = COALESCE(email_registered_at, excluded.email_registered_at),
+                    last_seen_at = excluded.last_seen_at
+            """, (user_id, email, now, now))
             await conn.commit()
 
     async def webhook_event_exists(self, event_id: str) -> bool:
@@ -731,6 +748,16 @@ class Database:
         async with aiosqlite.connect(self.db_path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute("SELECT * FROM users WHERE is_active = 1") as cur:
+                return [dict(row) for row in await cur.fetchall()]
+
+    async def get_registered_users(self) -> List[Dict]:
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT * FROM users
+                WHERE email IS NOT NULL AND email != ''
+                ORDER BY created_at DESC
+            """) as cur:
                 return [dict(row) for row in await cur.fetchall()]
 
     async def get_expired_users(self) -> List[Dict]:

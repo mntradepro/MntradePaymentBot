@@ -34,6 +34,7 @@ def _trim_for_telegram(text: str, limit: int = MAX_TG_TEXT_LEN) -> str:
 class EditState(StatesGroup):
     waiting_text = State()
     waiting_price = State()
+    waiting_checkout_url = State()
 
 
 class FriendState(StatesGroup):
@@ -67,7 +68,7 @@ def admin_menu_kb():
     builder.button(text="✉️ Atgādinājumi", callback_data="adm_edit_reminders")
     builder.button(text="📤 Marketing", callback_data="adm_send_marketing")
     builder.button(text="🏷 Promo kodi", callback_data="adm_promo_menu")
-    builder.button(text="💰 Mainīt cenas", callback_data="adm_edit_prices")
+    builder.button(text="🔗 Checkout linki", callback_data="adm_edit_prices")
     builder.button(text="📥 Excel eksports", callback_data="adm_export_excel")
     builder.button(text="🎟 Giveaway", callback_data="adm_giveaway")
     builder.button(text="💾 DB Backup", callback_data="adm_backup")
@@ -268,6 +269,7 @@ async def adm_users(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
     users = await db.get_all_active_users()
+    registered = await db.get_registered_users()
     friends = await db.get_all_friends()
 
     builder = InlineKeyboardBuilder()
@@ -295,7 +297,23 @@ async def adm_users(callback: CallbackQuery):
             f"• {_safe_text(uname)}{friend_tag} — {_safe_text(plan_name)} → {_safe_text(exp)}"
         )
 
-    text = f"👥 <b>Aktīvie ({len(users)}):</b>\n\n" + ("\n".join(lines) if lines else "—")
+    reg_lines = []
+    for u in registered[:10]:
+        status = "Aktīvs" if u.get("is_active") and u.get("expires_at") and u.get("expires_at") > datetime.utcnow().isoformat() else "Neaktīvs"
+        exp = (u.get("expires_at") or "—")[:10]
+        email = u.get("email") or "—"
+        registered_at = (u.get("email_registered_at") or u.get("created_at") or "—")[:10]
+        uname = f"@{u['username']}" if u.get("username") else str(u["user_id"])
+        reg_lines.append(f"• {_safe_text(uname)} | {_safe_text(email)} | reg. {_safe_text(registered_at)} | {status} | līdz {_safe_text(exp)}")
+
+    text = (
+        f"👥 <b>Reģistrētie ({len(registered)}):</b>\n"
+        + ("\n".join(reg_lines) if reg_lines else "—")
+        + f"\n\n✅ <b>Aktīvie ({len(users)}):</b>\n"
+        + ("\n".join(lines) if lines else "—")
+    )
+    if len(registered) > 10:
+        text += f"\n...un vēl {len(registered) - 10} reģistrēti"
     if len(users) > 20:
         text += f"\n...un vēl {len(users) - 20}"
     if friends:
@@ -1047,21 +1065,61 @@ async def adm_receive_text(message: Message, state: FSMContext):
 async def adm_edit_prices(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
+    lv_url = await db.get_setting("checkout_url_lv") or "— nav iestatīts"
+    ru_url = await db.get_setting("checkout_url_ru") or "— nav iestatīts"
     builder = InlineKeyboardBuilder()
-    # Čata plāni
-    for key, plan in config.PLANS.items():
-        name = plan['name']['ru'] if isinstance(plan['name'], dict) else plan['name']
-        builder.button(text=f"{plan['emoji']} {name} — {plan.get('price_usdt', 0)} USDT", callback_data=f"adm_price_{key}")
-    # Kursi
-    for key, course in config.COURSES.items():
-        name = course['name']['ru'] if isinstance(course['name'], dict) else course['name']
-        saved = await db.get_setting(f"course_price_{key}")
-        price = float(saved) if saved else course['price_usdt']
-        builder.button(text=f"{course['emoji']} {name} — {price} USDT", callback_data=f"adm_cprice_{key}")
+    builder.button(text="🇱🇻 Latviešu checkout links", callback_data="adm_checkout_lv")
+    builder.button(text="🇷🇺 Русский checkout links", callback_data="adm_checkout_ru")
     builder.button(text="🔙 Atpakaļ", callback_data="adm_main")
     builder.adjust(1)
-    await callback.message.edit_text("💰 *Mainīt cenas*\n\n📋 Čata plāni + 📚 Kursi:", reply_markup=builder.as_markup(), parse_mode="Markdown")
+    await callback.message.edit_text(
+        "🔗 *Checkout linki VIP čatiem*\n\n"
+        "Šie linki ir pogām, kur lietotājs izvēlas VIP čatu. Pirkums notiek mājaslapā, un pēc tam mājaslapa sūta webhook botam.\n\n"
+        f"🇱🇻 LV: `{lv_url}`\n"
+        f"🇷🇺 RU: `{ru_url}`",
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_checkout_"))
+async def adm_checkout_select(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    lang_code = callback.data.replace("adm_checkout_", "")
+    if lang_code not in ("lv", "ru"):
+        await callback.answer("Nav", show_alert=True)
+        return
+    current = await db.get_setting(f"checkout_url_{lang_code}") or "— nav iestatīts"
+    await state.set_state(EditState.waiting_checkout_url)
+    await state.update_data(checkout_lang=lang_code)
+    await callback.message.edit_text(
+        f"🔗 *Checkout links ({lang_code.upper()})*\n\n"
+        f"Pašreizējais:\n`{current}`\n\n"
+        "Ievadi jauno mājaslapas checkout linku:\n/cancel",
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+
+@router.message(EditState.waiting_checkout_url)
+async def adm_receive_checkout_url(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    if message.text == "/cancel":
+        await state.clear()
+        await message.answer("❌ Atcelts.", reply_markup=admin_menu_kb())
+        return
+    url = message.text.strip()
+    if not (url.startswith("https://") or url.startswith("http://")):
+        await message.answer("❌ Ievadi pilnu linku, piemēram `https://...`", parse_mode="Markdown")
+        return
+    data = await state.get_data()
+    lang_code = data.get("checkout_lang", "lv")
+    await db.set_setting(f"checkout_url_{lang_code}", url)
+    await state.clear()
+    await message.answer(f"✅ Checkout links ({lang_code.upper()}) saglabāts:\n{url}", reply_markup=admin_menu_kb())
 
 
 @router.callback_query(F.data.startswith("adm_cprice_"))
