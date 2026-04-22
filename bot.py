@@ -270,9 +270,11 @@ def back_button_text(lang):
 def paid_button_text(lang):
     return "✅ " + ui_text(lang, "Es samaksāju", "Я оплатил", "I paid")
 
-def menu_button(emoji, label, width=34):
-    text = f"{emoji}  {label}"
-    return text + ("\u00a0" * max(0, width - len(text)))
+def menu_button(emoji, label):
+    return f"{emoji}  {label}"
+
+def market_scanner_label(lang):
+    return ui_text(lang, "Tirgus Skaneris/AI signāli", "Сканер рынка/AI сигналы", "Market Scanner/AI Signals")
 
 def md_escape(text):
     if not text: return ""
@@ -311,7 +313,7 @@ def main_menu_keyboard(lang):
     if lang == "lv":
         b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
@@ -319,7 +321,7 @@ def main_menu_keyboard(lang):
     elif lang == "ru":
         b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
@@ -327,7 +329,7 @@ def main_menu_keyboard(lang):
     else:
         b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
@@ -366,7 +368,7 @@ def active_keyboard(lang):
         b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
@@ -375,7 +377,7 @@ def active_keyboard(lang):
         b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
@@ -384,7 +386,7 @@ def active_keyboard(lang):
         b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
@@ -577,7 +579,7 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
@@ -585,7 +587,7 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
@@ -593,7 +595,7 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", "Tirgus Skaneris/AI signāli"), callback_data="market_scanner")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
@@ -834,8 +836,8 @@ async def cb_market_scanner(callback: CallbackQuery):
     text = ui_text(
         lang,
         "📡 Tirgus Skaneris/AI signāli:\nhttps://t.me/promarketscanner",
-        "📡 Tirgus Skaneris/AI signāli:\nhttps://t.me/promarketscanner",
-        "📡 Tirgus Skaneris/AI signāli:\nhttps://t.me/promarketscanner",
+        "📡 Сканер рынка/AI сигналы:\nhttps://t.me/promarketscanner",
+        "📡 Market Scanner/AI Signals:\nhttps://t.me/promarketscanner",
     )
     await callback.message.answer(text)
 
@@ -967,43 +969,39 @@ from cron_jobs import setup_loyalty_cron
 class UserSettingsState(StatesGroup):
     waiting_email = State()
 
+def settings_text(lang, email, selected=False):
+    email_display = email if email else ui_text(lang, "— nav norādīts", "— не указан", "— not set")
+    check = " ✅" if selected else ""
+    if lang == "lv":
+        return (
+            "⚙️ *Iestatījumi*\n\n"
+            f"🌐 Valoda: *Latviešu*{check}\n"
+            f"📧 E-pasts: *{email_display}*\n\n"
+            "E-pasts piesaista tavu piekļuvi un pirkumus no mājaslapas - tāpēc norādi derīgu epastu.\n\n"
+            "Izvēlies, ko mainīt:"
+        )
+    if lang == "ru":
+        return (
+            "⚙️ *Настройки*\n\n"
+            f"🌐 Язык: *Русский*{check}\n"
+            f"📧 E-mail: *{email_display}*\n\n"
+            "E-mail привязывает твой доступ и покупки с сайта - поэтому укажи действительный e-mail.\n\n"
+            "Выбери, что изменить:"
+        )
+    return (
+        "⚙️ *Settings*\n\n"
+        f"🌐 Language: *English*{check}\n"
+        f"📧 E-mail: *{email_display}*\n\n"
+        "E-mail links your access and website purchases - so enter a valid e-mail.\n\n"
+        "Choose what to change:"
+    )
+
 @dp.callback_query(F.data == "user_settings")
 async def user_settings(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     email = user.get("email", "") if user else ""
-
-    if lang == "lv":
-        email_display = email if email else "— nav norādīts"
-        text = (
-            "⚙️ *Iestatījumi*\n\n"
-            f"🌐 Valoda: *Latviešu*\n"
-            f"📧 E-pasts: *{email_display}*\n\n"
-            "E-pasts piesaista tavu piekļuvi un pirkumus no mājaslapas.\n\n"
-            "Izvēlies, ko mainīt:"
-        )
-    elif lang == "ru":
-        email_display = email if email else "— не указан"
-        text = (
-            "⚙️ *Настройки*\n\n"
-            f"🌐 Язык: *Русский*\n"
-            f"📧 E-mail: *{email_display}*\n\n"
-            "🤔 *Зачем указывать почту?*\n"
-            "🎁 Скидки и акции на подписку чата и курсы обучения\n"
-            "🎟 Участие в ежемесячном розыгрыше продления абонемента!\n\n"
-            "Выбери что изменить:"
-        )
-    else:
-        email_display = email if email else "— not set"
-        text = (
-            "⚙️ *Settings*\n\n"
-            f"🌐 Language: *English*\n"
-            f"📧 E-mail: *{email_display}*\n\n"
-            "🤔 *Why provide your e-mail?*\n"
-            "🎁 Discounts and offers on chat subscription and courses\n"
-            "🎟 Monthly subscription extension giveaway!\n\n"
-            "Choose what to change:"
-        )
+    text = settings_text(lang, email)
 
     b = InlineKeyboardBuilder()
     b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
@@ -1025,32 +1023,7 @@ async def settings_lang(callback: CallbackQuery):
     # Rāda atjaunotu settings
     user = await db.get_user(callback.from_user.id)
     email = user.get("email", "") if user else ""
-    email_display = email if email else ("— nav norādīts" if lang == "lv" else ("— не указан" if lang == "ru" else "— not set"))
-    if lang == "lv":
-        text = (
-            "⚙️ *Iestatījumi*\n\n"
-            "🌐 Valoda: *Latviešu* ✅\n"
-            f"📧 E-pasts: *{email_display}*\n\n"
-            "E-pasts piesaista tavu piekļuvi un pirkumus no mājaslapas."
-        )
-    elif lang == "ru":
-        text = (
-            "⚙️ *Настройки*\n\n"
-            "🌐 Язык: *Русский* ✅\n"
-            f"📧 E-mail: *{email_display}*\n\n"
-            "🤔 *Зачем указывать почту?*\n"
-            "🎁 Скидки и акции на подписку чата и курсы обучения\n"
-            "🎟 Участие в ежемесячном розыгрыше продления абонемента!"
-        )
-    else:
-        text = (
-            "⚙️ *Settings*\n\n"
-            "🌐 Language: *English* ✅\n"
-            f"📧 E-mail: *{email_display}*\n\n"
-            "🤔 *Why provide your e-mail?*\n"
-            "🎁 Discounts and offers on chat subscription and courses\n"
-            "🎟 Monthly subscription extension giveaway!"
-        )
+    text = settings_text(lang, email, selected=True)
     b = InlineKeyboardBuilder()
     b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
     b.button(text="🇬🇧 English", callback_data="settings_lang_en")
