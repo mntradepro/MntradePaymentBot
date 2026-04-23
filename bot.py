@@ -1780,6 +1780,18 @@ async def course_checkout_missing(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("course_crypto_"))
 async def course_crypto_selected(callback: CallbackQuery, state: FSMContext):
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "lv") if user else "lv"
+    await callback.answer(
+        ui_text(
+            lang,
+            "Kursu crypto apmaksa botā vairs netiek izmantota. Izmanto kursa checkout pogu.",
+            "Crypto-оплата курсов в боте больше не используется. Используй checkout-кнопку курса.",
+            "Course crypto payment inside the bot is no longer used. Please use the course checkout button.",
+        ),
+        show_alert=True,
+    )
+    return
     """User izvēlējās crypto payment konkrētam kursam"""
     course_key = callback.data.replace("course_crypto_", "")
     course = config.COURSES.get(course_key)
@@ -1969,6 +1981,18 @@ async def _show_courses_list(callback, lang):
 
 @dp.message(CourseEmailState.waiting_email)
 async def course_receive_email(message: Message, state: FSMContext):
+    await state.clear()
+    user = await db.get_user(message.from_user.id)
+    lang = user.get("lang", "lv") if user else "lv"
+    await message.answer(
+        ui_text(
+            lang,
+            "Kursu pirkumi tagad notiek tikai caur mājaslapas checkout. E-pastu vari mainīt iestatījumos.",
+            "Покупки курсов теперь работают только через checkout на сайте. E-mail можно менять в настройках.",
+            "Course purchases now work only through website checkout. You can still change your e-mail in settings.",
+        )
+    )
+    return
     if message.text == "/cancel":
         await state.clear()
         await message.answer("❌")
@@ -2013,6 +2037,18 @@ async def course_receive_email(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("course_"))
 async def course_selected(callback: CallbackQuery):
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "lv") if user else "lv"
+    await callback.answer(
+        ui_text(
+            lang,
+            "Šī vecā kursa apmaksas poga vairs netiek izmantota. Atver kursu no jaunās izvēlnes un izmanto checkout.",
+            "Эта старая кнопка оплаты курса больше не используется. Открой курс из нового меню и используй checkout.",
+            "This old course payment button is no longer used. Open the course from the new menu and use checkout.",
+        ),
+        show_alert=True,
+    )
+    return
     course_key = callback.data.replace("course_", "")
     course = config.COURSES.get(course_key)
     if not course: await callback.answer("❌"); return
@@ -2082,6 +2118,18 @@ async def course_selected(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("check_course_"))
 async def check_course_payment(callback: CallbackQuery):
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "lv") if user else "lv"
+    await callback.answer(
+        ui_text(
+            lang,
+            "Vecā kursa maksājuma pārbaude ir izņemta. Kursu pirkumi tagad nāk tikai no mājaslapas webhook.",
+            "Старая проверка оплаты курса удалена. Покупки курсов теперь приходят только через webhook сайта.",
+            "The old course payment check has been removed. Course purchases now arrive only through the website webhook.",
+        ),
+        show_alert=True,
+    )
+    return
     course_key = callback.data.replace("check_course_", "")
     course = config.COURSES.get(course_key)
     if not course: await callback.answer("❌"); return
