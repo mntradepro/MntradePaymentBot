@@ -1067,10 +1067,12 @@ async def adm_edit_prices(callback: CallbackQuery):
         return
     lv_url = await db.get_setting("checkout_url_lv") or "— nav iestatīts"
     ru_url = await db.get_setting("checkout_url_ru") or "— nav iestatīts"
+    scanner_url = await db.get_setting("checkout_url_scanner_chat") or "— nav iestatīts"
     course_lines = []
     builder = InlineKeyboardBuilder()
     builder.button(text="🇱🇻 Latviešu checkout links", callback_data="adm_checkout_lv")
     builder.button(text="🇷🇺 Русский checkout links", callback_data="adm_checkout_ru")
+    builder.button(text="📡 Scanner checkout links", callback_data="adm_checkout_scanner_chat")
     for key, course in config.COURSES.items():
         name = course["name"].get("lv") if isinstance(course.get("name"), dict) else course.get("name", key)
         url = await db.get_setting(f"course_checkout_url_{key}") or "— nav iestatīts"
@@ -1083,7 +1085,8 @@ async def adm_edit_prices(callback: CallbackQuery):
         "Šie linki tiek izmantoti pogām, kur lietotājs tiek virzīts uz mājaslapas checkout. Pēc apmaksas mājaslapa sūta webhook botam.\n\n"
         "*VIP čati:*\n"
         f"🇱🇻 LV: `{lv_url}`\n"
-        f"🇷🇺 RU: `{ru_url}`\n\n"
+        f"🇷🇺 RU: `{ru_url}`\n"
+        f"📡 Scanner: `{scanner_url}`\n\n"
         "*Kursi:*\n"
         + "\n".join(course_lines),
         reply_markup=builder.as_markup(),
@@ -1100,6 +1103,9 @@ async def adm_checkout_select(callback: CallbackQuery, state: FSMContext):
     if checkout_code in ("lv", "ru"):
         setting_key = f"checkout_url_{checkout_code}"
         title = f"VIP checkout links ({checkout_code.upper()})"
+    elif checkout_code == "scanner_chat":
+        setting_key = "checkout_url_scanner_chat"
+        title = "Scanner checkout links"
     elif checkout_code.startswith("course_"):
         course_key = checkout_code.replace("course_", "")
         course = config.COURSES.get(course_key)

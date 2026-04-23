@@ -302,6 +302,73 @@ async def checkout_url_for_lang(lang):
 async def checkout_url_for_course(course_key):
     return (await db.get_setting(f"course_checkout_url_{course_key}")) or ""
 
+
+async def checkout_url_for_subscription_product(product_key: str, user_lang: str) -> str:
+    key = normalize_subscription_product_key(product_key, user_lang)
+    if key == "vip_chat_lv":
+        return (await db.get_setting("checkout_url_lv")) or ""
+    if key == "vip_chat_ru":
+        return (await db.get_setting("checkout_url_ru")) or ""
+    return (await db.get_setting(f"checkout_url_{key}")) or ""
+
+
+def normalize_subscription_product_key(product_key: str, user_lang: str) -> str:
+    key = (product_key or "").strip().lower()
+    aliases = {
+        "vip_lv": "vip_chat_lv",
+        "vip_chat_lv": "vip_chat_lv",
+        "vip_ru": "vip_chat_ru",
+        "vip_chat_ru": "vip_chat_ru",
+        "scanner": "scanner_chat",
+        "scanner_chat": "scanner_chat",
+        "market_scanner": "scanner_chat",
+        "monthly": "vip_chat_ru" if user_lang == "ru" else "vip_chat_lv",
+    }
+    return aliases.get(key, key)
+
+
+def resolve_subscription_product(product_key: str, user_lang: str) -> dict:
+    key = normalize_subscription_product_key(product_key, user_lang)
+    catalog = {
+        "vip_chat_lv": {
+            "chat_id": config.CHAT_IDS.get("lv", config.CHAT_ID),
+            "chat_link": config.CHAT_LINKS.get("lv", config.CHAT_LINK),
+            "name": {"lv": "VIP Treideru čats", "ru": "VIP чат трейдеров (LV)", "en": "VIP Traders Chat (LV)"},
+        },
+        "vip_chat_ru": {
+            "chat_id": config.CHAT_IDS.get("ru", config.CHAT_ID),
+            "chat_link": config.CHAT_LINKS.get("ru", config.CHAT_LINK),
+            "name": {"lv": "VIP Treideru čats (RU)", "ru": "VIP чат трейдеров", "en": "VIP Traders Chat (RU)"},
+        },
+        "scanner_chat": {
+            "chat_id": getattr(config, "SCANNER_CHAT_ID", 0),
+            "chat_link": getattr(config, "SCANNER_CHAT_LINK", "https://t.me/promarketscanner"),
+            "name": {"lv": "Tirgus Skaneris/AI signāli", "ru": "Сканер рынка/AI сигналы", "en": "Market Scanner/AI Signals"},
+        },
+    }
+    meta = catalog.get(key)
+    if not meta:
+        return {}
+    return {"product_key": key, **meta}
+
+
+async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, expires_at: datetime) -> str:
+    if not product_meta:
+        return ""
+    chat_id = int(product_meta.get("chat_id") or 0)
+    chat_link = product_meta.get("chat_link") or ""
+    if chat_id:
+        try:
+            await bot.unban_chat_member(chat_id, user_id)
+        except Exception:
+            pass
+        try:
+            link = await bot.create_chat_invite_link(chat_id, member_limit=1, expire_date=int((expires_at + timedelta(days=7)).timestamp()))
+            return t(lang, "invite", link=link.invite_link)
+        except Exception:
+            pass
+    return f"\n\n📢 {chat_link}" if chat_link else ""
+
 _active_payment_sessions = {}
 PAYMENT_TIMEOUT_SEC = 15 * 60
 PAYMENT_POLL_INTERVAL = 10
@@ -841,18 +908,51 @@ async def cb_market_scanner(callback: CallbackQuery):
     await callback.answer()
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
+    if not (user and user.get("email")):
+        await callback.message.answer(
+            ui_text(
+                lang,
+                "📧 Vispirms iestati e-pastu botā. Pēc pirkuma piekļuve tiks piesaistīta pēc šī e-pasta.",
+                "📧 Сначала укажи e-mail в боте. После покупки доступ будет привязан по этому e-mail.",
+                "📧 Please set your e-mail first. After purchase access will be linked by this e-mail.",
+            )
+        )
+        return
+    checkout_url = await checkout_url_for_subscription_product("scanner_chat", lang)
     text = ui_text(
         lang,
-        "📡 Tirgus Skaneris/AI signāli:\nhttps://t.me/promarketscanner",
-        "📡 Сканер рынка/AI сигналы:\nhttps://t.me/promarketscanner",
-        "📡 Market Scanner/AI Signals:\nhttps://t.me/promarketscanner",
+        "📡 *Tirgus Skaneris/AI signāli*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski iedos jaunu piekļuvi.",
+        "📡 *Сканер рынка/AI сигналы*\n\nПокупка происходит на сайте. После оплаты бот автоматически выдаст доступ.",
+        "📡 *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
     )
-    await callback.message.answer(text)
+    b = InlineKeyboardBuilder()
+    if checkout_url:
+        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), url=checkout_url)
+    else:
+        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), callback_data="scanner_checkout_missing")
+    b.button(text=back_button_text(lang), callback_data="back_to_main")
+    b.adjust(1)
+    await callback.message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
+
+
+@dp.callback_query(F.data == "scanner_checkout_missing")
+async def scanner_checkout_missing(callback: CallbackQuery):
+    await callback.answer("Scanner checkout links vēl nav iestatīts admin panelī.", show_alert=True)
 
 @dp.message(Command("status"))
 async def cmd_status(message: Message):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
+    active_subs = await db.get_active_user_subscriptions(message.from_user.id)
+    if active_subs:
+        rows = []
+        for sub in active_subs:
+            expires = datetime.fromisoformat(sub["expires_at"])
+            days = max(0, (expires - datetime.utcnow()).days)
+            rows.append(f"• *{sub.get('product_name', sub.get('product_key', '—'))}* — {expires.strftime('%d.%m.%Y')} ({days}d)")
+        header = ui_text(lang, "🟢 *Aktīvās piekļuves:*", "🟢 *Активные подписки:*", "🟢 *Active subscriptions:*")
+        await message.answer(header + "\n\n" + "\n".join(rows), parse_mode="Markdown")
+        return
     if not user or not user.get('expires_at'):
         await message.answer(t(lang, "status_none"), parse_mode="Markdown"); return
     expires = datetime.fromisoformat(user['expires_at'])
@@ -2155,15 +2255,33 @@ async def check_payment_cb(callback: CallbackQuery):
 # ─── UNIVERSĀLA AKTIVIZĀCIJA ───
 async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount):
     now = datetime.utcnow()
-    user = await db.get_user(user_id)
-    if user and user.get('expires_at'):
-        cur_exp = datetime.fromisoformat(user['expires_at'])
+    product_meta = resolve_subscription_product(plan_key, lang)
+    canonical_key = product_meta.get("product_key", plan_key)
+    plan_name_save = plan['name']['ru'] if isinstance(plan['name'], dict) else plan['name']
+    if product_meta and isinstance(product_meta.get("name"), dict):
+        plan_name_save = product_meta["name"].get("ru", plan_name_save)
+        plan_name_loc = product_meta["name"].get(lang, plan_name_save)
+    else:
+        plan_name_loc = plan['name'].get(lang, plan_name_save) if isinstance(plan['name'], dict) else plan['name']
+    active_subs = await db.get_active_user_subscriptions(user_id)
+    current_same = next((s for s in active_subs if s.get("product_key") == canonical_key), None)
+    if current_same and current_same.get("expires_at"):
+        cur_exp = datetime.fromisoformat(current_same["expires_at"])
         new_exp = (cur_exp if cur_exp > now else now) + timedelta(days=plan['days'])
     else:
         new_exp = now + timedelta(days=plan['days'])
-    plan_name_save = plan['name']['ru'] if isinstance(plan['name'], dict) else plan['name']
-    plan_name_loc = plan['name'].get(lang, plan_name_save) if isinstance(plan['name'], dict) else plan['name']
-    await db.activate_subscription(user_id=user_id, username=username, plan_key=plan_key, plan_name=plan_name_save, expires_at=new_exp, tx_hash=tx_hash, amount_usdt=amount)
+    await db.activate_product_subscription(
+        user_id=user_id,
+        username=username,
+        product_key=canonical_key,
+        product_name=plan_name_save,
+        expires_at=new_exp,
+        tx_hash=tx_hash,
+        amount_usdt=amount,
+        chat_id=product_meta.get("chat_id", 0) if product_meta else 0,
+        chat_link=product_meta.get("chat_link", "") if product_meta else "",
+        payment_system="webhook" if tx_hash.startswith("webhook:") else ""
+    )
     # Referral bonus + commission
     ref = await db.get_referral_by_referred(user_id)
     if ref and not ref.get("bonus_given"):
@@ -2172,7 +2290,7 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
             # 1. Give +10 days bonus
             rb = datetime.fromisoformat(referrer['expires_at']) if referrer.get('expires_at') else now
             bexp = (rb if rb > now else now) + timedelta(days=REFERRAL_BONUS_DAYS)
-            await db.activate_subscription(user_id=ref["referrer_id"], username=referrer.get("username"), plan_key=referrer.get("plan_key") or "referral_bonus", plan_name=f"Referral Bonus +{REFERRAL_BONUS_DAYS}d", expires_at=bexp, tx_hash=f"ref_bonus_{user_id}_{int(now.timestamp())}")
+            await db.activate_product_subscription(user_id=ref["referrer_id"], username=referrer.get("username"), product_key=referrer.get("plan_key") or "referral_bonus", product_name=f"Referral Bonus +{REFERRAL_BONUS_DAYS}d", expires_at=bexp, tx_hash=f"ref_bonus_{user_id}_{int(now.timestamp())}", chat_id=0, chat_link="")
             await db.mark_referral_bonus_given(user_id)
             ref_lang = referrer.get("lang", "ru")
             if ref_lang == "ru":
@@ -2189,7 +2307,7 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
             for aid in config.ADMIN_IDS:
                 try: await bot.send_message(aid, f"ðŸ’° *Jauns maksÄjums!*\n\nðŸ‘¤ {uname} (`{user_id}`)\nðŸ“¦ *{plan_name_loc}*\nðŸ’µ *{amount} USDT*\nðŸ“… LÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*\nðŸ”– TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
                 except: pass
-            return new_exp, plan_name_loc
+            return new_exp, plan_name_loc, product_meta
             
             # 2. Give 20% commission (chat subscription)
             commission = round(amount * (config.REFERRAL_COMMISSION_CHAT / 100), 2)
@@ -2241,7 +2359,7 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
     for aid in config.ADMIN_IDS:
         try: await bot.send_message(aid, f"💰 *Jauns maksājums!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Līdz: *{new_exp.strftime('%d.%m.%Y')}*\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
         except: pass
-    return new_exp, plan_name_loc
+    return new_exp, plan_name_loc, product_meta
 
 # Pēc veiksmīga payment — nosūtīt referral reminder pēc 5 min
 async def _post_payment_actions(user_id, lang):
@@ -2257,11 +2375,8 @@ async def _confirm_payment(user_id, plan_key, plan, lang, msg, username):
             remaining = PAYMENT_TIMEOUT_SEC - elapsed
             paid = await check_payment(config.CRYPTO_WALLET, plan['price_usdt'], user_id)
             if paid:
-                new_exp, plan_name_loc = await _do_activate(user_id, plan_key, plan, lang, username, paid, plan['price_usdt'])
-                try:
-                    link = await bot.create_chat_invite_link(chat_id_for_lang(lang), member_limit=1, expire_date=int((new_exp + timedelta(days=7)).timestamp()))
-                    inv = t(lang, "invite", link=link.invite_link)
-                except: inv = f"\n\n📢 {chat_link_for_lang(lang)}"
+                new_exp, plan_name_loc, product_meta = await _do_activate(user_id, plan_key, plan, lang, username, paid, plan['price_usdt'])
+                inv = await invite_text_for_product(user_id, lang, product_meta, new_exp)
                 txt = t(lang, "paid_ok", name=plan_name_loc, expires=new_exp.strftime('%d.%m.%Y'), tx=paid[:20]) + inv
                 try: await msg.edit_text(txt, parse_mode="Markdown")
                 except: await bot.send_message(user_id, txt, parse_mode="Markdown")
@@ -2420,11 +2535,8 @@ async def auto_check_pending_payments():
                 else:
                     # Čata abonements
                     plan = config.PLANS[pk]
-                    new_exp, pname = await _do_activate(uid, pk, plan, lang, username, tx, amount)
-                    try:
-                        link = await bot.create_chat_invite_link(chat_id_for_lang(lang), member_limit=1, expire_date=int((new_exp+timedelta(days=7)).timestamp()))
-                        inv = t(lang, "invite", link=link.invite_link)
-                    except: inv = f"\n\n📢 {chat_link_for_lang(lang)}"
+                    new_exp, pname, product_meta = await _do_activate(uid, pk, plan, lang, username, tx, amount)
+                    inv = await invite_text_for_product(uid, lang, product_meta, new_exp)
                     await bot.send_message(uid, t(lang, "auto_found", name=pname, expires=new_exp.strftime('%d.%m.%Y'), tx=tx[:20]) + inv, parse_mode="Markdown")
 
                 logger.info(f"[AUTO-CHECK] user={uid} TX={tx[:20]} plan={pk}")
@@ -2502,21 +2614,21 @@ async def send_upsell_offers():
         except Exception as e: logger.error(f"Upsell {user['user_id']}: {e}")
 
 async def kick_expired_users():
-    for user in await db.get_expired_users():
+    for user in await db.get_expired_chat_subscriptions():
         if user.get("is_friend"): continue
         # ADMIN AIZSARDZĪBA — nekad nebanoj adminus
         if user['user_id'] in config.ADMIN_IDS:
             logger.info(f"Skip admin {user['user_id']} — cannot kick admin")
             continue
         try:
-            chat_ids = config.all_chat_ids() if hasattr(config, "all_chat_ids") else [config.CHAT_ID]
-            for chat_id in chat_ids:
+            chat_id = int(user.get("chat_id") or 0)
+            if chat_id:
                 try:
                     await bot.ban_chat_member(chat_id, user['user_id'])
                     await bot.unban_chat_member(chat_id, user['user_id'])
                 except Exception as e:
                     logger.warning(f"Kick failed chat={chat_id} user={user['user_id']}: {e}")
-            await db.deactivate_subscription(user['user_id'])
+            await db.mark_subscription_inactive(user['id'])
             try: await bot.send_message(user['user_id'], t(user.get("lang","ru"), "kicked"), reply_markup=plans_keyboard(user.get("lang","ru")), parse_mode="Markdown")
             except: pass
             username = f"@{user['username']}" if user.get("username") else f"ID {user['user_id']}"
@@ -2524,7 +2636,7 @@ async def kick_expired_users():
             admin_text = (
                 "🚫 *Lietotājs izmests no čata*\n\n"
                 f"👤 {username} (`{user['user_id']}`)\n"
-                f"📦 {user.get('plan_name', '—')}\n"
+                f"📦 {user.get('product_name', user.get('plan_name', '—'))}\n"
                 f"📅 Abonements beidzās: `{expires_at}`\n\n"
                 "ℹ️ Marketing ziņas šim lietotājam joprojām var tikt sūtītas no DB segmentiem."
             )
@@ -3799,14 +3911,10 @@ async def website_purchase_webhook(request: web.Request):
     lang = user.get("lang", "ru")
     username = user.get("username") or ""
     await db.save_webhook_event(event_key, email, product_key, payment_system, json.dumps(payload, ensure_ascii=False))
-    new_exp, plan_name = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
+    new_exp, plan_name, product_meta = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
 
     try:
-        try:
-            link = await bot.create_chat_invite_link(chat_id_for_lang(lang), member_limit=1, expire_date=int((new_exp + timedelta(days=7)).timestamp()))
-            invite = t(lang, "invite", link=link.invite_link)
-        except Exception:
-            invite = f"\n\n📢 {chat_link_for_lang(lang)}"
+        invite = await invite_text_for_product(user["user_id"], lang, product_meta, new_exp)
         await bot.send_message(user["user_id"], t(lang, "paid_ok", name=plan_name, expires=new_exp.strftime("%d.%m.%Y"), tx=event_id[:20]) + invite, parse_mode="Markdown")
     except Exception as e:
         logger.warning(f"Failed to notify webhook buyer {user['user_id']}: {e}")

@@ -22,6 +22,8 @@ class Config:
         lang: os.getenv(f"CHAT_LINK_{lang.upper()}", os.getenv("CHAT_LINK", "https://t.me/+xxxx"))
         for lang in ("lv", "en", "ru")
     })
+    SCANNER_CHAT_ID: int = int(os.getenv("SCANNER_CHAT_ID", "0"))
+    SCANNER_CHAT_LINK: str = os.getenv("SCANNER_CHAT_LINK", "https://t.me/promarketscanner")
     CRYPTO_WALLET: str = os.getenv("CRYPTO_WALLET", "0xYourBEP20WalletHere")
 
     # Website purchase webhook

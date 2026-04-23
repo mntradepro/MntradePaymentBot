@@ -93,6 +93,24 @@ class Database:
                 )
             """)
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_subscriptions (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id       INTEGER NOT NULL,
+                    product_key   TEXT NOT NULL,
+                    product_name  TEXT,
+                    chat_id       INTEGER,
+                    chat_link     TEXT,
+                    activated_at  TEXT NOT NULL,
+                    expires_at    TEXT NOT NULL,
+                    is_active     INTEGER DEFAULT 1,
+                    tx_hash       TEXT,
+                    payment_system TEXT,
+                    UNIQUE(user_id, product_key)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_active ON user_subscriptions(user_id, is_active, expires_at)")
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_subscriptions_chat_active ON user_subscriptions(chat_id, is_active, expires_at)")
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sent_reminders (
                     user_id     INTEGER,
                     days_before INTEGER,
@@ -395,6 +413,44 @@ class Database:
                 return [dict(r) for r in await cur.fetchall()]
 
     async def activate_subscription(self, user_id, username, plan_key, plan_name, expires_at, tx_hash, amount_usdt=0.0):
+        return await self.activate_product_subscription(
+            user_id=user_id,
+            username=username,
+            product_key=plan_key,
+            product_name=plan_name,
+            expires_at=expires_at,
+            tx_hash=tx_hash,
+            amount_usdt=amount_usdt,
+            chat_id=0,
+            chat_link="",
+            payment_system=""
+        )
+
+    async def _refresh_user_access_summary(self, conn, user_id: int):
+        conn.row_factory = aiosqlite.Row
+        now = datetime.utcnow().isoformat()
+        async with conn.execute("""
+            SELECT product_key, product_name, activated_at, expires_at, tx_hash
+            FROM user_subscriptions
+            WHERE user_id = ? AND is_active = 1 AND expires_at > ?
+            ORDER BY expires_at DESC
+            LIMIT 1
+        """, (user_id, now)) as cur:
+            row = await cur.fetchone()
+        if row:
+            await conn.execute("""
+                UPDATE users
+                SET plan_key = ?, plan_name = ?, activated_at = ?, expires_at = ?, is_active = 1, tx_hash = ?
+                WHERE user_id = ?
+            """, (row["product_key"], row["product_name"], row["activated_at"], row["expires_at"], row["tx_hash"], user_id))
+        else:
+            await conn.execute("""
+                UPDATE users
+                SET is_active = 0, plan_key = NULL, plan_name = NULL, activated_at = NULL, tx_hash = NULL
+                WHERE user_id = ?
+            """, (user_id,))
+
+    async def activate_product_subscription(self, user_id, username, product_key, product_name, expires_at, tx_hash, amount_usdt=0.0, chat_id=0, chat_link="", payment_system=""):
         now = datetime.utcnow().isoformat()
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("""
@@ -404,13 +460,28 @@ class Database:
                     username=excluded.username, plan_key=excluded.plan_key,
                     plan_name=excluded.plan_name, activated_at=excluded.activated_at,
                     expires_at=excluded.expires_at, is_active=1, tx_hash=excluded.tx_hash
-            """, (user_id, username, plan_key, plan_name, now, expires_at.isoformat(), tx_hash))
+            """, (user_id, username, product_key, product_name, now, expires_at.isoformat(), tx_hash))
+            await conn.execute("""
+                INSERT INTO user_subscriptions
+                    (user_id, product_key, product_name, chat_id, chat_link, activated_at, expires_at, is_active, tx_hash, payment_system)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                ON CONFLICT(user_id, product_key) DO UPDATE SET
+                    product_name = excluded.product_name,
+                    chat_id = excluded.chat_id,
+                    chat_link = excluded.chat_link,
+                    activated_at = excluded.activated_at,
+                    expires_at = excluded.expires_at,
+                    is_active = 1,
+                    tx_hash = excluded.tx_hash,
+                    payment_system = excluded.payment_system
+            """, (user_id, product_key, product_name, chat_id or 0, chat_link or "", now, expires_at.isoformat(), tx_hash, payment_system or ""))
             await conn.execute("""
                 INSERT INTO payment_history (user_id, plan_key, plan_name, amount_usdt, tx_hash)
                 VALUES (?, ?, ?, ?, ?)
-            """, (user_id, plan_key, plan_name, amount_usdt, tx_hash))
+            """, (user_id, product_key, product_name, amount_usdt, tx_hash))
             await conn.execute("INSERT OR IGNORE INTO used_transactions (tx_hash, user_id) VALUES (?, ?)", (tx_hash, user_id))
             await conn.execute("DELETE FROM pending_payments WHERE user_id = ?", (user_id,))
+            await self._refresh_user_access_summary(conn, user_id)
             await conn.commit()
 
     async def set_friend(self, user_id: int, is_friend: bool):
@@ -454,6 +525,43 @@ class Database:
                 "UPDATE users SET is_active = 0, expires_at = ? WHERE user_id = ?",
                 (now, user_id)
             )
+            await conn.execute(
+                "UPDATE user_subscriptions SET is_active = 0 WHERE user_id = ?",
+                (user_id,)
+            )
+            await conn.commit()
+
+    async def get_active_user_subscriptions(self, user_id: int) -> List[Dict]:
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT * FROM user_subscriptions
+                WHERE user_id = ? AND is_active = 1 AND expires_at > ?
+                ORDER BY expires_at ASC
+            """, (user_id, now)) as cur:
+                return [dict(row) for row in await cur.fetchall()]
+
+    async def get_expired_chat_subscriptions(self) -> List[Dict]:
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT us.*, u.username, u.lang, u.is_friend
+                FROM user_subscriptions us
+                JOIN users u ON u.user_id = us.user_id
+                WHERE us.is_active = 1 AND us.expires_at < ? AND COALESCE(us.chat_id, 0) != 0
+            """, (now,)) as cur:
+                return [dict(row) for row in await cur.fetchall()]
+
+    async def mark_subscription_inactive(self, subscription_id: int):
+        async with aiosqlite.connect(self.db_path) as conn:
+            async with conn.execute("SELECT user_id FROM user_subscriptions WHERE id = ?", (subscription_id,)) as cur:
+                row = await cur.fetchone()
+                user_id = row[0] if row else None
+            await conn.execute("UPDATE user_subscriptions SET is_active = 0 WHERE id = ?", (subscription_id,))
+            if user_id:
+                await self._refresh_user_access_summary(conn, user_id)
             await conn.commit()
 
     # ─── PENDING PAYMENTS ───
