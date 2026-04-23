@@ -15,6 +15,8 @@ def _cron_renew_keyboard(lang='ru'):
     b = InlineKeyboardBuilder()
     if lang == 'ru':
         b.button(text="🔥  Продлить сейчас", callback_data="vip_chat_plans")
+    elif lang == 'lv':
+        b.button(text="🔥  Pagarināt tagad", callback_data="vip_chat_plans")
     else:
         b.button(text="🔥  Renew Now", callback_data="vip_chat_plans")
     b.adjust(1)
@@ -29,6 +31,58 @@ class LoyaltyCronJobs:
         self.db = db
         self.config = config
         self.loyalty = loyalty_system
+
+    async def _get_text_setting(self, key: str, fallback: str) -> str:
+        return (await self.db.get_setting(key)) or fallback
+
+    async def _get_int_setting(self, key: str, fallback: int) -> int:
+        raw = await self.db.get_setting(key)
+        try:
+            return int(raw) if raw is not None else fallback
+        except (TypeError, ValueError):
+            return fallback
+
+    def _coupon_block(self, lang: str, coupon_code) -> str:
+        if not coupon_code:
+            return ""
+        if lang == 'ru':
+            return (
+                f"\n✅ {self.config.REMINDER_COUPON_DISCOUNT}% скидка на другие планы"
+                f"\n✅ {self.config.REMINDER_COUPON_DISCOUNT}% купон на курсы ({self.config.REMINDER_COUPON_HOURS}ч) ⏰"
+                f"\n\nКод: `{coupon_code}`"
+            )
+        if lang == 'lv':
+            return (
+                f"\n✅ {self.config.REMINDER_COUPON_DISCOUNT}% atlaide citiem plāniem"
+                f"\n✅ {self.config.REMINDER_COUPON_DISCOUNT}% kupons kursiem ({self.config.REMINDER_COUPON_HOURS}h) ⏰"
+                f"\n\nKods: `{coupon_code}`"
+            )
+        return (
+            f"\n✅ {self.config.REMINDER_COUPON_DISCOUNT}% discount other plans"
+            f"\n✅ {self.config.REMINDER_COUPON_DISCOUNT}% course coupon ({self.config.REMINDER_COUPON_HOURS}h) ⏰"
+            f"\n\nCode: `{coupon_code}`"
+        )
+
+    def _tier_block(self, lang: str, days: int, tier_emoji: str, tier_name: str, tier_discount: int) -> str:
+        if tier_discount <= 0:
+            return ""
+        if lang == 'ru':
+            if days in (7, 30):
+                return f"\n\n🎯 ВАЖНО: Сохрани статус {tier_emoji} {tier_name} ({tier_discount}%)!"
+            if days == 3:
+                return f"\n✅ Сохранить {tier_emoji} {tier_name} ({tier_discount}%)"
+            return f"\n❌ Статус {tier_emoji} {tier_name} (-{tier_discount}%)"
+        if lang == 'lv':
+            if days in (7, 30):
+                return f"\n\n🎯 SVARĪGI: Saglabā statusu {tier_emoji} {tier_name} ({tier_discount}%)!"
+            if days == 3:
+                return f"\n✅ Saglabā {tier_emoji} {tier_name} ({tier_discount}%)"
+            return f"\n❌ Statuss {tier_emoji} {tier_name} (-{tier_discount}%)"
+        if days in (7, 30):
+            return f"\n\n🎯 IMPORTANT: Keep {tier_emoji} {tier_name} status ({tier_discount}%)!"
+        if days == 3:
+            return f"\n✅ Keep {tier_emoji} {tier_name} ({tier_discount}%)"
+        return f"\n❌ {tier_emoji} {tier_name} status (-{tier_discount}%)"
     
     async def daily_loyalty_check(self):
         """
@@ -167,141 +221,27 @@ class LoyaltyCronJobs:
             tier_discount = tier_data.get('chat_discount', 0)
             tier_emoji = tier_data.get('emoji', '')
             tier_name = tier_data.get('tag', tier)
-            
-            # Build message based on days and tier
-            if lang == 'ru':
-                if days == 7:
-                    text = f"""📅 Абонемент закончится через 7 дней!
 
-💰 ПРОДЛИ СЕЙЧАС — получи:
-✅ +{self.config.REMINDER_BONUS_DAYS} дней бесплатно"""
-                    
-                    if coupon_code:
-                        text += f"""
-✅ 5% скидка на другие планы
-✅ 5% купон на курсы (24ч) ⏰
+            bonus_days = await self._get_int_setting("remarketing_reminder_bonus_days", self.config.REMINDER_BONUS_DAYS)
+            template = await self._get_text_setting(
+                f"remarketing_reminder_{days}_{lang}",
+                ""
+            )
+            if not template:
+                logger.warning(f"Missing remarketing reminder template: days={days} lang={lang}")
+                return
 
-Код: `{coupon_code}`"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-
-🎯 ВАЖНО: Сохрани статус {tier_emoji} {tier_name} ({tier_discount}%)!"""
-                    
-                    text += "\n\n"
-                
-                elif days == 3:
-                    text = f"""⚠️ 3 ДНЯ до окончания абонемента!
-
-💰 Самое время продлить и получить:
-✅ +{self.config.REMINDER_BONUS_DAYS} дней бесплатно"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-✅ Сохранить {tier_emoji} {tier_name} ({tier_discount}%)"""
-                    
-                    text += "\n\n"
-                
-                elif days == 1:
-                    text = f"""🚨 ПОСЛЕДНИЙ ДЕНЬ!
-
-Завтра потеряешь:
-❌ Доступ к VIP чату"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-❌ Статус {tier_emoji} {tier_name} (-{tier_discount}%)"""
-                    
-                    text += """
-
-💡 Продли СЕЙЧАС - не упусти момент!
-
-"""
-                
-                elif days == 30:
-                    text = f"""📅 Годовой абонемент заканчивается через месяц
-
-ℹ️ Напоминание:
-До окончания подписки осталось 30 дней"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-
-💎 Твой статус: {tier_emoji} {tier_name} ({tier_discount}%)"""
-                    
-                    text += """
-
-Чтобы сохранить статус и привилегии,
-продли подписку до истечения срока.
-
-"""
-            
-            else:  # EN
-                if days == 7:
-                    text = f"""📅 Subscription expires in 7 days!
-
-💰 RENEW NOW — get:
-✅ +{self.config.REMINDER_BONUS_DAYS} days free"""
-                    
-                    if coupon_code:
-                        text += f"""
-✅ 5% discount other plans
-✅ 5% course coupon (24h) ⏰
-
-Code: `{coupon_code}`"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-
-🎯 IMPORTANT: Keep {tier_emoji} {tier_name} status ({tier_discount}%)!"""
-                    
-                    text += "\n\n"
-                
-                elif days == 3:
-                    text = f"""⚠️ 3 DAYS until subscription ends!
-
-💰 Time to renew and get:
-✅ +{self.config.REMINDER_BONUS_DAYS} days free"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-✅ Keep {tier_emoji} {tier_name} ({tier_discount}%)"""
-                    
-                    text += "\n\n"
-                
-                elif days == 1:
-                    text = f"""🚨 LAST DAY!
-
-Tomorrow you'll lose:
-❌ VIP chat access"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-❌ {tier_emoji} {tier_name} status (-{tier_discount}%)"""
-                    
-                    text += """
-
-💡 RENEW NOW - don't miss out!
-
-"""
-                
-                elif days == 30:
-                    text = f"""📅 Yearly subscription expires in a month
-
-ℹ️ Reminder:
-30 days until subscription ends"""
-                    
-                    if tier_discount > 0:
-                        text += f"""
-
-💎 Your status: {tier_emoji} {tier_name} ({tier_discount}%)"""
-                    
-                    text += """
-
-To keep your status and privileges,
-renew before expiration.
-
-"""
+            text = template.format(
+                bonus_days=bonus_days,
+                coupon_block=self._coupon_block(lang, coupon_code),
+                tier_block=self._tier_block(lang, days, tier_emoji, tier_name, tier_discount),
+                tier_emoji=tier_emoji,
+                tier_name=tier_name,
+                tier_discount=tier_discount,
+                coupon_code=coupon_code or "",
+                coupon_discount=self.config.REMINDER_COUPON_DISCOUNT,
+                coupon_hours=self.config.REMINDER_COUPON_HOURS,
+            )
             
             await self.bot.send_message(user_id, text, reply_markup=_cron_renew_keyboard(lang), parse_mode="Markdown")
             logger.info(f"Sent {days}d reminder: user={user_id}")
@@ -318,9 +258,8 @@ renew before expiration.
         
         try:
             # Get users who expired exactly 5 days ago
-            users = await self.db.get_expired_users_for_winback(
-                self.config.WINBACK_TRIGGER_DAYS
-            )
+            trigger_days = await self._get_int_setting("remarketing_winback_trigger_days", self.config.WINBACK_TRIGGER_DAYS)
+            users = await self.db.get_expired_users_for_winback(trigger_days)
             
             for user_row in users:
                 user_id = user_row['user_id']
@@ -345,34 +284,13 @@ renew before expiration.
         try:
             user = await self.db.get_user(user_id)
             lang = user.get('lang', 'ru')
-            
-            if lang == 'ru':
-                text = """💔 Мы тебя потеряли...
 
-Вернись в MNtradepro VIP с бонусами:
-
-🎁 WELCOME BACK бонусы:
-• 7 дней БЕСПЛАТНО
-• 10% скидка на год
-• 5% скидка на курсы
-
-⏰ Предложение 72 часа
-
-"""
-            
-            else:
-                text = """💔 We lost you...
-
-Return to MNtradepro VIP with bonuses:
-
-🎁 WELCOME BACK bonuses:
-• 7 days FREE
-• 10% discount yearly
-• 5% discount courses
-
-⏰ Offer valid 72h
-
-"""
+            text = (await self._get_text_setting(f"remarketing_winback_{lang}", "")).format(
+                bonus_days=await self._get_int_setting("remarketing_winback_bonus_days", 7),
+                yearly_discount=self.config.WINBACK_YEARLY_DISCOUNT,
+                course_discount=self.config.REMINDER_COUPON_DISCOUNT,
+                offer_hours=await self._get_int_setting("remarketing_offer_hours", 72),
+            )
             
             await self.bot.send_message(user_id, text, reply_markup=_cron_renew_keyboard(lang), parse_mode="Markdown")
             

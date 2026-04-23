@@ -119,6 +119,7 @@ async def admin_help(message: Message):
         "• 👋 Welcome teksts — rediģēt /start ziņu (RU/EN)\n"
         "• ✉️ Atgādinājumi — rediģēt 3d/1d reminder tekstu\n"
         "• 📤 Marketing — sūtīt ziņas dažādām grupām\n"
+        "• ⚙️ Remarketing — rediģēt reminder / win-back tekstus un dienas\n"
         "• 🏷 Promo kodi — izveidot/dzēst atlaižu kodus\n"
         "• 💰 Cenas — mainīt plānu cenas\n"
         "• 📥 Excel — eksportēt lietotāju datus\n"
@@ -920,8 +921,34 @@ def marketing_audience_kb(counts: dict):
     builder.button(text=f"1️⃣ 1x pircēji ({counts['one_time']})", callback_data="mkt_aud_one_time")
     builder.button(text=f"⏰ Beigsies 7d ({counts['expiring_soon']})", callback_data="mkt_aud_expiring_soon")
     builder.button(text=f"👋 Ref nepircēji ({counts['ref_pending']})", callback_data="mkt_aud_ref_pending")
+    builder.button(text="⚙️ Remarketing", callback_data="adm_marketing_remarketing")
     builder.button(text="🔙 Atpakaļ", callback_data="adm_main")
     builder.adjust(1)
+    return builder.as_markup()
+
+
+def remarketing_settings_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📅 30d LV", callback_data="adm_edit_remarket_remarketing_reminder_30_lv")
+    builder.button(text="📅 30d RU", callback_data="adm_edit_remarket_remarketing_reminder_30_ru")
+    builder.button(text="📅 30d EN", callback_data="adm_edit_remarket_remarketing_reminder_30_en")
+    builder.button(text="⚠️ 7d LV", callback_data="adm_edit_remarket_remarketing_reminder_7_lv")
+    builder.button(text="⚠️ 7d RU", callback_data="adm_edit_remarket_remarketing_reminder_7_ru")
+    builder.button(text="⚠️ 7d EN", callback_data="adm_edit_remarket_remarketing_reminder_7_en")
+    builder.button(text="⚠️ 3d LV", callback_data="adm_edit_remarket_remarketing_reminder_3_lv")
+    builder.button(text="⚠️ 3d RU", callback_data="adm_edit_remarket_remarketing_reminder_3_ru")
+    builder.button(text="⚠️ 3d EN", callback_data="adm_edit_remarket_remarketing_reminder_3_en")
+    builder.button(text="🚨 1d LV", callback_data="adm_edit_remarket_remarketing_reminder_1_lv")
+    builder.button(text="🚨 1d RU", callback_data="adm_edit_remarket_remarketing_reminder_1_ru")
+    builder.button(text="🚨 1d EN", callback_data="adm_edit_remarket_remarketing_reminder_1_en")
+    builder.button(text="💔 Winback LV", callback_data="adm_edit_remarket_remarketing_winback_lv")
+    builder.button(text="💔 Winback RU", callback_data="adm_edit_remarket_remarketing_winback_ru")
+    builder.button(text="💔 Winback EN", callback_data="adm_edit_remarket_remarketing_winback_en")
+    builder.button(text="⏱ Trigger dienas", callback_data="adm_edit_remarket_remarketing_winback_trigger_days")
+    builder.button(text="🎁 Bonus dienas", callback_data="adm_edit_remarket_remarketing_winback_bonus_days")
+    builder.button(text="⌛ Offer stundas", callback_data="adm_edit_remarket_remarketing_offer_hours")
+    builder.button(text="🔙 Atpakaļ", callback_data="adm_send_marketing")
+    builder.adjust(3, 3, 3, 3, 3, 3, 1)
     return builder.as_markup()
 
 
@@ -951,6 +978,30 @@ async def adm_send_marketing_menu(callback: CallbackQuery):
         "Izvēlies grupu → ievadi tekstu → izsūtīts!",
         reply_markup=marketing_audience_kb(counts), parse_mode="Markdown"
     )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "adm_marketing_remarketing")
+async def adm_marketing_remarketing(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    trigger_days = await db.get_setting("remarketing_winback_trigger_days") or str(config.WINBACK_TRIGGER_DAYS)
+    bonus_days = await db.get_setting("remarketing_winback_bonus_days") or "7"
+    offer_hours = await db.get_setting("remarketing_offer_hours") or "72"
+    text = (
+        "⚙️ *Marketing -> Remarketing*\n\n"
+        "Šeit vari redzēt un rediģēt automātiskos retention / win-back tekstus.\n\n"
+        "⏰ *Kad sūtas:*\n"
+        "• 30d / 7d / 3d / 1d reminderi — katru dienu plkst. 10:00 UTC\n"
+        f"• Win-back — pēc *{trigger_days}* dienām kopš abonements beidzies\n\n"
+        "🎁 *Pašreizējais win-back piedāvājums:*\n"
+        f"• Bonus dienas tekstā: *{bonus_days}*\n"
+        f"• Piedāvājuma ilgums: *{offer_hours}h*\n\n"
+        "💡 Tekstos vari lietot mainīgos:\n"
+        "`{bonus_days}` ` {coupon_block}` ` {tier_block}` ` {tier_name}` ` {tier_discount}`\n"
+        "`{yearly_discount}` ` {course_discount}` ` {offer_hours}`"
+    )
+    await callback.message.edit_text(text, reply_markup=remarketing_settings_kb(), parse_mode="Markdown")
     await callback.answer()
 
 
@@ -1036,7 +1087,7 @@ async def mkt_receive_text(message: Message, state: FSMContext):
 async def adm_edit_remarket_start(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
-    key = callback.data.replace("adm_edit_", "")
+    key = callback.data.replace("adm_edit_remarket_", "")
     current = await db.get_setting(key) or "—"
     await state.set_state(EditState.waiting_text)
     await state.update_data(edit_key=key)
