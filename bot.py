@@ -16,7 +16,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import config
 from database import db
-from crypto_checker import check_payment
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -446,11 +445,6 @@ async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, e
             pass
     return f"\n\n📢 {chat_link}" if chat_link else ""
 
-_active_payment_sessions = {}
-PAYMENT_TIMEOUT_SEC = 15 * 60
-PAYMENT_POLL_INTERVAL = 10
-PAYMENT_MAX_ATTEMPTS = PAYMENT_TIMEOUT_SEC // PAYMENT_POLL_INTERVAL
-
 def lang_keyboard():
     b = InlineKeyboardBuilder()
     b.button(text="🇷🇺 Русский", callback_data="lang_ru")
@@ -544,14 +538,6 @@ def active_keyboard(lang):
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
-    return b.as_markup()
-
-def payment_keyboard(plan_key, lang):
-    b = InlineKeyboardBuilder()
-    b.button(text=t(lang, "btn_paid"), callback_data=f"check_{plan_key}")
-    b.button(text=t(lang, "btn_qr"), callback_data=f"qr_{plan_key}")
-    b.button(text=t(lang, "btn_back"), callback_data="back_plans")
-    b.adjust(2, 1)
     return b.as_markup()
 
 def referral_keyboard(lang):
@@ -2266,6 +2252,16 @@ async def _get_unique_amount(plan_key, user_id, base_price):
 # ─── PLAN/PAYMENT ───
 @dp.callback_query(F.data.startswith("plan_"))
 async def plan_selected(callback: CallbackQuery):
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "lv") if user else "lv"
+    text = ui_text(
+        lang,
+        "Šī apmaksas metode vairs netiek izmantota. Izmanto mājaslapas checkout pogas.",
+        "Этот способ оплаты больше не используется. Используй checkout-кнопки сайта.",
+        "This payment method is no longer used. Please use the website checkout buttons.",
+    )
+    await callback.answer(text, show_alert=True)
+    return
     plan_key = callback.data.split("_", 1)[1]
     if plan_key not in config.PLANS: await callback.answer("❌", show_alert=True); return
     plan = config.PLANS[plan_key]
@@ -2315,6 +2311,16 @@ async def plan_selected(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("check_"))
 async def check_payment_cb(callback: CallbackQuery):
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "lv") if user else "lv"
+    text = ui_text(
+        lang,
+        "Automātiskā crypto pārbaude ir izņemta. Pirkums tagad notiek tikai caur mājaslapu un webhook.",
+        "Автопроверка crypto удалена. Теперь покупка работает только через сайт и webhook.",
+        "Automatic crypto checking has been removed. Purchases now work only via website checkout and webhook.",
+    )
+    await callback.answer(text, show_alert=True)
+    return
     plan_key = callback.data.split("_", 1)[1]
     if plan_key not in config.PLANS: await callback.answer("❌", show_alert=True); return
     user_id = callback.from_user.id
@@ -2460,6 +2466,8 @@ async def _post_payment_actions(user_id, lang):
     asyncio.create_task(_send_referral_reminder(user_id, lang))
 
 async def _confirm_payment(user_id, plan_key, plan, lang, msg, username):
+    logger.info("Legacy _confirm_payment call skipped; website checkout + webhook flow is active.")
+    return
     elapsed = 0
     try:
         for _ in range(PAYMENT_MAX_ATTEMPTS):
@@ -2570,6 +2578,16 @@ async def back_to_plans(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("qr_"))
 async def show_qr_code(callback: CallbackQuery):
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "lv") if user else "lv"
+    text = ui_text(
+        lang,
+        "QR crypto apmaksa vairs nav aktīva. Izmanto checkout pogas botā.",
+        "QR crypto оплата больше не активна. Используй checkout-кнопки в боте.",
+        "QR crypto payment is no longer active. Use the checkout buttons in the bot.",
+    )
+    await callback.answer(text, show_alert=True)
+    return
     plan_key = callback.data.split("_", 1)[1]
     if plan_key not in config.PLANS: await callback.answer("❌", show_alert=True); return
     plan = config.PLANS[plan_key]
@@ -2593,6 +2611,7 @@ async def show_qr_code(callback: CallbackQuery):
 
 # ─── FIX #2: AUTO-CHECK FONS ───
 async def auto_check_pending_payments():
+    return
     pending = await db.get_all_pending_payments()
     for p in pending:
         uid, amount, pk = p['user_id'], p['amount_usdt'], p['plan_key']
@@ -4105,8 +4124,6 @@ async def main():
                 pass
     from admin import router as admin_router
     dp.include_router(admin_router)
-    scheduler.add_job(auto_check_pending_payments, 'interval', minutes=3)
-    scheduler.add_job(db.cleanup_old_pending, 'interval', hours=1)
     scheduler.add_job(check_expiring_subscriptions, 'cron', hour=10, minute=0)
     scheduler.add_job(send_upsell_offers, 'cron', hour=11, minute=0)
     scheduler.add_job(kick_expired_users, 'interval', hours=1)

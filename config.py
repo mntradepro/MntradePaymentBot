@@ -24,8 +24,7 @@ class Config:
     })
     SCANNER_CHAT_ID: int = int(os.getenv("SCANNER_CHAT_ID", "0"))
     SCANNER_CHAT_LINK: str = os.getenv("SCANNER_CHAT_LINK", "https://t.me/promarketscanner")
-    CRYPTO_WALLET: str = os.getenv("CRYPTO_WALLET", "0xYourBEP20WalletHere")
-
+    CRYPTO_WALLET: str = os.getenv("CRYPTO_WALLET", "")
     # Website purchase webhook
     WEBHOOK_HOST: str = os.getenv("WEBHOOK_HOST", "0.0.0.0")
     WEBHOOK_PORT: int = int(os.getenv("WEBHOOK_PORT", "8080"))
@@ -34,15 +33,6 @@ class Config:
 
     # Support kontakts — @username vai grupa
     SUPPORT_CONTACT: str = os.getenv("SUPPORT_CONTACT", "https://t.me/mntrade_support")
-
-    # MegaNode (BSCTrace) — BEZMAKSAS: https://dashboard.nodereal.io
-    MEGANODE_API_KEY: str = os.getenv("MEGANODE_API_KEY", "")
-
-    # Etherscan V2 — BSC prasa MAKSAS plānu
-    BSCSCAN_API_KEY: str = os.getenv("BSCSCAN_API_KEY", "")
-
-    # USDT BEP-20 contract (BSC mainnet)
-    USDT_CONTRACT: str = "0x55d398326f99059fF775485246999027B3197955"
 
     ADMIN_IDS: List[int] = field(default_factory=lambda: [
         int(x.strip()) for x in os.getenv("ADMIN_IDS", "0").split(",") if x.strip().isdigit()
@@ -186,11 +176,7 @@ class Config:
     SURVEY_REWARD_HOURS: int = 24
 
     def __post_init__(self):
-        if self.CRYPTO_WALLET.startswith("0xYour"):
-            logger.error("❌ CRYPTO_WALLET nav iestatīts!")
-        if self.MEGANODE_API_KEY:
-            logger.info(f"✅ MegaNode key: {self.MEGANODE_API_KEY[:8]}...")
-        logger.info(f"CONFIG: wallet={self.CRYPTO_WALLET[:16]}... support={self.SUPPORT_CONTACT}")
+        logger.info(f"CONFIG: support={self.SUPPORT_CONTACT}")
 
     def chat_id_for_lang(self, lang: str) -> int:
         return self.CHAT_IDS.get(lang, self.CHAT_ID)
