@@ -276,6 +276,14 @@ def menu_button(emoji, label):
 def market_scanner_label(lang):
     return ui_text(lang, "Tirgus Skaneris/AI signāli", "Сканер рынка/AI сигналы", "Market Scanner/AI Signals")
 
+def email_binding_notice(lang):
+    return ui_text(
+        lang,
+        "E-pasts piesaista tavu piekļuvi un pirkumus no mājaslapas - tāpēc norādi derīgu epastu.",
+        "E-mail привязывает твой доступ и покупки с сайта - поэтому укажи действительный e-mail.",
+        "E-mail links your access and website purchases - so enter a valid e-mail.",
+    )
+
 def md_escape(text):
     if not text: return ""
     for ch in ['*','_','`','[',']']: text = text.replace(ch, f'\\{ch}')
@@ -664,19 +672,19 @@ async def cmd_start(message: Message, state: FSMContext):
             if lang == "lv":
                 text = (
                     "📧 *Ievadi savu e-pastu*\n\n"
-                    "Pie šī e-pasta tiks piesaistīta piekļuve un mājaslapas pirkumi.\n\n"
+                    f"{email_binding_notice(lang)}\n\n"
                     "_Atsūti e-pastu vienā ziņā:_"
                 )
             elif lang == "ru":
                 text = (
                     "📧 *Укажи свой e-mail*\n\n"
-                    "К нему будет привязан доступ и покупки с сайта.\n\n"
+                    f"{email_binding_notice(lang)}\n\n"
                     "_Отправь e-mail одним сообщением:_"
                 )
             else:
                 text = (
                     "📧 *Enter your e-mail*\n\n"
-                    "Your access and website purchases will be linked to it.\n\n"
+                    f"{email_binding_notice(lang)}\n\n"
                     "_Send your e-mail as one message:_"
                 )
             await state.set_state(RegistrationEmailState.waiting_email)
@@ -977,7 +985,7 @@ def settings_text(lang, email, selected=False):
             "⚙️ *Iestatījumi*\n\n"
             f"🌐 Valoda: *Latviešu*{check}\n"
             f"📧 E-pasts: *{email_display}*\n\n"
-            "E-pasts piesaista tavu piekļuvi un pirkumus no mājaslapas - tāpēc norādi derīgu epastu.\n\n"
+            f"{email_binding_notice(lang)}\n\n"
             "Izvēlies, ko mainīt:"
         )
     if lang == "ru":
@@ -985,14 +993,14 @@ def settings_text(lang, email, selected=False):
             "⚙️ *Настройки*\n\n"
             f"🌐 Язык: *Русский*{check}\n"
             f"📧 E-mail: *{email_display}*\n\n"
-            "E-mail привязывает твой доступ и покупки с сайта - поэтому укажи действительный e-mail.\n\n"
+            f"{email_binding_notice(lang)}\n\n"
             "Выбери, что изменить:"
         )
     return (
         "⚙️ *Settings*\n\n"
         f"🌐 Language: *English*{check}\n"
         f"📧 E-mail: *{email_display}*\n\n"
-        "E-mail links your access and website purchases - so enter a valid e-mail.\n\n"
+        f"{email_binding_notice(lang)}\n\n"
         "Choose what to change:"
     )
 
@@ -1042,25 +1050,21 @@ async def settings_email(callback: CallbackQuery, state: FSMContext):
     if lang == "lv":
         text = (
             "📧 *Ievadi savu e-pastu:*\n\n"
-            "Šis e-pasts tiks izmantots, lai piesaistītu tavu piekļuvi un mājaslapas pirkumus.\n\n"
+            f"{email_binding_notice(lang)}\n\n"
             "_Atsūti savu e-pastu ziņā:_\n\n"
             "/cancel lai atceltu"
         )
     elif lang == "ru":
         text = (
             "📧 *Укажи свой e-mail:*\n\n"
-            "🤔 *Зачем указывать почту?*\n"
-            "🎁 Скидки и акции на подписку чата и курсы обучения\n"
-            "🎟 Участие в ежемесячном розыгрыше продления абонемента!\n\n"
+            f"{email_binding_notice(lang)}\n\n"
             "_Отправь свой e-mail сообщением:_\n\n"
             "/cancel для отмены"
         )
     else:
         text = (
             "📧 *Enter your e-mail:*\n\n"
-            "🤔 *Why provide your e-mail?*\n"
-            "🎁 Discounts and offers on chat subscription and training courses\n"
-            "🎟 Monthly subscription extension giveaway!\n\n"
+            f"{email_binding_notice(lang)}\n\n"
             "_Send your e-mail as a message:_\n\n"
             "/cancel to cancel"
         )
@@ -1171,9 +1175,7 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 "🎟 *Розыгрыш месяца*\n\n"
                 f"Каждый месяц среди подписчиков разыгрывается *+{prize_days} дней* бесплатного доступа!\n\n"
                 "⚠️ Для участия нужно указать *e-mail*.\n\n"
-                "🤔 *Зачем указывать почту?*\n"
-                "🎁 Скидки и акции на подписку чата и курсы обучения\n"
-                "🎟 Участие в ежемесячном розыгрыше!\n\n"
+                f"{email_binding_notice(lang)}\n\n"
                 "📧 _Отправь свой e-mail сообщением:_\n"
                 "/cancel для отмены"
             )
@@ -1182,9 +1184,7 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 "🎟 *Mēneša izloze*\n\n"
                 f"Katru mēnesi abonenti var laimēt *+{prize_days} dienas* bezmaksas piekļuvi!\n\n"
                 "⚠️ Lai piedalītos, jānorāda *e-pasts*.\n\n"
-                "🤔 *Kāpēc norādīt e-pastu?*\n"
-                "🎁 Atlaides abonementam un kursiem\n"
-                "🎟 Dalība ikmēneša izlozē!\n\n"
+                f"{email_binding_notice(lang)}\n\n"
                 "📧 _Atsūti savu e-pastu ziņā:_\n"
                 "/cancel lai atceltu"
             )
@@ -1193,9 +1193,7 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
                 "🎟 *Monthly Giveaway*\n\n"
                 f"Every month subscribers can win *+{prize_days} days* of free access!\n\n"
                 "⚠️ To participate you need to provide your *e-mail*.\n\n"
-                "🤔 *Why provide your e-mail?*\n"
-                "🎁 Discounts on subscription and courses\n"
-                "🎟 Monthly giveaway participation!\n\n"
+                f"{email_binding_notice(lang)}\n\n"
                 "📧 _Send your e-mail as a message:_\n"
                 "/cancel to cancel"
             )
