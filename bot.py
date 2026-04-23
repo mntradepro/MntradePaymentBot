@@ -257,6 +257,83 @@ async def inactive_welcome_text(lang, name):
         )
     return t(lang, "inactive_welcome", name=name)
 
+
+async def build_active_access_text(user_id: int, lang: str, name: str = None) -> str:
+    user = await db.get_user(user_id)
+    active_subs = await db.get_active_user_subscriptions(user_id)
+    if not active_subs:
+        return ""
+    if name is None:
+        name = md_escape((user or {}).get("first_name") or "Trader")
+
+    if lang == "lv":
+        header = f"👋 *Sveiks, {name}!*\n\n✅ *Aktīvās piekļuves:*"
+    elif lang == "ru":
+        header = f"👋 *Привет, {name}!*\n\n✅ *Активные подписки:*"
+    else:
+        header = f"👋 *Hello, {name}!*\n\n✅ *Active subscriptions:*"
+
+    rows = []
+    nearest_days = None
+    now = datetime.utcnow()
+    for sub in active_subs:
+        try:
+            expires_dt = datetime.fromisoformat(sub["expires_at"])
+        except Exception:
+            continue
+        days_left = max(0, (expires_dt - now).days)
+        if nearest_days is None or days_left < nearest_days:
+            nearest_days = days_left
+        product_name = sub.get("product_name") or sub.get("product_key") or "—"
+        rows.append(f"• *{product_name}* — {expires_dt.strftime('%d.%m.%Y')} ({days_left}d)")
+
+    loyalty_data = await db.get_user_loyalty(user_id)
+    if not loyalty_data:
+        await db.update_user_loyalty(user_id, 'rookie', 0)
+        loyalty_data = {'current_tier': 'rookie', 'consecutive_months': 0}
+    current_tier = loyalty_data.get('current_tier', 'rookie')
+    tier_data = config.LOYALTY_TIERS.get(current_tier, {})
+    tier_emoji = tier_data.get('emoji', '🌱')
+    tier_tag = tier_data.get('tag', 'Rookie')
+    if lang == "lv":
+        loyalty_line = f"\n\n{tier_emoji} Lojalitātes līmenis: *{tier_tag}*"
+    elif lang == "ru":
+        loyalty_line = f"\n\n{tier_emoji} Уровень лояльности: *{tier_tag}*"
+    else:
+        loyalty_line = f"\n\n{tier_emoji} Loyalty level: *{tier_tag}*"
+
+    urgency = ""
+    if nearest_days is not None and nearest_days <= 3:
+        if nearest_days == 0:
+            urgency = ui_text(lang, "\n\n🚨 *Viena no piekļuvēm beidzas šodien!*", "\n\n🚨 *Одна из подписок истекает сегодня!*", "\n\n🚨 *One of your subscriptions expires today!*")
+        else:
+            urgency = ui_text(
+                lang,
+                f"\n\n⚠️ *Tuvākā piekļuve beidzas pēc {nearest_days} dienām!*",
+                f"\n\n⚠️ *Ближайшая подписка истекает через {nearest_days} дн.*",
+                f"\n\n⚠️ *Your nearest subscription expires in {nearest_days} days!*"
+            )
+
+    return header + "\n\n" + "\n".join(rows) + loyalty_line + urgency
+
+
+async def build_active_home_view(user_id: int, lang: str, name: str = None):
+    active_subs = await db.get_active_user_subscriptions(user_id)
+    if not active_subs:
+        return "", active_keyboard(lang)
+    nearest_days = None
+    now = datetime.utcnow()
+    for sub in active_subs:
+        try:
+            expires_dt = datetime.fromisoformat(sub["expires_at"])
+        except Exception:
+            continue
+        days_left = max(0, (expires_dt - now).days)
+        if nearest_days is None or days_left < nearest_days:
+            nearest_days = days_left
+    kb = _urgency_keyboard(lang) if nearest_days is not None and nearest_days <= 3 else active_keyboard(lang)
+    return await build_active_access_text(user_id, lang, name), kb
+
 def ui_text(lang, lv, ru, en):
     if lang == "lv":
         return lv
@@ -763,7 +840,11 @@ async def cmd_start(message: Message, state: FSMContext):
             reply_markup=_first_time_lang_keyboard(ref_param)
         )
         return
-    if user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
+    active_subs = await db.get_active_user_subscriptions(user_id)
+    if active_subs:
+        welcome_text, kb = await build_active_home_view(user_id, lang, name)
+        await message.answer(welcome_text, reply_markup=kb, parse_mode="Markdown")
+        return
         expires_dt = datetime.fromisoformat(user['expires_at'])
         expires = expires_dt.strftime("%d.%m.%Y")
         days_left = max(0, (expires_dt - datetime.utcnow()).days)
@@ -859,7 +940,11 @@ async def lang_selected(callback: CallbackQuery):
     await db.set_user_lang(callback.from_user.id, lang)
     name = md_escape(callback.from_user.first_name)
     user = await db.get_user(callback.from_user.id)
-    if user and user.get("expires_at") and datetime.fromisoformat(user["expires_at"]) > datetime.utcnow():
+    active_subs = await db.get_active_user_subscriptions(callback.from_user.id)
+    if active_subs:
+        text, kb = await build_active_home_view(callback.from_user.id, lang, name)
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    elif user and user.get("expires_at") and datetime.fromisoformat(user["expires_at"]) > datetime.utcnow():
         expires_dt = datetime.fromisoformat(user["expires_at"]); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
         # Custom welcome no DB (tāpat kā cmd_start)
@@ -1059,7 +1144,11 @@ async def ref_back_start(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     name = md_escape(callback.from_user.first_name)
-    if user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
+    active_subs = await db.get_active_user_subscriptions(callback.from_user.id)
+    if active_subs:
+        text, kb = await build_active_home_view(callback.from_user.id, lang, name)
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    elif user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
         expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
         welcome_text = await inactive_welcome_text(lang, name)
@@ -1205,8 +1294,12 @@ async def settings_back(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     name = md_escape(callback.from_user.first_name)
-    has_active = user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow()
-    if has_active:
+    active_subs = await db.get_active_user_subscriptions(callback.from_user.id)
+    has_active = bool(active_subs) or (user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow())
+    if active_subs:
+        text, kb = await build_active_home_view(callback.from_user.id, lang, name)
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    elif has_active:
         expires = datetime.fromisoformat(user['expires_at']).strftime("%d.%m.%Y")
         expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
@@ -2451,7 +2544,11 @@ async def back_to_main_menu(callback: CallbackQuery):
     name = md_escape(callback.from_user.first_name)
     
     # Pārbauda vai ir aktīva subscription
-    if user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
+    active_subs = await db.get_active_user_subscriptions(callback.from_user.id)
+    if active_subs:
+        text, kb = await build_active_home_view(callback.from_user.id, lang, name)
+        await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    elif user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
         expires_dt = datetime.fromisoformat(user['expires_at'])
         text = t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days))
         await callback.message.edit_text(text, reply_markup=active_keyboard(lang), parse_mode="Markdown")
@@ -3630,8 +3727,12 @@ async def start_back_callback(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     name = md_escape(callback.from_user.first_name)
-    has_active = user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow()
-    if has_active:
+    active_subs = await db.get_active_user_subscriptions(callback.from_user.id)
+    has_active = bool(active_subs) or (user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow())
+    if active_subs:
+        welcome_text, kb = await build_active_home_view(callback.from_user.id, lang, name)
+        await callback.message.edit_text(welcome_text, reply_markup=kb, parse_mode="Markdown")
+    elif has_active:
         expires_dt = datetime.fromisoformat(user['expires_at'])
         days_left = max(0, (expires_dt - datetime.utcnow()).days)
         loyalty_data = await db.get_user_loyalty(callback.from_user.id)
