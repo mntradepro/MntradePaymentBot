@@ -2438,7 +2438,6 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
             winback_bonus_days = bonus_days
             new_exp = bonus_exp
             await db.redeem_winback_offer(user_id, tx_hash)
-            await db.log_winback_usage(user_id)
             bonus_text = ui_text(
                 lang,
                 f"🎁 *Atgriešanās bonuss aktivizēts!*\n\nTev pievienotas *+{bonus_days} bezmaksas dienas*.\n📅 Aktīvs līdz: *{new_exp.strftime('%d.%m.%Y')}*",
@@ -3935,9 +3934,6 @@ async def handle_survey_response(callback: CallbackQuery, state: FSMContext):
     # Save response
     await db.save_survey_response(user_id, response_type, coupon_code)
     
-    # Log win-back usage
-    await db.log_winback_usage(user_id)
-    
     if lang == 'ru':
         text = f"""🎁 *Спасибо за ответ!*
 
@@ -3997,7 +3993,6 @@ async def survey_custom_text(message: Message, state: FSMContext):
     
     coupon_code = await loyalty_system.generate_winback_coupon(user_id, survey_response=True)
     await db.save_survey_response(user_id, custom_text, coupon_code)
-    await db.log_winback_usage(user_id)
     
     if lang == 'ru':
         text = (

@@ -255,21 +255,15 @@ class LoyaltyDatabaseMixin:
             since = (datetime.utcnow() - timedelta(days=365)).isoformat()
         async with aiosqlite.connect(self.db_path) as conn:
             async with conn.execute("""
-                SELECT COUNT(*) FROM winback_surveys
-                WHERE user_id = ? AND created_at > ?
+                SELECT COUNT(*) FROM winback_offers
+                WHERE user_id = ? AND redeemed_at IS NOT NULL AND redeemed_at > ?
             """, (user_id, since)) as cur:
                 row = await cur.fetchone()
                 return row[0] if row else 0
 
     async def log_winback_usage(self, user_id: int):
-        """Reģistrē win-back izmantošanu — izsauc bot.py"""
-        now = datetime.utcnow().isoformat()
-        async with aiosqlite.connect(self.db_path) as conn:
-            await conn.execute(
-                "INSERT INTO winback_surveys (user_id, created_at) VALUES (?, ?)",
-                (user_id, now)
-            )
-            await conn.commit()
+        """Atstāts saderībai ar vecākiem izsaukumiem."""
+        return None
 
     async def get_expired_users_for_winback(self, days_expired: int = 5) -> List[Dict]:
         """Lietotāji kuru abonements beidzies pirms N dienām — izsauc cron_jobs.py"""

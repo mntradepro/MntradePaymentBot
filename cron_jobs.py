@@ -294,9 +294,8 @@ class LoyaltyCronJobs:
                 offer_hours=offer_hours,
             )
 
-            await self.db.create_winback_offer(user_id, bonus_days, offer_hours)
-            
             await self.bot.send_message(user_id, text, reply_markup=_cron_renew_keyboard(lang), parse_mode="Markdown")
+            await self.db.create_winback_offer(user_id, bonus_days, offer_hours)
             
             # Also send survey
             await self.send_survey(user_id, lang)
