@@ -2448,9 +2448,52 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
                 await bot.send_message(user_id, bonus_text, parse_mode="Markdown")
             except Exception as e:
                 logger.warning(f"Failed to send winback bonus notice {user_id}: {e}")
-    # Referral bonus + commission
+    # Referral bonus days
     ref = await db.get_referral_by_referred(user_id)
     if ref and not ref.get("bonus_given"):
+        referrer = await db.get_user(ref["referrer_id"])
+        if referrer:
+            ref_product_key = referrer.get("plan_key") or ""
+            bonus_granted = False
+            if ref_product_key:
+                bonus_exp = await db.extend_product_subscription(ref["referrer_id"], ref_product_key, REFERRAL_BONUS_DAYS)
+                if bonus_exp:
+                    bonus_granted = True
+                    await db.mark_referral_bonus_given(user_id)
+                    ref_lang = referrer.get("lang", "ru")
+                    if ref_lang == "ru":
+                        ref_text = (
+                            f"🎁 *Бонус за друга!*\n\n"
+                            f"Твой реферал оформил подписку.\n"
+                            f"Тебе добавлено *+{REFERRAL_BONUS_DAYS} дней* бесплатного доступа.\n"
+                            f"📅 Активно до: *{bonus_exp.strftime('%d.%m.%Y')}*"
+                        )
+                    elif ref_lang == "lv":
+                        ref_text = (
+                            f"🎁 *Bonuss par draugu!*\n\n"
+                            f"Tavs referral noformēja abonementu.\n"
+                            f"Tev pievienotas *+{REFERRAL_BONUS_DAYS} bezmaksas dienas*.\n"
+                            f"📅 Aktīvs līdz: *{bonus_exp.strftime('%d.%m.%Y')}*"
+                        )
+                    else:
+                        ref_text = (
+                            f"🎁 *Referral bonus!*\n\n"
+                            f"Your referral purchased a subscription.\n"
+                            f"You received *+{REFERRAL_BONUS_DAYS} free days*.\n"
+                            f"📅 Active until: *{bonus_exp.strftime('%d.%m.%Y')}*"
+                        )
+                    try:
+                        await bot.send_message(ref["referrer_id"], ref_text, parse_mode="Markdown")
+                    except Exception as e:
+                        logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
+            if not bonus_granted:
+                logger.warning(
+                    f"Referral bonus not granted for referrer={ref['referrer_id']} referred={user_id}: no extendable active subscription"
+                )
+
+    # Legacy referral branch kept disabled for compatibility
+    ref = await db.get_referral_by_referred(user_id)
+    if False and ref and not ref.get("bonus_given"):
         referrer = await db.get_user(ref["referrer_id"])
         if referrer:
             # 1. Give +10 days bonus
@@ -4081,9 +4124,6 @@ async def website_purchase_webhook(request: web.Request):
     event_key = f"{payment_system or 'website'}:{event_id}"
     tx_hash = f"webhook:{event_key}"
 
-    if await db.webhook_event_exists(event_key):
-        return web.json_response({"ok": True, "duplicate": True})
-
     user = await db.get_user_by_email(email)
     if not user:
         for aid in config.ADMIN_IDS:
@@ -4095,8 +4135,15 @@ async def website_purchase_webhook(request: web.Request):
 
     lang = user.get("lang", "ru")
     username = user.get("username") or ""
-    await db.save_webhook_event(event_key, email, product_key, payment_system, json.dumps(payload, ensure_ascii=False))
-    new_exp, plan_name, product_meta = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
+    payload_json = json.dumps(payload, ensure_ascii=False)
+    claimed = await db.claim_webhook_event(event_key, email, product_key, payment_system, payload_json)
+    if not claimed:
+        return web.json_response({"ok": True, "duplicate": True})
+    try:
+        new_exp, plan_name, product_meta = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
+    except Exception:
+        await db.delete_webhook_event(event_key)
+        raise
 
     try:
         invite = await invite_text_for_product(user["user_id"], lang, product_meta, new_exp)

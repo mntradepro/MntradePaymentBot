@@ -399,12 +399,26 @@ class Database:
             async with conn.execute("SELECT 1 FROM webhook_events WHERE event_id = ?", (event_id,)) as cur:
                 return await cur.fetchone() is not None
 
+    async def claim_webhook_event(self, event_id: str, email: str, product_key: str, payment_system: str, payload: str) -> bool:
+        async with aiosqlite.connect(self.db_path) as conn:
+            cur = await conn.execute("""
+                INSERT OR IGNORE INTO webhook_events (event_id, email, product_key, payment_system, payload)
+                VALUES (?, ?, ?, ?, ?)
+            """, (event_id, email.strip().lower(), product_key, payment_system, payload))
+            await conn.commit()
+            return (cur.rowcount or 0) > 0
+
     async def save_webhook_event(self, event_id: str, email: str, product_key: str, payment_system: str, payload: str):
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("""
                 INSERT OR IGNORE INTO webhook_events (event_id, email, product_key, payment_system, payload)
                 VALUES (?, ?, ?, ?, ?)
             """, (event_id, email.strip().lower(), product_key, payment_system, payload))
+            await conn.commit()
+
+    async def delete_webhook_event(self, event_id: str):
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("DELETE FROM webhook_events WHERE event_id = ?", (event_id,))
             await conn.commit()
 
     # ─── GIVEAWAY ───

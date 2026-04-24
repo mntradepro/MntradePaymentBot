@@ -268,14 +268,13 @@ class LoyaltyDatabaseMixin:
     async def get_expired_users_for_winback(self, days_expired: int = 5) -> List[Dict]:
         """Lietotāji kuru abonements beidzies pirms N dienām — izsauc cron_jobs.py"""
         target_date = (datetime.utcnow() - timedelta(days=days_expired)).strftime("%Y-%m-%d")
-        target_next = (datetime.utcnow() - timedelta(days=days_expired - 1)).strftime("%Y-%m-%d")
         async with aiosqlite.connect(self.db_path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute("""
                 SELECT * FROM users
-                WHERE is_active = 0 AND date(expires_at) BETWEEN ? AND ?
+                WHERE is_active = 0 AND date(expires_at) = ?
                 AND plan_key IS NOT NULL AND plan_key != ''
-            """, (target_date, target_next)) as cur:
+            """, (target_date,)) as cur:
                 return [dict(row) for row in await cur.fetchall()]
 
     # ─── SURVEYS ───

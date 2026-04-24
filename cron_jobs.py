@@ -263,6 +263,12 @@ class LoyaltyCronJobs:
             
             for user_row in users:
                 user_id = user_row['user_id']
+                campaign_key = f"winback:{user_row.get('expires_at', '')[:10]}"
+
+                already_sent = await self.db.marketing_already_sent(user_id, campaign_key)
+                if already_sent:
+                    logger.info(f"Win-back already sent: user={user_id} campaign={campaign_key}")
+                    continue
                 
                 # Check if can use win-back
                 can_use = await self.loyalty.can_use_winback(user_id)
@@ -272,7 +278,9 @@ class LoyaltyCronJobs:
                     continue
                 
                 # Send win-back offer
-                await self.send_winback_offer(user_id)
+                sent = await self.send_winback_offer(user_id)
+                if sent:
+                    await self.db.mark_marketing_sent(user_id, campaign_key)
             
             logger.info(f"✅ Win-back campaigns: {len(users)} users contacted")
             
@@ -301,9 +309,11 @@ class LoyaltyCronJobs:
             await self.send_survey(user_id, lang)
             
             logger.info(f"Sent win-back offer: user={user_id}")
+            return True
             
         except Exception as e:
             logger.error(f"Failed to send win-back: user={user_id} error={e}")
+            return False
     
     async def send_survey(self, user_id: int, lang: str):
         """Send survey to user"""
