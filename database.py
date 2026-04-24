@@ -161,6 +161,23 @@ class Database:
                     created_at    TEXT DEFAULT (datetime('now'))
                 )
             """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS referral_bonus_wallet (
+                    user_id      INTEGER PRIMARY KEY,
+                    balance_days INTEGER NOT NULL DEFAULT 0,
+                    updated_at   TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS referral_bonus_usage (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id     INTEGER NOT NULL,
+                    product_key TEXT NOT NULL,
+                    days_used   INTEGER NOT NULL,
+                    created_at  TEXT DEFAULT (datetime('now')),
+                    note        TEXT
+                )
+            """)
             
             # Migrācijas — kolonnas
             for col_sql in [
@@ -1176,6 +1193,50 @@ class Database:
             async with conn.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id = ? AND bonus_given = 1", (referrer_id,)) as cur:
                 row = await cur.fetchone()
                 return row[0] if row else 0
+
+    async def get_referral_bonus_days_balance(self, user_id: int) -> int:
+        async with aiosqlite.connect(self.db_path) as conn:
+            async with conn.execute(
+                "SELECT balance_days FROM referral_bonus_wallet WHERE user_id = ?",
+                (user_id,)
+            ) as cur:
+                row = await cur.fetchone()
+                return int(row[0]) if row and row[0] is not None else 0
+
+    async def add_referral_bonus_days(self, user_id: int, days: int, note: str = "") -> int:
+        if days <= 0:
+            return await self.get_referral_bonus_days_balance(user_id)
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT INTO referral_bonus_wallet (user_id, balance_days, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    balance_days = referral_bonus_wallet.balance_days + excluded.balance_days,
+                    updated_at = excluded.updated_at
+            """, (user_id, days, now))
+            await conn.commit()
+        return await self.get_referral_bonus_days_balance(user_id)
+
+    async def consume_referral_bonus_days(self, user_id: int, days: int, product_key: str, note: str = "") -> bool:
+        if days <= 0:
+            return False
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            cur = await conn.execute("""
+                UPDATE referral_bonus_wallet
+                SET balance_days = balance_days - ?, updated_at = ?
+                WHERE user_id = ? AND balance_days >= ?
+            """, (days, now, user_id, days))
+            if (cur.rowcount or 0) <= 0:
+                await conn.rollback()
+                return False
+            await conn.execute("""
+                INSERT INTO referral_bonus_usage (user_id, product_key, days_used, created_at, note)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, product_key, days, now, note))
+            await conn.commit()
+            return True
 
     async def get_my_referrals(self, referrer_id: int) -> List[Dict]:
         async with aiosqlite.connect(self.db_path) as conn:

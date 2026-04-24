@@ -333,6 +333,47 @@ async def build_active_home_view(user_id: int, lang: str, name: str = None):
     kb = _urgency_keyboard(lang) if nearest_days is not None and nearest_days <= 3 else active_keyboard(lang)
     return await build_active_access_text(user_id, lang, name), kb
 
+async def get_bonus_eligible_chat_subscriptions(user_id: int):
+    subs = await db.get_active_user_subscriptions(user_id)
+    return [s for s in subs if int(s.get("chat_id") or 0) != 0]
+
+async def build_referral_overview_text(user_id: int, lang: str) -> str:
+    bot_me = await bot.get_me()
+    ref_link = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
+    ref_count = await db.get_referral_count(user_id)
+    bonus_count = await db.get_referral_bonus_count(user_id)
+    bonus_days_balance = await db.get_referral_bonus_days_balance(user_id)
+    return ui_text(
+        lang,
+        (
+            "👥 *Referral programma*\n\n"
+            f"📌 Tava saite:\n`{ref_link}`\n\n"
+            f"📊 Uzaicināti: *{ref_count}*\n"
+            f"✅ Draugi ar saņemtu bonusu: *{bonus_count}*\n"
+            f"🎁 Pieejamās bonusu dienas: *{bonus_days_balance}*\n\n"
+            f"Par katru draugu, kurš veic pirkumu, tu saņem *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
+            "Bonusu dienas vari izmantot pats un izvēlēties, kuram aktīvajam čatam tās pielikt."
+        ),
+        (
+            "👥 *Реферальная программа*\n\n"
+            f"📌 Твоя ссылка:\n`{ref_link}`\n\n"
+            f"📊 Приглашено: *{ref_count}*\n"
+            f"✅ Друзья с начисленным бонусом: *{bonus_count}*\n"
+            f"🎁 Доступно бонусных дней: *{bonus_days_balance}*\n\n"
+            f"За каждого друга, который совершит покупку, ты получаешь *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
+            "Бонусные дни ты используешь сам и выбираешь, к какому активному чату их применить."
+        ),
+        (
+            "👥 *Referral Program*\n\n"
+            f"📌 Your link:\n`{ref_link}`\n\n"
+            f"📊 Invited: *{ref_count}*\n"
+            f"✅ Friends with granted bonus: *{bonus_count}*\n"
+            f"🎁 Available bonus days: *{bonus_days_balance}*\n\n"
+            f"For every friend who makes a purchase, you get *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
+            "You can use those bonus days yourself and choose which active chat to apply them to."
+        ),
+    )
+
 def ui_text(lang, lv, ru, en):
     if lang == "lv":
         return lv
@@ -543,17 +584,19 @@ def active_keyboard(lang):
 def referral_keyboard(lang):
     b = InlineKeyboardBuilder()
     b.button(text="🔗 " + ui_text(lang, "Mana referral saite", "Моя реф. ссылка", "My Ref Link"), callback_data="ref_my_link")
+    b.button(text="🎁 " + ui_text(lang, "Izmantot bonusu dienas", "Использовать бонусные дни", "Use bonus days"), callback_data="ref_use_bonus")
     b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My Referrals"), callback_data="ref_my_list")
     b.button(text=back_button_text(lang), callback_data="ref_back_start")
-    b.adjust(2, 1)
+    b.adjust(1, 1, 1, 1)
     return b.as_markup()
 
 def referral_keyboard_with_earnings(lang):
-    """Referral keyboard ar earnings"""
+    """Referral keyboard ar bonus day wallet"""
     b = InlineKeyboardBuilder()
+    b.button(text="🎁 " + ui_text(lang, "Izmantot bonusu dienas", "Использовать бонусные дни", "Use bonus days"), callback_data="ref_use_bonus")
     b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My referrals"), callback_data="ref_my_list")
     b.button(text=back_button_text(lang), callback_data="settings_back")
-    b.adjust(1)
+    b.adjust(1, 1, 1)
     return b.as_markup()
 
 
@@ -1043,53 +1086,19 @@ async def cmd_renew(message: Message):
 async def cmd_referral(message: Message):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    if lang == "lv":
-        text = (
-            "👥 *Referral programma*\n\n"
-            "🎁 Saņem bezmaksas piekļuves dienas par katru aktīvu draugu!\n\n"
-            "Uzaicini draugu ar savu unikālo saiti. Tiklīdz viņš veic pirkumu, "
-            "tu saņem *10 dienas* piekļuvei kā bonusu.\n\n"
-            "🚀 Jo vairāk aktīvu draugu — jo ilgāks tavs bonusa periods."
-        )
-    elif lang == "ru":
-        text = (
-            "👥 *Реферальная программа*\n\n"
-            "🎁 Получай бесплатный доступ за каждого активного друга!\n\n"
-            "Пригласи друга по своей уникальной ссылке. Как только он оформит подписку, "
-            "ты получишь *10 дней* доступа к чату в подарок!\n\n"
-            "🚀 Чем больше друзей — тем дольше твой бесплатный период."
-        )
-    else:
-        text = (
-            "👥 *Referral Program*\n\n"
-            "🎁 Get free access for every active friend!\n\n"
-            "Invite a friend using your unique link. As soon as they subscribe, "
-            "you'll receive *10 days* of free chat access as a gift!\n\n"
-            "🚀 The more friends — the longer your free period."
-        )
-    await message.answer(text, reply_markup=referral_keyboard(lang), parse_mode="Markdown")
+    await message.answer(
+        await build_referral_overview_text(message.from_user.id, lang),
+        reply_markup=referral_keyboard_with_earnings(lang),
+        parse_mode="Markdown",
+    )
 
 @dp.callback_query(F.data == "ref_main")
 async def ref_main(callback: CallbackQuery):
-    """Referral main - ar earnings info"""
+    """Referral main - bonus day wallet"""
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
-    
-    bot_me = await bot.get_me()
-    ref_link = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
-    
-    ref_count = await db.get_referral_count(user_id)
-    bonus_count = await db.get_referral_bonus_count(user_id)
-    balance = await db.get_referral_balance(user_id)
-    
-    text = t(lang, "referral_info",
-        ref_link=ref_link,
-        count=ref_count,
-        bonuses=bonus_count,
-        balance=f"{balance:.2f}"
-    )
-    
+    text = await build_referral_overview_text(user_id, lang)
     await callback.message.edit_text(
         text,
         reply_markup=referral_keyboard_with_earnings(lang),
@@ -1102,13 +1111,7 @@ async def ref_my_link(callback: CallbackQuery):
     uid = callback.from_user.id
     user = await db.get_user(uid)
     lang = user.get("lang", "ru") if user else "ru"
-    bot_info = await bot.get_me()
-    ref_link = f"https://t.me/{bot_info.username}?start=ref_{uid}"
-    try:
-        balance = await db.get_referral_balance(uid)
-    except:
-        balance = 0.0
-    await callback.message.edit_text(t(lang, "referral_info", ref_link=ref_link, count=await db.get_referral_count(uid), bonuses=await db.get_referral_bonus_count(uid), balance=f"{balance:.2f}"), reply_markup=referral_keyboard(lang), parse_mode="Markdown")
+    await callback.message.edit_text(await build_referral_overview_text(uid, lang), reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
     await callback.answer()
 
 @dp.callback_query(F.data == "ref_my_list")
@@ -1118,11 +1121,19 @@ async def ref_my_list(callback: CallbackQuery):
     lang = user.get("lang", "ru") if user else "ru"
     referrals = await db.get_my_referrals(uid)
     if not referrals:
-        await callback.message.edit_text(t(lang, "my_referrals_empty"), reply_markup=referral_keyboard(lang), parse_mode="Markdown")
+        await callback.message.edit_text(t(lang, "my_referrals_empty"), reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
         await callback.answer(); return
     lines = [t(lang, "referral_row_bonus" if r.get("bonus_given") else "referral_row_pending", name=f"@{r['username']}" if r.get("username") else (r.get("first_name") or f"ID {r['referred_id']}")) for r in referrals]
     bonuses = sum(1 for r in referrals if r.get("bonus_given"))
-    await callback.message.edit_text(t(lang, "my_referrals", count=len(referrals), bonuses=bonuses, total_days=bonuses*REFERRAL_BONUS_DAYS, referral_list="\n".join(lines)), reply_markup=referral_keyboard(lang), parse_mode="Markdown")
+    balance_days = await db.get_referral_bonus_days_balance(uid)
+    text = t(lang, "my_referrals", count=len(referrals), bonuses=bonuses, total_days=bonuses*REFERRAL_BONUS_DAYS, referral_list="\n".join(lines))
+    text += ui_text(
+        lang,
+        f"\n\n🎁 *Pieejamās bonusu dienas:* {balance_days}",
+        f"\n\n🎁 *Доступно бонусных дней:* {balance_days}",
+        f"\n\n🎁 *Available bonus days:* {balance_days}",
+    )
+    await callback.message.edit_text(text, reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
     await callback.answer()
 
 @dp.callback_query(F.data == "ref_back_start")
@@ -1139,6 +1150,109 @@ async def ref_back_start(callback: CallbackQuery):
     else:
         welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
+    await callback.answer()
+
+@dp.callback_query(F.data == "ref_use_bonus")
+async def ref_use_bonus(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    user = await db.get_user(user_id)
+    lang = user.get("lang", "ru") if user else "ru"
+    balance_days = await db.get_referral_bonus_days_balance(user_id)
+    if balance_days < REFERRAL_BONUS_DAYS:
+        await callback.answer(
+            ui_text(
+                lang,
+                f"Nepietiek bonusu dienu. Vajag vismaz {REFERRAL_BONUS_DAYS}, šobrīd ir {balance_days}.",
+                f"Недостаточно бонусных дней. Нужно минимум {REFERRAL_BONUS_DAYS}, сейчас {balance_days}.",
+                f"Not enough bonus days. You need at least {REFERRAL_BONUS_DAYS}, currently {balance_days}.",
+            ),
+            show_alert=True
+        )
+        return
+    eligible = await get_bonus_eligible_chat_subscriptions(user_id)
+    if not eligible:
+        await callback.answer(
+            ui_text(
+                lang,
+                "Tev nav aktīvu čatu, kuriem var pielikt bonusu dienas.",
+                "У тебя нет активных чатов, к которым можно применить бонусные дни.",
+                "You do not have any active chats to apply bonus days to.",
+            ),
+            show_alert=True
+        )
+        return
+    text = ui_text(
+        lang,
+        f"🎁 *Izmantot bonusu dienas*\n\nPieejams: *{balance_days}* dienas\n\nIzvēlies, kuram aktīvajam čatam pielikt *+{REFERRAL_BONUS_DAYS} dienas*:",
+        f"🎁 *Использовать бонусные дни*\n\nДоступно: *{balance_days}* дней\n\nВыбери, к какому активному чату применить *+{REFERRAL_BONUS_DAYS} дней*:",
+        f"🎁 *Use bonus days*\n\nAvailable: *{balance_days}* days\n\nChoose which active chat should receive *+{REFERRAL_BONUS_DAYS} days*:",
+    )
+    b = InlineKeyboardBuilder()
+    for sub in eligible:
+        label = sub.get("product_name") or sub.get("product_key") or "Chat"
+        b.button(text=f"💎 {label}", callback_data=f"ref_apply_bonus_{sub['product_key']}")
+    b.button(text=back_button_text(lang), callback_data="ref_main")
+    b.adjust(1)
+    await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("ref_apply_bonus_"))
+async def ref_apply_bonus(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    product_key = callback.data.replace("ref_apply_bonus_", "", 1)
+    user = await db.get_user(user_id)
+    lang = user.get("lang", "ru") if user else "ru"
+    eligible = await get_bonus_eligible_chat_subscriptions(user_id)
+    target = next((s for s in eligible if s.get("product_key") == product_key), None)
+    if not target:
+        await callback.answer(
+            ui_text(
+                lang,
+                "Šis čats vairs nav pieejams bonusa dienām.",
+                "Этот чат больше недоступен для бонусных дней.",
+                "This chat is no longer available for bonus days.",
+            ),
+            show_alert=True
+        )
+        return
+    consumed = await db.consume_referral_bonus_days(
+        user_id,
+        REFERRAL_BONUS_DAYS,
+        product_key,
+        note="manual_referral_bonus_redemption"
+    )
+    if not consumed:
+        await callback.answer(
+            ui_text(
+                lang,
+                "Nepietiek bonusu dienu.",
+                "Недостаточно бонусных дней.",
+                "Not enough bonus days.",
+            ),
+            show_alert=True
+        )
+        return
+    new_exp = await db.extend_product_subscription(user_id, product_key, REFERRAL_BONUS_DAYS)
+    if not new_exp:
+        await db.add_referral_bonus_days(user_id, REFERRAL_BONUS_DAYS, note="refund_failed_manual_bonus_redemption")
+        await callback.answer(
+            ui_text(
+                lang,
+                "Neizdevās pielikt bonusu dienas. Mēģini vēlreiz.",
+                "Не удалось применить бонусные дни. Попробуй ещё раз.",
+                "Could not apply bonus days. Please try again.",
+            ),
+            show_alert=True
+        )
+        return
+    balance_days = await db.get_referral_bonus_days_balance(user_id)
+    text = ui_text(
+        lang,
+        f"✅ *Bonusa dienas izmantotas!*\n\nČats: *{target.get('product_name') or product_key}*\nPievienots: *+{REFERRAL_BONUS_DAYS} dienas*\nAktīvs līdz: *{new_exp.strftime('%d.%m.%Y')}*\nAtlikums: *{balance_days}* dienas",
+        f"✅ *Бонусные дни применены!*\n\nЧат: *{target.get('product_name') or product_key}*\nДобавлено: *+{REFERRAL_BONUS_DAYS} дней*\nАктивно до: *{new_exp.strftime('%d.%m.%Y')}*\nОстаток: *{balance_days}* дней",
+        f"✅ *Bonus days applied!*\n\nChat: *{target.get('product_name') or product_key}*\nAdded: *+{REFERRAL_BONUS_DAYS} days*\nActive until: *{new_exp.strftime('%d.%m.%Y')}*\nRemaining: *{balance_days}* days",
+    )
+    await callback.message.edit_text(text, reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
     await callback.answer()
 
 # ─── USER SETTINGS ───
@@ -2247,25 +2361,42 @@ async def check_course_payment(callback: CallbackQuery):
             try: await bot.send_message(aid, admin_text, parse_mode="Markdown")
             except: pass
 
-        # Referral bonus +10 dienas arī par kursu pirkumu
+        # Referral bonus wallet arī par kursa pirkumu
         ref = await db.get_referral_by_referred(user_id)
         if ref and not ref.get("bonus_given"):
-            now = datetime.utcnow()
             referrer = await db.get_user(ref["referrer_id"])
             if referrer:
-                rb = datetime.fromisoformat(referrer['expires_at']) if referrer.get('expires_at') else now
-                bexp = (rb if rb > now else now) + timedelta(days=REFERRAL_BONUS_DAYS)
-                await db.activate_subscription(
-                    user_id=ref["referrer_id"], username=referrer.get("username"),
-                    plan_key=referrer.get("plan_key") or "referral_bonus",
-                    plan_name=f"Referral Bonus +{REFERRAL_BONUS_DAYS}d",
-                    expires_at=bexp, tx_hash=f"ref_course_{user_id}_{int(now.timestamp())}"
+                new_balance_days = await db.add_referral_bonus_days(
+                    ref["referrer_id"],
+                    REFERRAL_BONUS_DAYS,
+                    note=f"referred_course_purchase:{user_id}"
                 )
                 await db.mark_referral_bonus_given(user_id)
                 rlang = referrer.get("lang", "ru")
                 try:
-                    await bot.send_message(ref["referrer_id"],
-                        t(rlang, "referral_bonus_received", expires=bexp.strftime("%d.%m.%Y")),
+                    await bot.send_message(
+                        ref["referrer_id"],
+                        ui_text(
+                            rlang,
+                            (
+                                "🎉 *Referral bonuss saņemts!*\n\n"
+                                f"Tavs draugs veica pirkumu, un tev piešķirtas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
+                                f"Tagad tavā balansā ir *{new_balance_days}* bonusu dienas.\n\n"
+                                "Atver referral sadaļu un izvēlies, kuram aktīvajam čatam tās pielikt."
+                            ),
+                            (
+                                "🎉 *Реферальный бонус получен!*\n\n"
+                                f"Твой друг совершил покупку, и тебе начислено *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
+                                f"Теперь на твоем балансе *{new_balance_days}* бонусных дней.\n\n"
+                                "Открой раздел referral и выбери, к какому активному чату их применить."
+                            ),
+                            (
+                                "🎉 *Referral bonus received!*\n\n"
+                                f"Your friend made a purchase and you received *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
+                                f"You now have *{new_balance_days}* bonus days in your balance.\n\n"
+                                "Open the referral section and choose which active chat to apply them to."
+                            ),
+                        ),
                         parse_mode="Markdown")
                 except: pass
     else:
@@ -2461,43 +2592,41 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
     if ref and not ref.get("bonus_given"):
         referrer = await db.get_user(ref["referrer_id"])
         if referrer:
-            ref_product_key = referrer.get("plan_key") or ""
-            bonus_granted = False
-            if ref_product_key:
-                bonus_exp = await db.extend_product_subscription(ref["referrer_id"], ref_product_key, REFERRAL_BONUS_DAYS)
-                if bonus_exp:
-                    bonus_granted = True
-                    await db.mark_referral_bonus_given(user_id)
-                    ref_lang = referrer.get("lang", "ru")
-                    if ref_lang == "ru":
-                        ref_text = (
-                            f"🎁 *Бонус за друга!*\n\n"
-                            f"Твой реферал оформил подписку.\n"
-                            f"Тебе добавлено *+{REFERRAL_BONUS_DAYS} дней* бесплатного доступа.\n"
-                            f"📅 Активно до: *{bonus_exp.strftime('%d.%m.%Y')}*"
-                        )
-                    elif ref_lang == "lv":
-                        ref_text = (
-                            f"🎁 *Bonuss par draugu!*\n\n"
-                            f"Tavs referral noformēja abonementu.\n"
-                            f"Tev pievienotas *+{REFERRAL_BONUS_DAYS} bezmaksas dienas*.\n"
-                            f"📅 Aktīvs līdz: *{bonus_exp.strftime('%d.%m.%Y')}*"
-                        )
-                    else:
-                        ref_text = (
-                            f"🎁 *Referral bonus!*\n\n"
-                            f"Your referral purchased a subscription.\n"
-                            f"You received *+{REFERRAL_BONUS_DAYS} free days*.\n"
-                            f"📅 Active until: *{bonus_exp.strftime('%d.%m.%Y')}*"
-                        )
-                    try:
-                        await bot.send_message(ref["referrer_id"], ref_text, parse_mode="Markdown")
-                    except Exception as e:
-                        logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
-            if not bonus_granted:
-                logger.warning(
-                    f"Referral bonus not granted for referrer={ref['referrer_id']} referred={user_id}: no extendable active subscription"
+            new_balance_days = await db.add_referral_bonus_days(
+                ref["referrer_id"],
+                REFERRAL_BONUS_DAYS,
+                note=f"referred_user_purchase:{user_id}"
+            )
+            await db.mark_referral_bonus_given(user_id)
+            ref_lang = referrer.get("lang", "ru")
+            if ref_lang == "ru":
+                ref_text = (
+                    f"🎁 *Бонус за друга!*\n\n"
+                    f"Твой реферал оформил подписку.\n"
+                    f"Тебе начислено *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
+                    f"Теперь доступно: *{new_balance_days}* дней.\n\n"
+                    "Используй их сам и выбери, к какому активному чату применить бонус."
                 )
+            elif ref_lang == "lv":
+                ref_text = (
+                    f"🎁 *Bonuss par draugu!*\n\n"
+                    f"Tavs referral noformēja abonementu.\n"
+                    f"Tev ieskaitītas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
+                    f"Tagad pieejams: *{new_balance_days}* dienas.\n\n"
+                    "Izmanto tās pats un izvēlies, kuram aktīvajam čatam pielikt bonusu."
+                )
+            else:
+                ref_text = (
+                    f"🎁 *Referral bonus!*\n\n"
+                    f"Your referral purchased a subscription.\n"
+                    f"You received *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
+                    f"You now have: *{new_balance_days}* days available.\n\n"
+                    "Use them yourself and choose which active chat should receive the bonus."
+                )
+            try:
+                await bot.send_message(ref["referrer_id"], ref_text, parse_mode="Markdown")
+            except Exception as e:
+                logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
 
     # Legacy referral branch kept disabled for compatibility
     ref = await db.get_referral_by_referred(user_id)
@@ -3018,130 +3147,58 @@ async def run_monthly_giveaway():
     logger.info(f"[GIVEAWAY] {prev_month}: {len(winners)} winners from {len(participants)}")
 
 
-
-
-# Modificētā referral_keyboard ar earnings support
-def referral_keyboard_with_earnings(lang):
-    b = InlineKeyboardBuilder()
-    b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My referrals"), callback_data="ref_my_list")
-    b.button(text=back_button_text(lang), callback_data="settings_back")
-    b.adjust(1)
-    return b.as_markup()
-
-
-# JAUNA - Earnings page ar withdrawal opcijām
+# Legacy naudas referral sadaļas aizvietotas ar bonusu dienu maku
 @dp.callback_query(F.data == "ref_earnings_page")
 async def show_earnings_page(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    
-    # Balance info
-    balance = await db.get_referral_balance(user_id)
-    total_earned = await db.get_total_referral_earnings(user_id)
-    
-    # Withdrawn summa
-    history = await db.get_user_withdrawal_history(user_id)
-    withdrawn = sum(w['amount_usd'] for w in history if w['status'] == 'approved')
-    
-    text = t(lang, "referral_earnings",
-        balance=f"{balance:.2f}",
-        total=f"{total_earned:.2f}",
-        withdrawn=f"{withdrawn:.2f}",
-        min=config.MIN_WITHDRAWAL_AMOUNT
+    text = await build_referral_overview_text(callback.from_user.id, lang)
+    text += ui_text(
+        lang,
+        "\n\nℹ️ Šobrīd referral programma izmanto tikai bonusu dienas. Naudas izmaksas vairs nav pieejamas.",
+        "\n\nℹ️ Сейчас referral программа использует только бонусные дни. Денежные выплаты больше недоступны.",
+        "\n\nℹ️ The referral program now uses bonus days only. Cash payouts are no longer available.",
     )
-    
-    b = InlineKeyboardBuilder()
-    b.button(text=t(lang, "withdrawal_button"), callback_data="ref_withdraw")
-    b.button(text=t(lang, "earnings_button"), callback_data="ref_earnings_list")
-    b.button(text=t(lang, "withdrawal_history_button"), callback_data="ref_withdraw_history")
-    b.button(text="🔙 " + t(lang, "btn_back"), callback_data="ref_main")
-    b.adjust(1)
-    
-    await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
     await callback.answer()
 
 
-# Earnings list
+# Legacy callbacks no longer expose cash earnings
 @dp.callback_query(F.data == "ref_earnings_list")
 async def show_earnings_list(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    
-    earnings = await db.get_referral_earnings_list(user_id)
-    
-    if not earnings:
-        text = t(lang, "earnings_empty")
-    else:
-        rows = []
-        total = 0
-        for e in earnings[:20]:
-            date = datetime.fromisoformat(e['earned_at']).strftime('%d.%m.%Y')
-            ref_name = e.get('referred_username') or e.get('referred_first_name') or f"ID{e['referred_id']}"
-            rows.append(t(lang, "earnings_row",
-                date=date,
-                name=ref_name,
-                amount=f"{e['amount_usd']:.2f}",
-                commission=f"{e['commission_usd']:.2f}"
-            ))
-            total += e['commission_usd']
-        
-        list_str = "\n\n".join(rows)
-        text = t(lang, "earnings_list", list=list_str, total=f"{total:.2f}")
-    
-    b = InlineKeyboardBuilder()
-    b.button(text="🔙 " + t(lang, "btn_back"), callback_data="ref_earnings_page")
-    
-    await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
-    await callback.answer()
+    await callback.answer(
+        ui_text(
+            lang,
+            "Referral programma tagad izmanto tikai bonusu dienas.",
+            "Referral программа теперь использует только бонусные дни.",
+            "The referral program now uses bonus days only.",
+        ),
+        show_alert=True,
+    )
+    await callback.message.edit_text(
+        await build_referral_overview_text(callback.from_user.id, lang),
+        reply_markup=referral_keyboard_with_earnings(lang),
+        parse_mode="Markdown",
+    )
 
 
-# Withdrawal start
+# Legacy withdrawal flow disabled
 @dp.callback_query(F.data == "ref_withdraw")
 async def start_withdrawal(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    
-    # Security checks
-    if await db.is_user_banned(user_id):
-        await callback.answer(t(lang, "withdrawal_error_banned"), show_alert=True)
-        return
-    
-    if await db.has_pending_withdrawal(user_id):
-        await callback.answer(t(lang, "withdrawal_error_pending"), show_alert=True)
-        return
-    
-    balance = await db.get_referral_balance(user_id)
-    if balance < config.MIN_WITHDRAWAL_AMOUNT:
-        await callback.answer(
-            t(lang, "withdrawal_error_min", min=config.MIN_WITHDRAWAL_AMOUNT, balance=f"{balance:.2f}"),
-            show_alert=True
-        )
-        return
-    
-    # Rate limit
-    recent_count = await db.count_recent_withdrawal_requests(user_id, hours=24)
-    if recent_count >= 3:
-        await callback.answer(t(lang, "withdrawal_error_rate_limit"), show_alert=True)
-        await db.add_fraud_alert(user_id, "withdrawal_rate_limit", f"{recent_count} requests in 24h")
-        return
-    
-    email = user.get('email', '') if user else ''
-    
-    if not email:
-        await state.set_state(WithdrawalState.waiting_email)
-        await state.update_data(withdrawal_amount=balance)
-        text = t(lang, "withdrawal_request", balance=f"{balance:.2f}", min=config.MIN_WITHDRAWAL_AMOUNT)
-        await callback.message.edit_text(text, parse_mode="Markdown")
-        await callback.answer()
-    else:
-        await state.set_state(WithdrawalState.waiting_address)
-        await state.update_data(withdrawal_amount=balance, withdrawal_email=email)
-        text = t(lang, "withdrawal_enter_address", amount=f"{balance:.2f}", email=email)
-        await callback.message.edit_text(text, parse_mode="Markdown")
-        await callback.answer()
+    await state.clear()
+    await callback.answer(
+        ui_text(
+            lang,
+            "Naudas izmaksas vairs nav pieejamas. Referral programma tagad dod tikai bonusu dienas čatiem.",
+            "Денежные выплаты больше недоступны. Referral программа теперь дает только бонусные дни для чатов.",
+            "Cash payouts are no longer available. The referral program now gives only bonus days for chats.",
+        ),
+        show_alert=True,
+    )
 
 
 # Withdrawal email handler
@@ -3149,26 +3206,15 @@ async def start_withdrawal(callback: CallbackQuery, state: FSMContext):
 async def withdrawal_receive_email(message: Message, state: FSMContext):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    if message.text == "/cancel":
-        await state.clear()
-        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
-        return
-    
-    email = message.text.strip()
-    if "@" not in email or "." not in email or len(email) < 5:
-        await message.answer("❌ " + ui_text(lang, "Nepareizs e-pasts. Pamēģini vēlreiz:", "Неверный e-mail. Попробуй:", "Invalid email. Try:"))
-        return
-    
-    await db.set_user_email(message.from_user.id, email)
-    
-    data = await state.get_data()
-    balance = data.get('withdrawal_amount', 0)
-    
-    await state.set_state(WithdrawalState.waiting_address)
-    await state.update_data(withdrawal_email=email)
-    
-    text = t(lang, "withdrawal_enter_address", amount=f"{balance:.2f}", email=email)
-    await message.answer(text, parse_mode="Markdown")
+    await state.clear()
+    await message.answer(
+        ui_text(
+            lang,
+            "Referral izmaksas ir izslēgtas. Tagad pieejamas tikai bonusu dienas čatiem.",
+            "Referral выплаты отключены. Теперь доступны только бонусные дни для чатов.",
+            "Referral payouts are disabled. Only bonus days for chats are available now.",
+        )
+    )
 
 
 # Withdrawal address handler
@@ -3176,89 +3222,31 @@ async def withdrawal_receive_email(message: Message, state: FSMContext):
 async def withdrawal_receive_address(message: Message, state: FSMContext):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    if message.text == "/cancel":
-        await state.clear()
-        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
-        return
-    
-    address = message.text.strip()
-    
-    if len(address) < 20 or ' ' in address:
-        await message.answer("❌ " + ui_text(lang, "Nepareiza adrese", "Неверный адрес", "Invalid address"))
-        return
-    
-    data = await state.get_data()
-    balance = data.get('withdrawal_amount', 0)
-    email = data.get('withdrawal_email', '')
-    
-    await state.update_data(withdrawal_address=address)
-    
-    text = t(lang, "withdrawal_confirm", amount=f"{balance:.2f}", email=email, address=address)
-    
-    b = InlineKeyboardBuilder()
-    b.button(text="✅ " + ui_text(lang, "Apstiprināt", "Подтвердить", "Confirm"), callback_data="withdraw_confirm")
-    b.button(text="❌ " + ui_text(lang, "Atcelt", "Отменить", "Cancel"), callback_data="withdraw_cancel")
-    b.adjust(2)
-    
-    await message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
+    await state.clear()
+    await message.answer(
+        ui_text(
+            lang,
+            "Referral izmaksas ir izslēgtas. Tagad pieejamas tikai bonusu dienas čatiem.",
+            "Referral выплаты отключены. Теперь доступны только бонусные дни для чатов.",
+            "Referral payouts are disabled. Only bonus days for chats are available now.",
+        )
+    )
 
 
 # Withdrawal confirm
 @dp.callback_query(F.data == "withdraw_confirm")
 async def withdrawal_confirm(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-
-    user_id = callback.from_user.id
-    amount = data.get('withdrawal_amount', 0)
-    email = data.get('withdrawal_email', '')
-    address = data.get('withdrawal_address', '')
-    
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-
-    if not amount or amount <= 0 or not email or "@" not in email or not address or len(address) < 20 or ' ' in address:
-        await state.clear()
-        await callback.message.edit_text(
-            "❌ " + ui_text(lang, "Nederīgi izmaksas dati", "Неверные данные для вывода", "Invalid withdrawal data")
-        )
-        await callback.answer()
-        return
-    
-    balance = await db.get_referral_balance(user_id)
-    if balance < amount:
-        await state.clear()
-        await callback.message.edit_text("❌ " + ui_text(lang, "Nepietiek līdzekļu", "Недостаточно средств", "Insufficient funds"))
-        await callback.answer()
-        return
-
-    if await db.has_pending_withdrawal(user_id):
-        await state.clear()
-        await callback.message.edit_text("❌ " + ui_text(lang, "Jau ir aktīvs izmaksas pieprasījums", "Уже есть активный запрос на вывод", "An active withdrawal request already exists"))
-        await callback.answer()
-        return
-
     await state.clear()
-    request_id = await db.create_withdrawal_request(user_id, amount, address, email)
-    
-    text = t(lang, "withdrawal_submitted", amount=f"{amount:.2f}", address=address)
-    await callback.message.edit_text(text, parse_mode="Markdown")
-    
-    username = callback.from_user.username or ""
-    admin_text = (
-        f"💸 *Jauns withdrawal request #{request_id}*\n\n"
-        f"👤 @{username} (`{user_id}`)\n"
-        f"💵 Summa: *{amount:.2f}$*\n"
-        f"📧 E-mail: `{email}`\n"
-        f"📋 Adrese: `{address}`\n\n"
-        f"Izmanto /admin lai apstiprinātu/noraidītu"
+    await callback.message.edit_text(
+        ui_text(
+            lang,
+            "ℹ️ Referral izmaksas vairs nav pieejamas. Tagad tiek izmantotas tikai bonusu dienas čatiem.",
+            "ℹ️ Referral выплаты больше недоступны. Теперь используются только бонусные дни для чатов.",
+            "ℹ️ Referral payouts are no longer available. Only bonus days for chats are used now.",
+        )
     )
-    
-    for admin_id in config.ADMIN_IDS:
-        try:
-            await bot.send_message(admin_id, admin_text, parse_mode="Markdown")
-        except:
-            pass
-    
     await callback.answer()
 
 
@@ -3268,45 +3256,36 @@ async def withdrawal_cancel(callback: CallbackQuery, state: FSMContext):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     await state.clear()
-    await callback.message.edit_text("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
+    await callback.message.edit_text(
+        ui_text(
+            lang,
+            "Atcelts. Referral sadaļā tagad tiek izmantotas tikai bonusu dienas.",
+            "Отменено. В referral разделе теперь используются только бонусные дни.",
+            "Cancelled. The referral section now uses bonus days only.",
+        )
+    )
     await callback.answer()
 
 
 # Withdrawal history
 @dp.callback_query(F.data == "ref_withdraw_history")
 async def show_withdrawal_history(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    
-    history = await db.get_user_withdrawal_history(user_id)
-    
-    if not history:
-        text = t(lang, "withdrawal_history_empty")
-    else:
-        rows = []
-        for w in history[:10]:
-            date = datetime.fromisoformat(w['requested_at']).strftime('%d.%m.%Y')
-            status = w['status']
-            amount = w['amount_usd']
-            
-            if status == 'pending':
-                row = t(lang, "withdrawal_row_pending", date=date, amount=f"{amount:.2f}")
-            elif status == 'approved':
-                row = t(lang, "withdrawal_row_approved", date=date, amount=f"{amount:.2f}")
-            else:
-                row = t(lang, "withdrawal_row_rejected", date=date, amount=f"{amount:.2f}")
-            
-            rows.append(row)
-        
-        list_str = "\n".join(rows)
-        text = t(lang, "withdrawal_history", list=list_str)
-    
-    b = InlineKeyboardBuilder()
-    b.button(text="🔙 " + t(lang, "btn_back"), callback_data="ref_earnings_page")
-    
-    await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
-    await callback.answer()
+    await callback.message.edit_text(
+        await build_referral_overview_text(callback.from_user.id, lang),
+        reply_markup=referral_keyboard_with_earnings(lang),
+        parse_mode="Markdown",
+    )
+    await callback.answer(
+        ui_text(
+            lang,
+            "Izmaksu vēsture vairs netiek izmantota, jo referral programma tagad strādā ar bonusu dienām.",
+            "История выплат больше не используется, потому что referral программа теперь работает с бонусными днями.",
+            "Withdrawal history is no longer used because the referral program now works with bonus days.",
+        ),
+        show_alert=True,
+    )
 
 
 
