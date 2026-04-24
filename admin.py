@@ -2137,6 +2137,8 @@ async def show_ban_list(callback: CallbackQuery):
 @router.callback_query(F.data == "adm_loyalty_stats")
 async def show_loyalty_stats(callback: CallbackQuery):
     """Show loyalty statistics dashboard"""
+    if not is_admin(callback.from_user.id):
+        return
     
     # Get stats no user_loyalty tabulas
     users_by_tier = await db.get_users_by_tier()
@@ -2279,6 +2281,8 @@ async def channel_audit(callback: CallbackQuery, bot: Bot):
 @router.callback_query(F.data == "adm_pending_tags")
 async def show_pending_tags(callback: CallbackQuery):
     """Show pending tag updates"""
+    if not is_admin(callback.from_user.id):
+        return
     
     pending = await db.get_pending_tag_updates()
     if pending:
@@ -2329,6 +2333,8 @@ async def show_pending_tags(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("tag_done_"))
 async def mark_tag_done(callback: CallbackQuery):
     """Mark tag as set"""
+    if not is_admin(callback.from_user.id):
+        return
     
     if callback.data == "tag_done_all":
         # Mark all as done
@@ -2350,6 +2356,8 @@ async def mark_tag_done(callback: CallbackQuery):
 @router.callback_query(F.data == "adm_coupons_stats")
 async def show_coupons_stats(callback: CallbackQuery):
     """Show coupon statistics — izmanto loyalty_promo_codes tabulu"""
+    if not is_admin(callback.from_user.id):
+        return
     
     # Aktīvie kuponi (used=0, nav beidzies termiņš)
     now = datetime.utcnow().isoformat()
@@ -2448,6 +2456,8 @@ async def adm_export_survey(callback: CallbackQuery):
 @router.callback_query(F.data == "adm_cleanup_coupons")
 async def cleanup_coupons(callback: CallbackQuery):
     """Manually trigger coupon cleanup"""
+    if not is_admin(callback.from_user.id):
+        return
     
     await db.cleanup_expired_coupons()
     await callback.answer("✅ Expired coupons cleaned up!")
@@ -2457,6 +2467,8 @@ async def cleanup_coupons(callback: CallbackQuery):
 @router.callback_query(F.data == "adm_survey_responses")
 async def show_survey_responses(callback: CallbackQuery):
     """Show recent survey responses"""
+    if not is_admin(callback.from_user.id):
+        return
     
     responses = await db.get_survey_responses(limit=20)
     if responses:
@@ -2516,6 +2528,8 @@ async def show_survey_responses(callback: CallbackQuery):
 @router.callback_query(F.data == "adm_settings")
 async def show_admin_settings(callback: CallbackQuery):
     """Show admin settings"""
+    if not is_admin(callback.from_user.id):
+        return
     
     # Get current public lang
     pub_lang = await db.get_setting('public_announcement_lang') or 'ru'
@@ -2546,6 +2560,8 @@ async def show_admin_settings(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("set_pub_lang_"))
 async def set_public_language(callback: CallbackQuery):
     """Set public announcement language"""
+    if not is_admin(callback.from_user.id):
+        return
     
     lang = callback.data[13:]  # Remove "set_pub_lang_"
     
@@ -2559,6 +2575,8 @@ async def set_public_language(callback: CallbackQuery):
 async def admin_set_tier_command(message: Message):
     """Manually set user's tier
     Usage: /admin_set_tier @username tier_name"""
+    if not is_admin(message.from_user.id):
+        return
     
     parts = message.text.split()
     
@@ -2596,6 +2614,8 @@ async def admin_set_tier_command(message: Message):
 async def admin_add_days_command(message: Message):
     """Manually add bonus days
     Usage: /admin_add_days @username days"""
+    if not is_admin(message.from_user.id):
+        return
     
     parts = message.text.split()
     

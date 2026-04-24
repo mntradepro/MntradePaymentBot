@@ -1620,8 +1620,8 @@ async def promo_apply(message: Message, state: FSMContext):
         pkey = target.replace("plan_", "") if target.startswith("plan_") else target
         await db.set_pending_payment(user_id, pkey, unique_amount)
 
-    # Atzīmēt kodu kā izmantotu
-    await db.use_promo_code(code)
+    # Atzīmē kā aktīvu lietotāja promokodu; izlietojam tikai pēc veiksmīga pirkuma
+    await db.apply_promo_to_user(user_id, code)
 
     name = item['name'][lang] if isinstance(item['name'], dict) else item['name']
     if lang == "ru":
@@ -2157,6 +2157,10 @@ async def check_course_payment(callback: CallbackQuery):
 
         # Saglabāt pirkumu UN iegūt purchase_id
         purchase_id = await db.add_course_purchase(user_id, username, course_key, name_ru, expected, tx, email)
+        active_promo_code = await db.get_user_active_promo(user_id)
+        if active_promo_code:
+            await db.use_promo_code(active_promo_code)
+            await db.clear_user_promo(user_id)
 
         # ═══════════════════════════════════════════════════════════════
         # REFERRAL COMMISSION 15%
@@ -2429,6 +2433,10 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
         chat_link=product_meta.get("chat_link", "") if product_meta else "",
         payment_system="webhook" if tx_hash.startswith("webhook:") else ""
     )
+    active_promo_code = await db.get_user_active_promo(user_id)
+    if active_promo_code:
+        await db.use_promo_code(active_promo_code)
+        await db.clear_user_promo(user_id)
     winback_bonus_days = 0
     active_winback = await db.get_active_winback_offer(user_id)
     if active_winback and product_meta and int(product_meta.get("chat_id") or 0) != 0:
@@ -3199,8 +3207,7 @@ async def withdrawal_receive_address(message: Message, state: FSMContext):
 @dp.callback_query(F.data == "withdraw_confirm")
 async def withdrawal_confirm(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    await state.clear()
-    
+
     user_id = callback.from_user.id
     amount = data.get('withdrawal_amount', 0)
     email = data.get('withdrawal_email', '')
@@ -3208,12 +3215,29 @@ async def withdrawal_confirm(callback: CallbackQuery, state: FSMContext):
     
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
+
+    if not amount or amount <= 0 or not email or "@" not in email or not address or len(address) < 20 or ' ' in address:
+        await state.clear()
+        await callback.message.edit_text(
+            "❌ " + ui_text(lang, "Nederīgi izmaksas dati", "Неверные данные для вывода", "Invalid withdrawal data")
+        )
+        await callback.answer()
+        return
     
     balance = await db.get_referral_balance(user_id)
     if balance < amount:
+        await state.clear()
         await callback.message.edit_text("❌ " + ui_text(lang, "Nepietiek līdzekļu", "Недостаточно средств", "Insufficient funds"))
+        await callback.answer()
         return
-    
+
+    if await db.has_pending_withdrawal(user_id):
+        await state.clear()
+        await callback.message.edit_text("❌ " + ui_text(lang, "Jau ir aktīvs izmaksas pieprasījums", "Уже есть активный запрос на вывод", "An active withdrawal request already exists"))
+        await callback.answer()
+        return
+
+    await state.clear()
     request_id = await db.create_withdrawal_request(user_id, amount, address, email)
     
     text = t(lang, "withdrawal_submitted", amount=f"{amount:.2f}", address=address)
@@ -4072,7 +4096,8 @@ async def survey_custom_text(message: Message, state: FSMContext):
 
 def _verify_webhook_request(raw_body: bytes, request: web.Request) -> bool:
     if not config.WEBHOOK_SECRET:
-        return True
+        logger.error("WEBHOOK_SECRET is not configured; rejecting purchase webhook")
+        return False
     provided_secret = request.headers.get("X-Webhook-Secret", "")
     if hmac.compare_digest(provided_secret, config.WEBHOOK_SECRET):
         return True
