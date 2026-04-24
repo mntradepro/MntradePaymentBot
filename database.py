@@ -143,6 +143,16 @@ class Database:
                 )
             """)
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS winback_offers (
+                    user_id     INTEGER PRIMARY KEY,
+                    sent_at     TEXT NOT NULL,
+                    expires_at  TEXT NOT NULL,
+                    bonus_days  INTEGER NOT NULL DEFAULT 0,
+                    redeemed_at TEXT,
+                    redeemed_tx TEXT
+                )
+            """)
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS referrals (
                     id            INTEGER PRIMARY KEY AUTOINCREMENT,
                     referrer_id   INTEGER NOT NULL,
@@ -1025,6 +1035,69 @@ class Database:
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)", (key, value))
             await conn.commit()
+
+    async def create_winback_offer(self, user_id: int, bonus_days: int, offer_hours: int):
+        now = datetime.utcnow()
+        expires_at = now + timedelta(hours=offer_hours)
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT INTO winback_offers (user_id, sent_at, expires_at, bonus_days, redeemed_at, redeemed_tx)
+                VALUES (?, ?, ?, ?, NULL, NULL)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    sent_at = excluded.sent_at,
+                    expires_at = excluded.expires_at,
+                    bonus_days = excluded.bonus_days,
+                    redeemed_at = NULL,
+                    redeemed_tx = NULL
+            """, (user_id, now.isoformat(), expires_at.isoformat(), bonus_days))
+            await conn.commit()
+
+    async def get_active_winback_offer(self, user_id: int) -> Optional[Dict]:
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT * FROM winback_offers
+                WHERE user_id = ? AND redeemed_at IS NULL AND expires_at > ?
+            """, (user_id, now)) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
+    async def redeem_winback_offer(self, user_id: int, tx_hash: str = ""):
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                UPDATE winback_offers
+                SET redeemed_at = ?, redeemed_tx = ?
+                WHERE user_id = ? AND redeemed_at IS NULL
+            """, (now, tx_hash, user_id))
+            await conn.commit()
+
+    async def extend_product_subscription(self, user_id: int, product_key: str, extra_days: int):
+        if extra_days <= 0:
+            return None
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT expires_at FROM user_subscriptions
+                WHERE user_id = ? AND product_key = ? AND is_active = 1
+                ORDER BY expires_at DESC
+                LIMIT 1
+            """, (user_id, product_key)) as cur:
+                row = await cur.fetchone()
+            if not row:
+                return None
+            now = datetime.utcnow()
+            current_exp = datetime.fromisoformat(row["expires_at"])
+            new_exp = (current_exp if current_exp > now else now) + timedelta(days=extra_days)
+            await conn.execute("""
+                UPDATE user_subscriptions
+                SET expires_at = ?
+                WHERE user_id = ? AND product_key = ? AND is_active = 1
+            """, (new_exp.isoformat(), user_id, product_key))
+            await self._refresh_user_access_summary(conn, user_id)
+            await conn.commit()
+            return new_exp
 
     # ─── MARKETING ───
 

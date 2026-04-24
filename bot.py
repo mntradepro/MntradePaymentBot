@@ -2429,6 +2429,26 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
         chat_link=product_meta.get("chat_link", "") if product_meta else "",
         payment_system="webhook" if tx_hash.startswith("webhook:") else ""
     )
+    winback_bonus_days = 0
+    active_winback = await db.get_active_winback_offer(user_id)
+    if active_winback and product_meta and int(product_meta.get("chat_id") or 0) != 0:
+        bonus_days = int(active_winback.get("bonus_days") or 0)
+        bonus_exp = await db.extend_product_subscription(user_id, canonical_key, bonus_days)
+        if bonus_exp:
+            winback_bonus_days = bonus_days
+            new_exp = bonus_exp
+            await db.redeem_winback_offer(user_id, tx_hash)
+            await db.log_winback_usage(user_id)
+            bonus_text = ui_text(
+                lang,
+                f"🎁 *Atgriešanās bonuss aktivizēts!*\n\nTev pievienotas *+{bonus_days} bezmaksas dienas*.\n📅 Aktīvs līdz: *{new_exp.strftime('%d.%m.%Y')}*",
+                f"🎁 *Win-back бонус активирован!*\n\nТебе добавлено *+{bonus_days} бесплатных дней*.\n📅 Активно до: *{new_exp.strftime('%d.%m.%Y')}*",
+                f"🎁 *Win-back bonus activated!*\n\nYou received *+{bonus_days} free days*.\n📅 Active until: *{new_exp.strftime('%d.%m.%Y')}*",
+            )
+            try:
+                await bot.send_message(user_id, bonus_text, parse_mode="Markdown")
+            except Exception as e:
+                logger.warning(f"Failed to send winback bonus notice {user_id}: {e}")
     # Referral bonus + commission
     ref = await db.get_referral_by_referred(user_id)
     if ref and not ref.get("bonus_given"):
@@ -2504,7 +2524,9 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
     # Admin notify
     uname = f"@{username}" if username else f"ID {user_id}"
     for aid in config.ADMIN_IDS:
-        try: await bot.send_message(aid, f"💰 *Jauns maksājums!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Līdz: *{new_exp.strftime('%d.%m.%Y')}*\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
+        try:
+            extra = f"\n🎁 Win-back bonuss: *+{winback_bonus_days} d.*" if winback_bonus_days else ""
+            await bot.send_message(aid, f"💰 *Jauns maksājums!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Līdz: *{new_exp.strftime('%d.%m.%Y')}*{extra}\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
         except: pass
     return new_exp, plan_name_loc, product_meta
 

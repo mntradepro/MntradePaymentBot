@@ -284,13 +284,17 @@ class LoyaltyCronJobs:
         try:
             user = await self.db.get_user(user_id)
             lang = user.get('lang', 'ru')
+            bonus_days = await self._get_int_setting("remarketing_winback_bonus_days", 7)
+            offer_hours = await self._get_int_setting("remarketing_offer_hours", 72)
 
             text = (await self._get_text_setting(f"remarketing_winback_{lang}", "")).format(
-                bonus_days=await self._get_int_setting("remarketing_winback_bonus_days", 7),
+                bonus_days=bonus_days,
                 yearly_discount=self.config.WINBACK_YEARLY_DISCOUNT,
                 course_discount=self.config.REMINDER_COUPON_DISCOUNT,
-                offer_hours=await self._get_int_setting("remarketing_offer_hours", 72),
+                offer_hours=offer_hours,
             )
+
+            await self.db.create_winback_offer(user_id, bonus_days, offer_hours)
             
             await self.bot.send_message(user_id, text, reply_markup=_cron_renew_keyboard(lang), parse_mode="Markdown")
             
