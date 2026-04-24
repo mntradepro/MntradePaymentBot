@@ -36,8 +36,8 @@ TEXTS = {
     "ru": {
         "welcome": "👋 Привет, {name}!\n\n🔐 Это эксклюзивный платный чат трейдеров.\n\n📋 *Выбери свой тарифный план:*",
         "active_sub": "👋 Привет, {name}!\n\n✅ Подписка активна до *{expires}*\n📦 Тариф: *{plan}*\n⏳ Осталось: *{days}* дн.",
-        "inactive_welcome": "👋 Привет, {name}!\n\n❌ Сейчас у тебя нет активной подписки.\n\n👥 Приглашай друзей и получай бесплатный доступ к чату и курсам!\n\n📋 *Выбери продукт:*",
-        "inactive_welcome_note": "❌ Сейчас у тебя нет активной подписки.\n\n👥 Приглашай друзей и получай бесплатный доступ к чату и курсам!",
+        "inactive_welcome": "👋 Привет, {name}!\n\n❌ Сейчас у тебя нет активной подписки.\n\n📋 *Выбери продукт:*",
+        "inactive_welcome_note": "❌ Сейчас у тебя нет активной подписки.",
         "choose_plan": "📋 *Выбери свой тарифный план:*",
         "payment_title": "{emoji} *{name}*\n\n💰 Цена: *{price}* ({usdt} USDT)\n📅 Срок: *{days} дней*\n\n━━━━━━━━━━━━━━━━\n📤 Отправь ровно *{usdt} USDT (BEP-20)* на:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Важно:\n• Только *USDT BEP-20* (сеть BSC)\n• Сумма: *{usdt} USDT*\n• После отправки нажми кнопку ниже",
         "paid_ok": "✅ *Платёж подтверждён!*\n\n📦 Тариф: *{name}*\n📅 Активен до: *{expires}*\n🔖 TX: `{tx}`",
@@ -53,8 +53,7 @@ TEXTS = {
         "qr_caption": "📷 *QR код для оплаты*\n\n📋 Адрес: `{wallet}`\n💰 Сумма: *{usdt} USDT (BEP-20)*\n⚠️ Отсканируй QR → введи сумму вручную: *{usdt} USDT*\n🔗 Сеть: *BSC (BEP-20)*",
         "invite": "\n\n🔗 [Вступить в канал]({link})",
         
-        # JAUNAS REFERRAL EARNINGS TEKSTI
-        "referral_info": "👥 *Реферальная программа*\n\n🎁 За подписку на чат: *+10 дней* + *20% комиссия*\n💰 За покупку курса: *+15% комиссия*\n\n📌 Твоя ссылка:\n`{ref_link}`\n\n📊 Приглашено: *{count}*\n🎁 Бонусов подписки: *{bonuses}* × 10 дней\n💵 Доступно для вывода: *{balance}$*",
+        "referral_info": "👥 *Реферальная программа*\n\n🎁 За каждую покупку друга ты получаешь *+10 бонусных дней*.\n\n📌 Твоя ссылка:\n`{ref_link}`\n\n📊 Приглашено: *{count}*\n🎁 Получено бонусов: *{bonuses}*",
         
         "my_referrals": "👥 *Мои рефералы*\n\n📊 Всего: *{count}*\n🎁 Бонусов: *{bonuses}* × 10 дней\n📅 Итого: *{total_days}* дней\n\n{referral_list}",
         "my_referrals_empty": "👥 *Мои рефералы*\n\nТы ещё никого не пригласил.",
@@ -62,44 +61,32 @@ TEXTS = {
         "referral_row_pending": "⏳ {name} — ожидает оплаты",
         "referral_bonus_received": "🎉 *Бонус получен!*\n\nТвой друг оформил подписку — тебе *+10 дней*!\n📅 Активна до: *{expires}*",
         
-        # WITHDRAWAL TEKSTI
-        "referral_earnings": "💰 *Реферальные доходы*\n\n💵 Доступно для вывода: *{balance}$*\n📊 Всего заработано: *{total}$*\n💸 Выведено: *{withdrawn}$*\n\n━━━━━━━━━━━━━━━━\n\n🎯 *Как это работает:*\n• За каждый купленный курс твоим рефералом ты получаешь *15% комиссии*\n• Минимальная сумма для вывода: *{min}$*\n• Все выплаты обрабатываются вручную администрацией",
+        "referral_earnings": "🎁 *Бонусные дни referral*\n\nReferral программа теперь использует только бонусные дни для чатов.",
+        "withdrawal_button": "🎁 Бонусные дни",
+        "earnings_button": "📊 История referral",
+        "withdrawal_history_button": "📜 История bonus days",
+        "earnings_list": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
+        "earnings_empty": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
+        "earnings_row": "• {date} — {name}",
+        "withdrawal_request": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
+        "withdrawal_enter_address": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
+        "withdrawal_confirm": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
+        "withdrawal_submitted": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
+        "withdrawal_approved": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
+        "withdrawal_rejected": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
+        "withdrawal_history": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
+        "withdrawal_history_empty": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
+        "withdrawal_row_pending": "⏳ Referral bonus days",
+        "withdrawal_row_approved": "✅ Referral bonus days",
+        "withdrawal_row_rejected": "❌ Referral bonus days",
+        "withdrawal_error_banned": "❌ Денежные выплаты больше недоступны.",
+        "withdrawal_error_pending": "ℹ️ Referral программа теперь работает только с бонусными днями.",
+        "withdrawal_error_min": "ℹ️ Referral программа теперь работает только с бонусными днями.",
+        "withdrawal_error_no_email": "ℹ️ Referral программа теперь работает только с бонусными днями.",
+        "withdrawal_error_rate_limit": "ℹ️ Referral программа теперь работает только с бонусными днями.",
+        "referral_welcome": "👋 Тебя пригласил друг!\n\n🎁 Когда ты совершишь покупку, друг получит *+10 бонусных дней*.\n\n🔐 Выбери продукт:",
         
-        "withdrawal_button": "💸 Вывести средства",
-        "earnings_button": "📊 История доходов",
-        "withdrawal_history_button": "📜 История выплат",
-        
-        "earnings_list": "📊 *История доходов*\n\n{list}\n\n💵 Итого: *{total}$*",
-        "earnings_empty": "📊 *История доходов*\n\nПока нет доходов.\nПригласи друзей и зарабатывай!",
-        "earnings_row": "• {date} — {name}\n  💰 {amount}$ → 15% = *{commission}$*",
-        
-        "withdrawal_request": "💸 *Запрос на вывод*\n\n💵 Доступно: *{balance}$*\n\n⚠️ Для вывода необходимо:\n1. Указать e-mail\n2. Указать крипто-адрес (BEP-20)\n3. Минимум *{min}$*\n\n📧 _Отправь свой e-mail:_\n/cancel для отмены",
-        
-        "withdrawal_enter_address": "💸 *Вывод средств*\n\n💵 Сумма: *{amount}$*\n📧 E-mail: {email}\n\n📋 Теперь отправь адрес кошелька *(BEP-20 USDT)*:\n\n⚠️ Проверь адрес внимательно!\n/cancel для отмены",
-        
-        "withdrawal_confirm": "💸 *Подтверждение вывода*\n\n💵 Сумма: *{amount}$*\n📧 E-mail: {email}\n📋 Адрес: `{address}`\n\n⚠️ Проверь все данные!\nПосле подтверждения заявка будет отправлена администрации.",
-        
-        "withdrawal_submitted": "✅ *Заявка отправлена!*\n\n💵 Сумма: *{amount}$*\n📋 Адрес: `{address}`\n\n⏳ Заявка будет обработана администрацией в течение 24-48 часов.\n\nТы получишь уведомление о статусе.",
-        
-        "withdrawal_approved": "🎉 *Выплата одобрена!*\n\n💵 Сумма: *{amount}$*\n📋 Адрес: `{address}`\n\n✅ Средства будут отправлены в ближайшее время.\n{notes}",
-        
-        "withdrawal_rejected": "❌ *Выплата отклонена*\n\n💵 Сумма: *{amount}$*\n\n📝 Причина: {reason}",
-        
-        "withdrawal_history": "📜 *История выплат*\n\n{list}",
-        "withdrawal_history_empty": "📜 *История выплат*\n\nПока нет выплат.",
-        "withdrawal_row_pending": "⏳ {date} — *{amount}$* (ожидает)",
-        "withdrawal_row_approved": "✅ {date} — *{amount}$* (одобрено)",
-        "withdrawal_row_rejected": "❌ {date} — *{amount}$* (отклонено)",
-        
-        "withdrawal_error_banned": "❌ Вывод средств недоступен.",
-        "withdrawal_error_pending": "⚠️ У тебя уже есть активная заявка на вывод.\nДождись её обработки.",
-        "withdrawal_error_min": "❌ Минимальная сумма для вывода: *{min}$*\nТвой баланс: *{balance}$*",
-        "withdrawal_error_no_email": "❌ Для вывода необходимо указать e-mail.",
-        "withdrawal_error_rate_limit": "⚠️ Слишком много запросов.\nПопробуй позже.",
-        
-        "referral_welcome": "👋 Тебя пригласил друг!\n\n🎁 Подписка → друг получит *10 дней* + *20% комиссии*\n💰 Курс → друг получит *15% комиссии*\n\n🔐 Выбери план:",
-        
-        "help": "📖 *Команды:*\n\n/start — Начать\n/status — Статус\n/renew — Продлить\n/referral — Рефералы\n/language — Язык\n/support — Поддержка\n/id — Мой ID\n/loyalty — Лояльность\n/help — Справка",
+        "help": "📖 *Команды:*\n\n/start — Начать\n/status — Статус\n/renew — Продлить\n/language — Язык\n/support — Поддержка\n/id — Мой ID\n/loyalty — Лояльность\n/help — Справка",
         "support": "📩 *Поддержка*\n\nЕсли есть вопросы, напиши: https://t.me/mntrade_support",
         "auto_found": "✅ *Платёж найден автоматически!*\n\n📦 Тариф: *{name}*\n📅 Активен до: *{expires}*\n🔖 TX: `{tx}`\n\n_Обнаружен фоновой проверкой._",
         "upsell": "💡 *Специальное предложение!*\n\nТвоя подписка *{plan}* скоро заканчивается.\n\n🔥 Перейди на *годовой план* — экономия *{save}%*!\n💰 Цена: *{yearly_price} USDT* вместо {monthly_x12}",
@@ -107,8 +94,8 @@ TEXTS = {
     "en": {
         "welcome": "👋 Hello, {name}!\n\n🔐 This is an exclusive paid traders chat.\n\n📋 *Choose your subscription plan:*",
         "active_sub": "👋 Hello, {name}!\n\n✅ Subscription active until *{expires}*\n📦 Plan: *{plan}*\n⏳ Days left: *{days}*",
-        "inactive_welcome": "👋 Hello, {name}!\n\n❌ You do not have an active subscription right now.\n\n👥 Invite friends and get free access to the chat and courses!\n\n📋 *Choose a product:*",
-        "inactive_welcome_note": "❌ You do not have an active subscription right now.\n\n👥 Invite friends and get free access to the chat and courses!",
+        "inactive_welcome": "👋 Hello, {name}!\n\n❌ You do not have an active subscription right now.\n\n📋 *Choose a product:*",
+        "inactive_welcome_note": "❌ You do not have an active subscription right now.",
         "choose_plan": "📋 *Choose your subscription plan:*",
         "payment_title": "{emoji} *{name}*\n\n💰 Price: *{price}* ({usdt} USDT)\n📅 Duration: *{days} days*\n\n━━━━━━━━━━━━━━━━\n📤 Send exactly *{usdt} USDT (BEP-20)* to:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Only *USDT BEP-20* (BSC)\n• Amount: *{usdt} USDT*\n• Press button after sending",
         "paid_ok": "✅ *Payment confirmed!*\n\n📦 Plan: *{name}*\n📅 Active until: *{expires}*\n🔖 TX: `{tx}`",
@@ -124,8 +111,7 @@ TEXTS = {
         "qr_caption": "📷 *QR Code*\n\n📋 Address: `{wallet}`\n💰 Amount: *{usdt} USDT (BEP-20)*\n⚠️ Scan QR → enter *{usdt} USDT*\n🔗 Network: *BSC (BEP-20)*",
         "invite": "\n\n🔗 [Join channel]({link})",
         
-        # NEW REFERRAL EARNINGS TEXTS
-        "referral_info": "👥 *Referral Program*\n\n🎁 For chat subscription: *+10 days* + *20% commission*\n💰 For course purchase: *+15% commission*\n\n📌 Your link:\n`{ref_link}`\n\n📊 Invited: *{count}*\n🎁 Subscription bonuses: *{bonuses}* × 10 days\n💵 Available for withdrawal: *{balance}$*",
+        "referral_info": "👥 *Referral Program*\n\n🎁 For every friend purchase you receive *+10 bonus days*.\n\n📌 Your link:\n`{ref_link}`\n\n📊 Invited: *{count}*\n🎁 Bonuses received: *{bonuses}*",
         
         "my_referrals": "👥 *My Referrals*\n\n📊 Total: *{count}*\n🎁 Bonuses: *{bonuses}* × 10 days\n📅 Total: *{total_days}* days\n\n{referral_list}",
         "my_referrals_empty": "👥 *My Referrals*\n\nYou haven't invited anyone yet.",
@@ -133,44 +119,32 @@ TEXTS = {
         "referral_row_pending": "⏳ {name} — waiting",
         "referral_bonus_received": "🎉 *Bonus received!*\n\nYour friend subscribed — *+10 days*!\n📅 Active until: *{expires}*",
         
-        # WITHDRAWAL TEXTS
-        "referral_earnings": "💰 *Referral Earnings*\n\n💵 Available for withdrawal: *{balance}$*\n📊 Total earned: *{total}$*\n💸 Withdrawn: *{withdrawn}$*\n\n━━━━━━━━━━━━━━━━\n\n🎯 *How it works:*\n• For each course purchased by your referral you get *15% commission*\n• Minimum withdrawal: *{min}$*\n• All payouts processed manually by admin",
+        "referral_earnings": "🎁 *Referral Bonus Days*\n\nThe referral program now uses only bonus days for chats.",
+        "withdrawal_button": "🎁 Bonus days",
+        "earnings_button": "📊 Referral history",
+        "withdrawal_history_button": "📜 Bonus day history",
+        "earnings_list": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
+        "earnings_empty": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
+        "earnings_row": "• {date} — {name}",
+        "withdrawal_request": "🎁 The referral program now uses only bonus days for chats.",
+        "withdrawal_enter_address": "🎁 The referral program now uses only bonus days for chats.",
+        "withdrawal_confirm": "🎁 The referral program now uses only bonus days for chats.",
+        "withdrawal_submitted": "🎁 The referral program now uses only bonus days for chats.",
+        "withdrawal_approved": "🎁 The referral program now uses only bonus days for chats.",
+        "withdrawal_rejected": "🎁 The referral program now uses only bonus days for chats.",
+        "withdrawal_history": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
+        "withdrawal_history_empty": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
+        "withdrawal_row_pending": "⏳ Referral bonus days",
+        "withdrawal_row_approved": "✅ Referral bonus days",
+        "withdrawal_row_rejected": "❌ Referral bonus days",
+        "withdrawal_error_banned": "❌ Cash payouts are no longer available.",
+        "withdrawal_error_pending": "ℹ️ The referral program now works only with bonus days.",
+        "withdrawal_error_min": "ℹ️ The referral program now works only with bonus days.",
+        "withdrawal_error_no_email": "ℹ️ The referral program now works only with bonus days.",
+        "withdrawal_error_rate_limit": "ℹ️ The referral program now works only with bonus days.",
+        "referral_welcome": "👋 Invited by a friend!\n\n🎁 When you make a purchase, your friend gets *+10 bonus days*.\n\n🔐 Choose a product:",
         
-        "withdrawal_button": "💸 Withdraw funds",
-        "earnings_button": "📊 Earnings history",
-        "withdrawal_history_button": "📜 Withdrawal history",
-        
-        "earnings_list": "📊 *Earnings History*\n\n{list}\n\n💵 Total: *{total}$*",
-        "earnings_empty": "📊 *Earnings History*\n\nNo earnings yet.\nInvite friends and earn!",
-        "earnings_row": "• {date} — {name}\n  💰 {amount}$ → 15% = *{commission}$*",
-        
-        "withdrawal_request": "💸 *Withdrawal Request*\n\n💵 Available: *{balance}$*\n\n⚠️ Requirements:\n1. Provide e-mail\n2. Provide crypto address (BEP-20)\n3. Minimum *{min}$*\n\n📧 _Send your e-mail:_\n/cancel to cancel",
-        
-        "withdrawal_enter_address": "💸 *Withdrawal*\n\n💵 Amount: *{amount}$*\n📧 E-mail: {email}\n\n📋 Now send wallet address *(BEP-20 USDT)*:\n\n⚠️ Check address carefully!\n/cancel to cancel",
-        
-        "withdrawal_confirm": "💸 *Confirm Withdrawal*\n\n💵 Amount: *{amount}$*\n📧 E-mail: {email}\n📋 Address: `{address}`\n\n⚠️ Check all details!\nAfter confirmation request will be sent to admin.",
-        
-        "withdrawal_submitted": "✅ *Request submitted!*\n\n💵 Amount: *{amount}$*\n📋 Address: `{address}`\n\n⏳ Request will be processed within 24-48 hours.\n\nYou'll be notified about status.",
-        
-        "withdrawal_approved": "🎉 *Payout approved!*\n\n💵 Amount: *{amount}$*\n📋 Address: `{address}`\n\n✅ Funds will be sent shortly.\n{notes}",
-        
-        "withdrawal_rejected": "❌ *Payout rejected*\n\n💵 Amount: *{amount}$*\n\n📝 Reason: {reason}",
-        
-        "withdrawal_history": "📜 *Withdrawal History*\n\n{list}",
-        "withdrawal_history_empty": "📜 *Withdrawal History*\n\nNo withdrawals yet.",
-        "withdrawal_row_pending": "⏳ {date} — *{amount}$* (pending)",
-        "withdrawal_row_approved": "✅ {date} — *{amount}$* (approved)",
-        "withdrawal_row_rejected": "❌ {date} — *{amount}$* (rejected)",
-        
-        "withdrawal_error_banned": "❌ Withdrawal unavailable.",
-        "withdrawal_error_pending": "⚠️ You already have an active withdrawal request.\nPlease wait for processing.",
-        "withdrawal_error_min": "❌ Minimum withdrawal: *{min}$*\nYour balance: *{balance}$*",
-        "withdrawal_error_no_email": "❌ E-mail required for withdrawal.",
-        "withdrawal_error_rate_limit": "⚠️ Too many requests.\nTry later.",
-        
-        "referral_welcome": "👋 Invited by a friend!\n\n🎁 Subscription → friend gets *10 days* + *20% commission*\n💰 Course → friend gets *15% commission*\n\n🔐 Choose plan:",
-        
-        "help": "📖 *Commands:*\n\n/start — Start\n/status — Status\n/renew — Renew\n/referral — Referrals\n/language — Language\n/support — Support\n/id — My ID\n/loyalty — Loyalty\n/help — Help",
+        "help": "📖 *Commands:*\n\n/start — Start\n/status — Status\n/renew — Renew\n/language — Language\n/support — Support\n/id — My ID\n/loyalty — Loyalty\n/help — Help",
         "support": "📩 *Support*\n\nIf you have questions, write: https://t.me/mntrade_support",
         "auto_found": "✅ *Payment found automatically!*\n\n📦 Plan: *{name}*\n📅 Until: *{expires}*\n🔖 TX: `{tx}`\n\n_Detected by background check._",
         "upsell": "💡 *Special offer!*\n\nYour *{plan}* is ending soon.\n\n🔥 Upgrade to *yearly* — save *{save}%*!\n💰 Price: *{yearly_price} USDT* instead of {monthly_x12}",
@@ -195,8 +169,8 @@ TEXTS["lv"] = {
     **TEXTS["en"],
     "welcome": "👋 Sveiks, {name}!\n\n🔐 Šis ir slēgts maksas treideru community.\n\n📋 *Izvēlies abonementa plānu:*",
     "active_sub": "👋 Sveiks, {name}!\n\n✅ Abonements aktīvs līdz *{expires}*\n📦 Plāns: *{plan}*\n⏳ Atlikušas dienas: *{days}*",
-    "inactive_welcome": "👋 Sveiks, {name}!\n\n❌ Tev šobrīd nav aktīva abonementa.\n\n👥 Uzaicini draugus un dabū bezmaksas piekļuvi chatam un kursiem!\n\n📋 *Izvēlies produktu:*",
-    "inactive_welcome_note": "❌ Tev šobrīd nav aktīva abonementa.\n\n👥 Uzaicini draugus un dabū bezmaksas piekļuvi chatam un kursiem!",
+    "inactive_welcome": "👋 Sveiks, {name}!\n\n❌ Tev šobrīd nav aktīva abonementa.\n\n📋 *Izvēlies produktu:*",
+    "inactive_welcome_note": "❌ Tev šobrīd nav aktīva abonementa.",
     "choose_plan": "📋 *Izvēlies abonementa plānu:*",
     "payment_title": "{emoji} *{name}*\n\n💰 Cena: *{price}* ({usdt} USDT)\n📅 Termiņš: *{days} dienas*\n\n━━━━━━━━━━━━━━━━\n📤 Nosūti tieši *{usdt} USDT (BEP-20)* uz:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Tikai *USDT BEP-20* (BSC)\n• Summa: *{usdt} USDT*\n• Pēc maksājuma nospied pogu zemāk",
     "paid_ok": "✅ *Maksājums apstiprināts!*\n\n📦 Plāns: *{name}*\n📅 Aktīvs līdz: *{expires}*\n🔖 TX: `{tx}`",
@@ -214,31 +188,31 @@ TEXTS["lv"] = {
     "referral_row_bonus": "✅ {name} — bonuss saņemts",
     "referral_row_pending": "⏳ {name} — gaida pirkumu",
     "referral_bonus_received": "🎉 *Bonuss saņemts!*\n\nTavs draugs veica pirkumu — tev *+10 dienas*!\n📅 Aktīvs līdz: *{expires}*",
-    "referral_earnings": "💰 *Referral ienākumi*\n\n💵 Pieejams izmaksai: *{balance}$*\n📊 Kopā nopelnīts: *{total}$*\n💸 Izmaksāts: *{withdrawn}$*\n\n━━━━━━━━━━━━━━━━\n\n🎯 *Kā tas strādā:*\n• Par katru kursa pirkumu no tava referral saņem *15% komisiju*\n• Minimālā izmaksas summa: *{min}$*\n• Izmaksas manuāli apstrādā administrācija",
-    "withdrawal_button": "💸 Izņemt līdzekļus",
-    "earnings_button": "📊 Ienākumu vēsture",
-    "withdrawal_history_button": "📜 Izmaksu vēsture",
-    "earnings_list": "📊 *Ienākumu vēsture*\n\n{list}\n\n💵 Kopā: *{total}$*",
-    "earnings_empty": "📊 *Ienākumu vēsture*\n\nPagaidām ienākumu nav.\nUzaicini draugus un pelni!",
-    "earnings_row": "• {date} — {name}\n  💰 {amount}$ → 15% = *{commission}$*",
-    "withdrawal_request": "💸 *Izmaksas pieprasījums*\n\n💵 Pieejams: *{balance}$*\n\n⚠️ Izmaksai nepieciešams:\n1. Norādīt e-pastu\n2. Norādīt crypto adresi (BEP-20)\n3. Minimums *{min}$*\n\n📧 _Atsūti savu e-pastu:_\n/cancel lai atceltu",
-    "withdrawal_enter_address": "💸 *Izmaksa*\n\n💵 Summa: *{amount}$*\n📧 E-pasts: {email}\n\n📋 Tagad atsūti maka adresi *(BEP-20 USDT)*:\n\n⚠️ Rūpīgi pārbaudi adresi!\n/cancel lai atceltu",
-    "withdrawal_confirm": "💸 *Izmaksas apstiprinājums*\n\n💵 Summa: *{amount}$*\n📧 E-pasts: {email}\n📋 Adrese: `{address}`\n\n⚠️ Pārbaudi visus datus!\nPēc apstiprinājuma pieprasījums tiks nosūtīts administrācijai.",
-    "withdrawal_submitted": "✅ *Pieprasījums nosūtīts!*\n\n💵 Summa: *{amount}$*\n📋 Adrese: `{address}`\n\n⏳ Pieprasījums tiks apstrādāts 24-48 stundu laikā.\n\nTu saņemsi paziņojumu par statusu.",
-    "withdrawal_approved": "🎉 *Izmaksa apstiprināta!*\n\n💵 Summa: *{amount}$*\n📋 Adrese: `{address}`\n\n✅ Līdzekļi drīz tiks nosūtīti.\n{notes}",
-    "withdrawal_rejected": "❌ *Izmaksa noraidīta*\n\n💵 Summa: *{amount}$*\n\n📝 Iemesls: {reason}",
-    "withdrawal_history": "📜 *Izmaksu vēsture*\n\n{list}",
-    "withdrawal_history_empty": "📜 *Izmaksu vēsture*\n\nPagaidām izmaksu nav.",
-    "withdrawal_row_pending": "⏳ {date} — *{amount}$* (gaida)",
-    "withdrawal_row_approved": "✅ {date} — *{amount}$* (apstiprināta)",
-    "withdrawal_row_rejected": "❌ {date} — *{amount}$* (noraidīta)",
-    "withdrawal_error_banned": "❌ Izmaksa nav pieejama.",
-    "withdrawal_error_pending": "⚠️ Tev jau ir aktīvs izmaksas pieprasījums.\nLūdzu sagaidi apstrādi.",
-    "withdrawal_error_min": "❌ Minimālā izmaksas summa: *{min}$*\nTavs atlikums: *{balance}$*",
-    "withdrawal_error_no_email": "❌ Izmaksai nepieciešams e-pasts.",
-    "withdrawal_error_rate_limit": "⚠️ Pārāk daudz pieprasījumu.\nPamēģini vēlāk.",
+    "referral_earnings": "🎁 *Referral bonusu dienas*\n\nReferral programma tagad izmanto tikai bonusu dienas čatiem.",
+    "withdrawal_button": "🎁 Bonusu dienas",
+    "earnings_button": "📊 Referral vēsture",
+    "withdrawal_history_button": "📜 Bonusu dienu vēsture",
+    "earnings_list": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
+    "earnings_empty": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
+    "earnings_row": "• {date} — {name}",
+    "withdrawal_request": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
+    "withdrawal_enter_address": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
+    "withdrawal_confirm": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
+    "withdrawal_submitted": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
+    "withdrawal_approved": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
+    "withdrawal_rejected": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
+    "withdrawal_history": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
+    "withdrawal_history_empty": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
+    "withdrawal_row_pending": "⏳ Referral bonusu dienas",
+    "withdrawal_row_approved": "✅ Referral bonusu dienas",
+    "withdrawal_row_rejected": "❌ Referral bonusu dienas",
+    "withdrawal_error_banned": "❌ Naudas izmaksas vairs nav pieejamas.",
+    "withdrawal_error_pending": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
+    "withdrawal_error_min": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
+    "withdrawal_error_no_email": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
+    "withdrawal_error_rate_limit": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
     "referral_welcome": "👋 Tevi uzaicināja draugs!\n\n🎁 Kad tu veiksi pirkumu, draugs saņems *+10 bezmaksas dienas*.\n\n🔐 Izvēlies produktu:",
-    "help": "📖 *Komandas:*\n\n/start — Sākt\n/status — Statuss\n/renew — Pagarināt\n/referral — Referrals\n/language — Valoda\n/support — Atbalsts\n/id — Mans ID\n/loyalty — Lojalitāte\n/help — Palīdzība",
+    "help": "📖 *Komandas:*\n\n/start — Sākt\n/status — Statuss\n/renew — Pagarināt\n/language — Valoda\n/support — Atbalsts\n/id — Mans ID\n/loyalty — Lojalitāte\n/help — Palīdzība",
     "support": "📩 *Atbalsts*\n\nJa rodas jautājumi raksti https://t.me/mntrade_support",
 }
 
@@ -501,7 +475,6 @@ def main_menu_keyboard(lang):
         b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
@@ -509,7 +482,6 @@ def main_menu_keyboard(lang):
         b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
@@ -517,7 +489,6 @@ def main_menu_keyboard(lang):
         b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
@@ -556,7 +527,6 @@ def active_keyboard(lang):
         b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
@@ -565,7 +535,6 @@ def active_keyboard(lang):
         b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
@@ -574,31 +543,11 @@ def active_keyboard(lang):
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
         b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
-
-def referral_keyboard(lang):
-    b = InlineKeyboardBuilder()
-    b.button(text="🔗 " + ui_text(lang, "Mana referral saite", "Моя реф. ссылка", "My Ref Link"), callback_data="ref_my_link")
-    b.button(text="🎁 " + ui_text(lang, "Izmantot bonusu dienas", "Использовать бонусные дни", "Use bonus days"), callback_data="ref_use_bonus")
-    b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My Referrals"), callback_data="ref_my_list")
-    b.button(text=back_button_text(lang), callback_data="ref_back_start")
-    b.adjust(1, 1, 1, 1)
-    return b.as_markup()
-
-def referral_keyboard_with_earnings(lang):
-    """Referral keyboard ar bonus day wallet"""
-    b = InlineKeyboardBuilder()
-    b.button(text="🎁 " + ui_text(lang, "Izmantot bonusu dienas", "Использовать бонусные дни", "Use bonus days"), callback_data="ref_use_bonus")
-    b.button(text="👥 " + ui_text(lang, "Mani referrals", "Мои рефералы", "My referrals"), callback_data="ref_my_list")
-    b.button(text=back_button_text(lang), callback_data="settings_back")
-    b.adjust(1, 1, 1)
-    return b.as_markup()
-
 
 # ─── FIRST-TIME LANGUAGE SELECTION ───
 
@@ -761,7 +710,6 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Uzaicini draugu"), callback_data="ref_main")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
@@ -769,7 +717,6 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Приглашай и зарабатывай"), callback_data="ref_main")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
@@ -777,7 +724,6 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("👥", "Invite & Earn"), callback_data="ref_main")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
@@ -786,6 +732,7 @@ def _urgency_keyboard(lang):
 
 async def _send_referral_reminder(user_id, lang):
     """Nosūta referral reminder 5 min pēc maksājuma"""
+    return
     await asyncio.sleep(300)  # 5 minūtes
     try:
         bot_info = await bot.get_me()
@@ -793,19 +740,17 @@ async def _send_referral_reminder(user_id, lang):
         if lang == "ru":
             text = (
                 f"💡 *Кстати!*\n\n"
-                f"Пригласи друга — и вы оба получите бонус:\n\n"
-                f"🎁 Твой друг: скидка на первую подписку\n"
-                f"💰 Ты: *комиссия {config.REFERRAL_COMMISSION_CHAT}%* с каждой покупки друга\n"
-                f"📅 Плюс *+{config.REFERRAL_BONUS_DAYS} дней* бесплатно!\n\n"
+                f"Пригласи друга — и получай бонусные дни:\n\n"
+                f"🎁 За каждую покупку друга тебе начисляется *+{config.REFERRAL_BONUS_DAYS} бонусных дней*\n"
+                f"📅 Ты сам выбираешь, к какому активному чату их применить.\n\n"
                 f"📌 Твоя ссылка:\n`{ref_link}`"
             )
         else:
             text = (
                 f"💡 *By the way!*\n\n"
-                f"Invite a friend — you both get a bonus:\n\n"
-                f"🎁 Your friend: discount on first subscription\n"
-                f"💰 You: *{config.REFERRAL_COMMISSION_CHAT}% commission* on every purchase\n"
-                f"📅 Plus *+{config.REFERRAL_BONUS_DAYS} days* free!\n\n"
+                f"Invite a friend and collect bonus days:\n\n"
+                f"🎁 For every friend purchase you receive *+{config.REFERRAL_BONUS_DAYS} bonus days*\n"
+                f"📅 You choose which active chat to apply them to.\n\n"
                 f"📌 Your link:\n`{ref_link}`"
             )
         await bot.send_message(user_id, text, parse_mode="Markdown")
@@ -956,11 +901,8 @@ async def cmd_start(message: Message, state: FSMContext):
     else:
         referral = await db.get_referral_by_referred(user_id) if ref_param else None
         
-        if referral:
-            await message.answer(t(lang, "referral_welcome"), reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
-        else:
-            welcome_text = await inactive_welcome_text(lang, name)
-            await message.answer(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
+        welcome_text = await inactive_welcome_text(lang, name)
+        await message.answer(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
 
 @dp.callback_query(F.data.startswith("lang_"))
 async def lang_selected(callback: CallbackQuery):
@@ -1087,53 +1029,54 @@ async def cmd_referral(message: Message):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     await message.answer(
-        await build_referral_overview_text(message.from_user.id, lang),
-        reply_markup=referral_keyboard_with_earnings(lang),
-        parse_mode="Markdown",
+        ui_text(
+            lang,
+            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
+            "ℹ️ Referral система сейчас отключена.",
+            "ℹ️ The referral system is currently disabled.",
+        )
     )
 
 @dp.callback_query(F.data == "ref_main")
 async def ref_main(callback: CallbackQuery):
-    """Referral main - bonus day wallet"""
-    user_id = callback.from_user.id
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    text = await build_referral_overview_text(user_id, lang)
     await callback.message.edit_text(
-        text,
-        reply_markup=referral_keyboard_with_earnings(lang),
-        parse_mode="Markdown"
+        ui_text(
+            lang,
+            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
+            "ℹ️ Referral система сейчас отключена.",
+            "ℹ️ The referral system is currently disabled.",
+        )
     )
     await callback.answer()
 
 @dp.callback_query(F.data == "ref_my_link")
 async def ref_my_link(callback: CallbackQuery):
-    uid = callback.from_user.id
-    user = await db.get_user(uid)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    await callback.message.edit_text(await build_referral_overview_text(uid, lang), reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
+    await callback.message.edit_text(
+        ui_text(
+            lang,
+            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
+            "ℹ️ Referral система сейчас отключена.",
+            "ℹ️ The referral system is currently disabled.",
+        )
+    )
     await callback.answer()
 
 @dp.callback_query(F.data == "ref_my_list")
 async def ref_my_list(callback: CallbackQuery):
-    uid = callback.from_user.id
-    user = await db.get_user(uid)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    referrals = await db.get_my_referrals(uid)
-    if not referrals:
-        await callback.message.edit_text(t(lang, "my_referrals_empty"), reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
-        await callback.answer(); return
-    lines = [t(lang, "referral_row_bonus" if r.get("bonus_given") else "referral_row_pending", name=f"@{r['username']}" if r.get("username") else (r.get("first_name") or f"ID {r['referred_id']}")) for r in referrals]
-    bonuses = sum(1 for r in referrals if r.get("bonus_given"))
-    balance_days = await db.get_referral_bonus_days_balance(uid)
-    text = t(lang, "my_referrals", count=len(referrals), bonuses=bonuses, total_days=bonuses*REFERRAL_BONUS_DAYS, referral_list="\n".join(lines))
-    text += ui_text(
-        lang,
-        f"\n\n🎁 *Pieejamās bonusu dienas:* {balance_days}",
-        f"\n\n🎁 *Доступно бонусных дней:* {balance_days}",
-        f"\n\n🎁 *Available bonus days:* {balance_days}",
+    await callback.message.edit_text(
+        ui_text(
+            lang,
+            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
+            "ℹ️ Referral система сейчас отключена.",
+            "ℹ️ The referral system is currently disabled.",
+        )
     )
-    await callback.message.edit_text(text, reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
     await callback.answer()
 
 @dp.callback_query(F.data == "ref_back_start")
@@ -1154,106 +1097,39 @@ async def ref_back_start(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "ref_use_bonus")
 async def ref_use_bonus(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    balance_days = await db.get_referral_bonus_days_balance(user_id)
-    if balance_days < REFERRAL_BONUS_DAYS:
-        await callback.answer(
-            ui_text(
-                lang,
-                f"Nepietiek bonusu dienu. Vajag vismaz {REFERRAL_BONUS_DAYS}, šobrīd ir {balance_days}.",
-                f"Недостаточно бонусных дней. Нужно минимум {REFERRAL_BONUS_DAYS}, сейчас {balance_days}.",
-                f"Not enough bonus days. You need at least {REFERRAL_BONUS_DAYS}, currently {balance_days}.",
-            ),
-            show_alert=True
-        )
-        return
-    eligible = await get_bonus_eligible_chat_subscriptions(user_id)
-    if not eligible:
-        await callback.answer(
-            ui_text(
-                lang,
-                "Tev nav aktīvu čatu, kuriem var pielikt bonusu dienas.",
-                "У тебя нет активных чатов, к которым можно применить бонусные дни.",
-                "You do not have any active chats to apply bonus days to.",
-            ),
-            show_alert=True
-        )
-        return
-    text = ui_text(
-        lang,
-        f"🎁 *Izmantot bonusu dienas*\n\nPieejams: *{balance_days}* dienas\n\nIzvēlies, kuram aktīvajam čatam pielikt *+{REFERRAL_BONUS_DAYS} dienas*:",
-        f"🎁 *Использовать бонусные дни*\n\nДоступно: *{balance_days}* дней\n\nВыбери, к какому активному чату применить *+{REFERRAL_BONUS_DAYS} дней*:",
-        f"🎁 *Use bonus days*\n\nAvailable: *{balance_days}* days\n\nChoose which active chat should receive *+{REFERRAL_BONUS_DAYS} days*:",
+    await callback.answer(
+        ui_text(
+            lang,
+            "Referral sistēma šobrīd ir izslēgta.",
+            "Referral система сейчас отключена.",
+            "The referral system is currently disabled.",
+        ),
+        show_alert=True
     )
-    b = InlineKeyboardBuilder()
-    for sub in eligible:
-        label = sub.get("product_name") or sub.get("product_key") or "Chat"
-        b.button(text=f"💎 {label}", callback_data=f"ref_apply_bonus_{sub['product_key']}")
-    b.button(text=back_button_text(lang), callback_data="ref_main")
-    b.adjust(1)
-    await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
-    await callback.answer()
+    await callback.message.edit_text(
+        ui_text(
+            lang,
+            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
+            "ℹ️ Referral система сейчас отключена.",
+            "ℹ️ The referral system is currently disabled.",
+        )
+    )
 
 @dp.callback_query(F.data.startswith("ref_apply_bonus_"))
 async def ref_apply_bonus(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    product_key = callback.data.replace("ref_apply_bonus_", "", 1)
-    user = await db.get_user(user_id)
+    user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    eligible = await get_bonus_eligible_chat_subscriptions(user_id)
-    target = next((s for s in eligible if s.get("product_key") == product_key), None)
-    if not target:
-        await callback.answer(
-            ui_text(
-                lang,
-                "Šis čats vairs nav pieejams bonusa dienām.",
-                "Этот чат больше недоступен для бонусных дней.",
-                "This chat is no longer available for bonus days.",
-            ),
-            show_alert=True
-        )
-        return
-    consumed = await db.consume_referral_bonus_days(
-        user_id,
-        REFERRAL_BONUS_DAYS,
-        product_key,
-        note="manual_referral_bonus_redemption"
+    await callback.answer(
+        ui_text(
+            lang,
+            "Referral sistēma šobrīd ir izslēgta.",
+            "Referral система сейчас отключена.",
+            "The referral system is currently disabled.",
+        ),
+        show_alert=True
     )
-    if not consumed:
-        await callback.answer(
-            ui_text(
-                lang,
-                "Nepietiek bonusu dienu.",
-                "Недостаточно бонусных дней.",
-                "Not enough bonus days.",
-            ),
-            show_alert=True
-        )
-        return
-    new_exp = await db.extend_product_subscription(user_id, product_key, REFERRAL_BONUS_DAYS)
-    if not new_exp:
-        await db.add_referral_bonus_days(user_id, REFERRAL_BONUS_DAYS, note="refund_failed_manual_bonus_redemption")
-        await callback.answer(
-            ui_text(
-                lang,
-                "Neizdevās pielikt bonusu dienas. Mēģini vēlreiz.",
-                "Не удалось применить бонусные дни. Попробуй ещё раз.",
-                "Could not apply bonus days. Please try again.",
-            ),
-            show_alert=True
-        )
-        return
-    balance_days = await db.get_referral_bonus_days_balance(user_id)
-    text = ui_text(
-        lang,
-        f"✅ *Bonusa dienas izmantotas!*\n\nČats: *{target.get('product_name') or product_key}*\nPievienots: *+{REFERRAL_BONUS_DAYS} dienas*\nAktīvs līdz: *{new_exp.strftime('%d.%m.%Y')}*\nAtlikums: *{balance_days}* dienas",
-        f"✅ *Бонусные дни применены!*\n\nЧат: *{target.get('product_name') or product_key}*\nДобавлено: *+{REFERRAL_BONUS_DAYS} дней*\nАктивно до: *{new_exp.strftime('%d.%m.%Y')}*\nОстаток: *{balance_days}* дней",
-        f"✅ *Bonus days applied!*\n\nChat: *{target.get('product_name') or product_key}*\nAdded: *+{REFERRAL_BONUS_DAYS} days*\nActive until: *{new_exp.strftime('%d.%m.%Y')}*\nRemaining: *{balance_days}* days",
-    )
-    await callback.message.edit_text(text, reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
-    await callback.answer()
 
 # ─── USER SETTINGS ───
 
@@ -2276,47 +2152,9 @@ async def check_course_payment(callback: CallbackQuery):
             await db.use_promo_code(active_promo_code)
             await db.clear_user_promo(user_id)
 
-        # ═══════════════════════════════════════════════════════════════
-        # REFERRAL COMMISSION 15%
-        # ═══════════════════════════════════════════════════════════════
         ref = await db.get_referral_by_referred(user_id)
         if ref and False:
-            referrer_id = ref['referrer_id']
-            commission = round(expected * (config.REFERRAL_COMMISSION_COURSES / 100), 2)
-            
-            await db.add_referral_earning(
-                referrer_id=referrer_id,
-                referred_id=user_id,
-                purchase_id=purchase_id,
-                course_key=course_key,
-                amount_usd=expected,
-                commission_usd=commission
-            )
-            
-            # Paziņo referrer
-            try:
-                referrer = await db.get_user(referrer_id)
-                ref_lang = referrer.get("lang", "ru") if referrer else "ru"
-                ref_balance = await db.get_referral_balance(referrer_id)
-                
-                if ref_lang == "ru":
-                    ref_text = (
-                        f"💰 *Новый доход!*\n\n"
-                        f"Твой реферал купил курс *{name_ru}*\n"
-                        f"💵 Твоя комиссия: *{commission}$*\n\n"
-                        f"📊 Доступно для вывода: *{ref_balance:.2f}$*"
-                    )
-                else:
-                    ref_text = (
-                        f"💰 *New earning!*\n\n"
-                        f"Your referral purchased *{name_ru}* course\n"
-                        f"💵 Your commission: *{commission}$*\n\n"
-                        f"📊 Available for withdrawal: *{ref_balance:.2f}$*"
-                    )
-                
-                await bot.send_message(referrer_id, ref_text, parse_mode="Markdown")
-            except Exception as e:
-                logger.warning(f"Failed to notify referrer {referrer_id}: {e}")
+            pass
         # ═══════════════════════════════════════════════════════════════
 
         if lang == "ru":
@@ -2654,52 +2492,6 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
                 try: await bot.send_message(aid, f"ðŸ’° *Jauns maksÄjums!*\n\nðŸ‘¤ {uname} (`{user_id}`)\nðŸ“¦ *{plan_name_loc}*\nðŸ’µ *{amount} USDT*\nðŸ“… LÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*\nðŸ”– TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
                 except: pass
             return new_exp, plan_name_loc, product_meta
-            
-            # 2. Give 20% commission (chat subscription)
-            commission = round(amount * (config.REFERRAL_COMMISSION_CHAT / 100), 2)
-            # Create a pseudo purchase_id (using payment_history id would be better, but we use timestamp as workaround)
-            pseudo_purchase_id = int(now.timestamp())
-            await db.add_referral_earning(
-                referrer_id=ref["referrer_id"],
-                referred_id=user_id,
-                purchase_id=pseudo_purchase_id,
-                course_key=f"chat_{plan_key}",
-                amount_usd=amount,
-                commission_usd=commission,
-                earning_type="chat"
-            )
-            
-            # Notify referrer
-            ref_lang = referrer.get("lang", "ru")
-            ref_balance = await db.get_referral_balance(ref["referrer_id"])
-            if ref_lang == "ru":
-                ref_text = (
-                    f"💰 *Новый доход!*\n\n"
-                    f"Твой реферал купил подписку на чат\n"
-                    f"🎁 Бонус: *+{REFERRAL_BONUS_DAYS} дней*\n"
-                    f"💵 Комиссия: *{commission}$* (20%)\n\n"
-                    f"📊 Доступно для вывода: *{ref_balance:.2f}$*"
-                )
-            elif ref_lang == "lv":
-                ref_text = (
-                    f"💰 *Jauns ienākums!*\n\n"
-                    f"Tavs referral iegādājās čata abonementu\n"
-                    f"🎁 Bonuss: *+{REFERRAL_BONUS_DAYS} dienas*\n"
-                    f"💵 Komisija: *{commission}$* (20%)\n\n"
-                    f"📊 Pieejams izmaksai: *{ref_balance:.2f}$*"
-                )
-            else:
-                ref_text = (
-                    f"💰 *New earning!*\n\n"
-                    f"Your referral purchased chat subscription\n"
-                    f"🎁 Bonus: *+{REFERRAL_BONUS_DAYS} days*\n"
-                    f"💵 Commission: *{commission}$* (20%)\n\n"
-                    f"📊 Available for withdrawal: *{ref_balance:.2f}$*"
-                )
-            try:
-                await bot.send_message(ref["referrer_id"], ref_text, parse_mode="Markdown")
-            except Exception as e:
-                logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
     # Admin notify
     uname = f"@{username}" if username else f"ID {user_id}"
     for aid in config.ADMIN_IDS:
