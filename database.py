@@ -111,6 +111,23 @@ class Database:
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_active ON user_subscriptions(user_id, is_active, expires_at)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_subscriptions_chat_active ON user_subscriptions(chat_id, is_active, expires_at)")
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS pending_email_subscriptions (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email         TEXT NOT NULL,
+                    product_key   TEXT NOT NULL,
+                    product_name  TEXT,
+                    chat_id       INTEGER,
+                    chat_link     TEXT,
+                    activated_at  TEXT NOT NULL,
+                    expires_at    TEXT NOT NULL,
+                    is_active     INTEGER DEFAULT 1,
+                    tx_hash       TEXT,
+                    payment_system TEXT,
+                    UNIQUE(email, product_key)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_email_subscriptions_email_active ON pending_email_subscriptions(email, is_active, expires_at)")
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS sent_reminders (
                     user_id     INTEGER,
                     days_before INTEGER,
@@ -409,6 +426,65 @@ class Database:
                     email_registered_at = COALESCE(email_registered_at, excluded.email_registered_at),
                     last_seen_at = excluded.last_seen_at
             """, (user_id, email, now, now))
+            await conn.commit()
+
+    async def get_pending_email_subscriptions(self, email: str) -> List[Dict]:
+        normalized = email.strip().lower()
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT * FROM pending_email_subscriptions
+                WHERE LOWER(email) = ? AND is_active = 1 AND expires_at > ?
+                ORDER BY expires_at ASC
+            """, (normalized, now)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
+    async def get_pending_email_subscription(self, email: str, product_key: str) -> Optional[Dict]:
+        normalized = email.strip().lower()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT * FROM pending_email_subscriptions
+                WHERE LOWER(email) = ? AND product_key = ? AND is_active = 1
+                LIMIT 1
+            """, (normalized, product_key)) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
+    async def activate_pending_email_subscription(self, email: str, product_key: str, product_name: str, expires_at, tx_hash: str, chat_id=0, chat_link="", payment_system=""):
+        normalized = email.strip().lower()
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT INTO pending_email_subscriptions
+                    (email, product_key, product_name, chat_id, chat_link, activated_at, expires_at, is_active, tx_hash, payment_system)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                ON CONFLICT(email, product_key) DO UPDATE SET
+                    product_name = excluded.product_name,
+                    chat_id = excluded.chat_id,
+                    chat_link = excluded.chat_link,
+                    activated_at = excluded.activated_at,
+                    expires_at = excluded.expires_at,
+                    is_active = 1,
+                    tx_hash = excluded.tx_hash,
+                    payment_system = excluded.payment_system
+            """, (
+                normalized,
+                product_key,
+                product_name,
+                chat_id or 0,
+                chat_link or "",
+                now,
+                expires_at.isoformat(),
+                tx_hash,
+                payment_system or "",
+            ))
+            await conn.commit()
+
+    async def deactivate_pending_email_subscription(self, subscription_id: int):
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("UPDATE pending_email_subscriptions SET is_active = 0 WHERE id = ?", (subscription_id,))
             await conn.commit()
 
     async def webhook_event_exists(self, event_id: str) -> bool:

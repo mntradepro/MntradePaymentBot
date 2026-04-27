@@ -460,6 +460,33 @@ async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, e
             pass
     return f"\n\n📢 {chat_link}" if chat_link else ""
 
+
+async def attach_pending_email_purchases(user_id: int, email: str, lang: str, username: str = ""):
+    pending_subs = await db.get_pending_email_subscriptions(email)
+    if not pending_subs:
+        return []
+    activated = []
+    for sub in pending_subs:
+        try:
+            expires_at = datetime.fromisoformat(sub["expires_at"])
+        except Exception:
+            continue
+        await db.activate_product_subscription(
+            user_id=user_id,
+            username=username,
+            product_key=sub.get("product_key") or "website_subscription",
+            product_name=sub.get("product_name") or sub.get("product_key") or "Website Purchase",
+            expires_at=expires_at,
+            tx_hash=sub.get("tx_hash") or f"claimed:{sub.get('id')}",
+            amount_usdt=0.0,
+            chat_id=sub.get("chat_id", 0) or 0,
+            chat_link=sub.get("chat_link", "") or "",
+            payment_system=sub.get("payment_system", "") or "webhook",
+        )
+        await db.deactivate_pending_email_subscription(sub["id"])
+        activated.append(sub)
+    return activated
+
 def lang_keyboard():
     b = InlineKeyboardBuilder()
     b.button(text="🇷🇺 Русский", callback_data="lang_ru")
@@ -619,8 +646,11 @@ async def registration_receive_email(message: Message, state: FSMContext):
         return
     await db.set_user_lang(message.from_user.id, lang)
     await db.set_user_email(message.from_user.id, email)
+    claimed = await attach_pending_email_purchases(message.from_user.id, email, lang, message.from_user.username or "")
     await state.clear()
     await message.answer(("✅ E-pasts saglabāts." if lang == "lv" else ("✅ E-mail сохранён." if lang == "ru" else "✅ E-mail saved.")), parse_mode="Markdown")
+    if claimed:
+        await message.answer(ui_text(lang, f"âœ… Atrasti iepriekÅ¡Ä“ji pirkumi pÄ“c e-pasta. AktivizÄ“tas {len(claimed)} piekÄ¼uves.", f"âœ… ÐÐ°Ð¹Ð´ÐµÐ½Ñ‹ Ñ€Ð°Ð½ÐµÐµ Ð¾Ð¿Ð»Ð°Ñ‡ÐµÐ½Ð½Ñ‹Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ð¿Ð¾ e-mail. ÐÐºÑ‚Ð¸Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð¾Ð²: {len(claimed)}.", f"âœ… Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
     await _send_onboarding(message, lang, name)
 
 
@@ -1255,6 +1285,7 @@ async def receive_email(message: Message, state: FSMContext):
         return
     await state.clear()
     await db.set_user_email(message.from_user.id, email)
+    claimed = await attach_pending_email_purchases(message.from_user.id, email, "lv", message.from_user.username or "")
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     if lang == "lv":
@@ -1264,6 +1295,9 @@ async def receive_email(message: Message, state: FSMContext):
     else:
         await message.answer(f"✅ E-mail saved: *{email}*", parse_mode="Markdown")
 
+
+    if claimed:
+        await message.answer(ui_text(lang, f"âœ… Atrasti ieprÅ¡Ä“ji pirkumi pÄ“c e-pasta. AktivizÄ“tas {len(claimed)} piekÄ¼uves.", f"âœ… ÐÐ°Ð¹Ð´ÐµÐ½Ñ‹ Ñ€Ð°Ð½ÐµÐµ Ð¾Ð¿Ð»Ð°Ñ‡ÐµÐ½Ð½Ñ‹Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ð¿Ð¾ e-mail. ÐÐºÑ‚Ð¸Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð¾Ð²: {len(claimed)}.", f"âœ… Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "settings_back")
 async def settings_back(callback: CallbackQuery):
@@ -1466,6 +1500,7 @@ async def giveaway_receive_email(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     await db.set_user_email(user_id, email)
+    await attach_pending_email_purchases(user_id, email, "lv", message.from_user.username or "")
     await db.enter_giveaway(user_id, month)
     count = await db.get_giveaway_count(month)
     _, prize_days = await _giveaway_settings()
@@ -2000,6 +2035,7 @@ async def course_receive_email(message: Message, state: FSMContext):
     await state.clear()
     
     await db.set_user_email(message.from_user.id, email)
+    await attach_pending_email_purchases(message.from_user.id, email, "lv", message.from_user.username or "")
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     
@@ -3939,39 +3975,67 @@ async def website_purchase_webhook(request: web.Request):
         event_id = hashlib.sha256(raw_body).hexdigest()
     event_key = f"{payment_system or 'website'}:{event_id}"
     tx_hash = f"webhook:{event_key}"
+    payload_json = json.dumps(payload, ensure_ascii=False)
+    claimed = await db.claim_webhook_event(event_key, email, product_key, payment_system, payload_json)
+    if not claimed:
+        user = await db.get_user_by_email(email)
+        response = {
+            "ok": True,
+            "status": "duplicate",
+            "duplicate": True,
+            "message": "Webhook was already received and processed earlier.",
+            "email": email,
+            "product_key": product_key,
+            "event_id": event_id,
+        }
+        if user:
+            response["telegram_user_id"] = user["user_id"]
+        return web.json_response(response)
 
     user = await db.get_user_by_email(email)
     if not user:
+        product_meta = resolve_subscription_product(product_key, "lv")
+        pending_existing = await db.get_pending_email_subscription(email, product_key)
+        now = datetime.utcnow()
+        if pending_existing and pending_existing.get("expires_at"):
+            try:
+                current_exp = datetime.fromisoformat(pending_existing["expires_at"])
+            except Exception:
+                current_exp = now
+            pending_expires = (current_exp if current_exp > now else now) + timedelta(days=plan.get("days", 0))
+        else:
+            pending_expires = now + timedelta(days=plan.get("days", 0))
+        try:
+            await db.activate_pending_email_subscription(
+                email=email,
+                product_key=product_key,
+                product_name=plan["name"]["ru"] if isinstance(plan.get("name"), dict) else plan.get("name", product_key),
+                expires_at=pending_expires,
+                tx_hash=tx_hash,
+                chat_id=product_meta.get("chat_id", 0) if product_meta else 0,
+                chat_link=product_meta.get("chat_link", "") if product_meta else "",
+                payment_system=payment_system or "webhook",
+            )
+        except Exception:
+            await db.delete_webhook_event(event_key)
+            raise
         for aid in config.ADMIN_IDS:
             try:
                 await bot.send_message(aid, f"⚠️ *Webhook purchase without bot user*\n\n📧 `{email}`\n📦 `{product_key}`\n💳 `{payment_system}`", parse_mode="Markdown")
             except Exception:
                 pass
         return web.json_response({
-            "ok": False,
-            "status": "email_not_registered",
-            "error": "email_not_registered",
-            "message": "Purchase was received, but this e-mail is not registered in the bot yet.",
+            "ok": True,
+            "status": "pending_email_claim",
+            "message": "Purchase was received and saved by e-mail. It will be attached when the user registers in the bot with this e-mail.",
             "email": email,
             "product_key": product_key,
             "event_id": event_id,
-        }, status=404)
+            "expires_at": pending_expires.isoformat(),
+        })
 
     lang = user.get("lang", "ru")
     username = user.get("username") or ""
-    payload_json = json.dumps(payload, ensure_ascii=False)
-    claimed = await db.claim_webhook_event(event_key, email, product_key, payment_system, payload_json)
-    if not claimed:
-        return web.json_response({
-            "ok": True,
-            "status": "duplicate",
-            "duplicate": True,
-            "message": "Webhook was already received and processed earlier.",
-            "telegram_user_id": user["user_id"],
-            "email": email,
-            "product_key": product_key,
-            "event_id": event_id,
-        })
     try:
         new_exp, plan_name, product_meta = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
     except Exception:
