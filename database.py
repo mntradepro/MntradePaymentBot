@@ -440,6 +440,17 @@ class Database:
             """, (normalized, now)) as cur:
                 return [dict(r) for r in await cur.fetchall()]
 
+    async def get_all_pending_email_subscriptions(self) -> List[Dict]:
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT * FROM pending_email_subscriptions
+                WHERE is_active = 1 AND expires_at > ?
+                ORDER BY activated_at DESC, email ASC
+            """, (now,)) as cur:
+                return [dict(r) for r in await cur.fetchall()]
+
     async def get_pending_email_subscription(self, email: str, product_key: str) -> Optional[Dict]:
         normalized = email.strip().lower()
         async with aiosqlite.connect(self.db_path) as conn:

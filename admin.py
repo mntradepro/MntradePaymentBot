@@ -63,6 +63,7 @@ def admin_menu_kb():
     builder.button(text="ðŸ“ˆ DetalizÄ“ta", callback_data="adm_detailed_stats")
     builder.button(text="ðŸ“œ Retention Logs", callback_data="adm_retention_logs")
     builder.button(text="ðŸ‘¥ LietotÄji", callback_data="adm_users")
+    builder.button(text="â³ Pirkumi bez TG", callback_data="adm_pending_email_users")
     builder.button(text="ðŸ‘‹ Welcome teksts", callback_data="adm_edit_welcome")
     builder.button(text="ðŸ“š Kursu teksts", callback_data="adm_edit_courses_text")
     builder.button(text="âš™ï¸ Remarketing", callback_data="adm_marketing_remarketing")
@@ -275,8 +276,11 @@ async def adm_users(callback: CallbackQuery):
     builder.button(text="ðŸ‘« Pievienot draugu", callback_data="adm_add_friend")
     builder.button(text="âŒ NoÅ†emt draugu", callback_data="adm_remove_friend")
     builder.button(text="ðŸš« AtÅ†emt abonementu", callback_data="adm_revoke_sub")
+    for u in registered[:8]:
+        uname = f"@{u['username']}" if u.get("username") else str(u["user_id"])
+        builder.button(text=f"ðŸ” {uname}", callback_data=f"adm_user_view_{u['user_id']}")
     builder.button(text="ðŸ”™ AtpakaÄ¼", callback_data="adm_main")
-    builder.adjust(2, 1, 1)
+    builder.adjust(2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
 
     lines = []
     for u in users[:20]:
@@ -331,6 +335,106 @@ async def adm_users(callback: CallbackQuery):
     )
     await callback.answer()
     return
+
+
+@router.callback_query(F.data.startswith("adm_user_view_"))
+async def adm_user_view(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+
+    try:
+        user_id = int(callback.data.replace("adm_user_view_", ""))
+    except ValueError:
+        await callback.answer("NederÄ«gs user ID", show_alert=True)
+        return
+
+    user = await db.get_user(user_id)
+    if not user:
+        await callback.answer("LietotÄjs nav atrasts", show_alert=True)
+        return
+
+    active_subs = await db.get_active_user_subscriptions(user_id)
+    uname = f"@{user['username']}" if user.get("username") else str(user_id)
+    lines = []
+    for sub in active_subs:
+        exp = sub.get("expires_at") or "â€”"
+        if "T" in exp:
+            exp = exp[:10]
+        lines.append(
+            f"â€¢ {_safe_text(sub.get('product_name') or sub.get('product_key') or 'â€”')} â†’ {_safe_text(exp)}"
+        )
+
+    text = (
+        f"ðŸ‘¤ <b>LietotÄja profils</b>\n\n"
+        f"ID: <code>{user_id}</code>\n"
+        f"Username: <b>{_safe_text(uname)}</b>\n"
+        f"E-pasts: <code>{_safe_text(user.get('email') or 'â€”')}</code>\n"
+        f"Valoda: <code>{_safe_text(user.get('lang') or 'â€”')}</code>\n"
+        f"Statuss: <b>{'AktÄ«vs' if user.get('is_active') else 'NeaktÄ«vs'}</b>\n"
+        f"ReÄ£istrÄ“ts: <code>{_safe_text((user.get('email_registered_at') or user.get('created_at') or 'â€”')[:19])}</code>\n"
+        f"PÄ“dÄ“jÄ aktivitÄte: <code>{_safe_text((user.get('last_seen_at') or 'â€”')[:19])}</code>\n\n"
+        f"ðŸ“¦ <b>AktÄ«vÄs piekÄ¼uves ({len(active_subs)}):</b>\n"
+        + ("\n".join(lines) if lines else "â€”")
+    )
+
+    await callback.message.edit_text(
+        _trim_for_telegram(text),
+        reply_markup=back_kb("adm_users"),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "adm_pending_email_users")
+async def adm_pending_email_users(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+
+    pending = await db.get_all_pending_email_subscriptions()
+    if not pending:
+        await callback.message.edit_text(
+            "â³ <b>Pirkumi bez TG konta</b>\n\nPaÅ¡laik nav neviena pirkuma, kas gaida lietotÄja pirmo ieieÅ¡anu botÄ.",
+            reply_markup=back_kb("adm_main"),
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
+    lines = []
+    seen_emails = set()
+    for row in pending[:25]:
+        email = (row.get("email") or "").strip().lower()
+        expires_at = row.get("expires_at") or "â€”"
+        activated_at = row.get("activated_at") or "â€”"
+        product_name = row.get("product_name") or row.get("product_key") or "â€”"
+        if "T" in expires_at:
+            expires_at = expires_at[:10]
+        if "T" in activated_at:
+            activated_at = activated_at[:10]
+        seen_emails.add(email)
+        lines.append(
+            f"â€¢ <b>{_safe_text(email)}</b>\n"
+            f"  â”œ Produkts: {_safe_text(product_name)}\n"
+            f"  â”œ MaksÄjums: {_safe_text(row.get('payment_system') or 'â€”')}\n"
+            f"  â”œ Pirkts: {_safe_text(activated_at)}\n"
+            f"  â”” AktÄ«vs lÄ«dz: {_safe_text(expires_at)}"
+        )
+
+    text = (
+        f"â³ <b>Pirkumi bez TG konta</b>\n\n"
+        f"ðŸ“§ UnikÄlie e-pasti: <b>{len(seen_emails)}</b>\n"
+        f"ðŸ“¦ AktÄ«vie gaidoÅ¡ie pirkumi: <b>{len(pending)}</b>\n\n"
+        + "\n\n".join(lines)
+    )
+    if len(pending) > 25:
+        text += f"\n\n...un vÄ“l {len(pending) - 25} ieraksti"
+
+    await callback.message.edit_text(
+        _trim_for_telegram(text),
+        reply_markup=back_kb("adm_main"),
+        parse_mode="HTML",
+    )
+    await callback.answer()
 
 
 # â”€â”€â”€ FRIENDS â”€â”€â”€

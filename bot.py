@@ -647,6 +647,13 @@ async def registration_receive_email(message: Message, state: FSMContext):
     await db.set_user_lang(message.from_user.id, lang)
     await db.set_user_email(message.from_user.id, email)
     claimed = await attach_pending_email_purchases(message.from_user.id, email, lang, message.from_user.username or "")
+    uname = f"@{message.from_user.username}" if message.from_user.username else f"ID {message.from_user.id}"
+    await notify_admins(
+        "📧 *Lietotājs piesaistīja e-pastu*\n\n"
+        f"👤 {uname} (`{message.from_user.id}`)\n"
+        f"📧 `{email}`\n"
+        f"📦 Aktivizēti gaidošie pirkumi: *{len(claimed)}*"
+    )
     await state.clear()
     await message.answer(("✅ E-pasts saglabāts." if lang == "lv" else ("✅ E-mail сохранён." if lang == "ru" else "✅ E-mail saved.")), parse_mode="Markdown")
     if claimed:
@@ -799,6 +806,13 @@ async def cmd_start(message: Message, state: FSMContext):
     auto_lang = tg_lang if tg_lang in SUPPORTED_LANGS else DEFAULT_LANG
     existing_user = await db.get_user(user_id)
     await db.register_user(user_id, message.from_user.username, message.from_user.first_name, auto_lang)
+    if not existing_user:
+        uname = f"@{message.from_user.username}" if message.from_user.username else f"ID {user_id}"
+        await notify_admins(
+            "🆕 *Jauns lietotājs botā*\n\n"
+            f"👤 {uname} (`{user_id}`)\n"
+            f"🌐 Valoda: `{auto_lang}`"
+        )
     if ref_param and ref_param.startswith("ref_"):
         try:
             rid = ref_param[4:]
@@ -2286,13 +2300,18 @@ async def check_course_payment(callback: CallbackQuery):
 
 
 # ─── DEBUG / ERROR NOTIFICATIONS ───
+async def notify_admins(text: str, parse_mode: str = "Markdown"):
+    for aid in config.ADMIN_IDS:
+        try:
+            await bot.send_message(aid, text, parse_mode=parse_mode)
+        except Exception:
+            pass
+
 
 async def notify_admins_error(context: str, error: str):
     """Sūta admin paziņojumu par kļūdu"""
     text = f"⚠️ *Bota kļūda*\n\n📍 `{context}`\n❌ `{str(error)[:500]}`"
-    for aid in config.ADMIN_IDS:
-        try: await bot.send_message(aid, text, parse_mode="Markdown")
-        except: pass
+    await notify_admins(text, parse_mode="Markdown")
 
 
 # ─── FIX #3: SLOT NO DB ───
@@ -4017,6 +4036,7 @@ async def website_purchase_webhook(request: web.Request):
                 payment_system=payment_system or "webhook",
             )
         except Exception:
+            await notify_admins_error(f"webhook_pending_save {email} {product_key}", "Failed to save pending e-mail purchase")
             await db.delete_webhook_event(event_key)
             raise
         for aid in config.ADMIN_IDS:
@@ -4039,6 +4059,7 @@ async def website_purchase_webhook(request: web.Request):
     try:
         new_exp, plan_name, product_meta = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
     except Exception:
+        await notify_admins_error(f"webhook_activate user={user['user_id']} product={product_key}", "Failed to activate purchase from webhook")
         await db.delete_webhook_event(event_key)
         raise
 
@@ -4047,6 +4068,7 @@ async def website_purchase_webhook(request: web.Request):
         await bot.send_message(user["user_id"], t(lang, "paid_ok", name=plan_name, expires=new_exp.strftime("%d.%m.%Y"), tx=event_id[:20]) + invite, parse_mode="Markdown")
     except Exception as e:
         logger.warning(f"Failed to notify webhook buyer {user['user_id']}: {e}")
+        await notify_admins_error(f"webhook_notify_user user={user['user_id']} product={product_key}", e)
 
     return web.json_response({
         "ok": True,
