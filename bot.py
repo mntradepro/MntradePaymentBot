@@ -3899,11 +3899,21 @@ def _webhook_plan_from_payload(payload: dict):
 async def website_purchase_webhook(request: web.Request):
     raw_body = await request.read()
     if not _verify_webhook_request(raw_body, request):
-        return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
+        return web.json_response({
+            "ok": False,
+            "status": "unauthorized",
+            "error": "unauthorized",
+            "message": "Webhook signature check failed.",
+        }, status=401)
     try:
         payload = json.loads(raw_body.decode("utf-8"))
     except Exception:
-        return web.json_response({"ok": False, "error": "invalid_json"}, status=400)
+        return web.json_response({
+            "ok": False,
+            "status": "invalid_json",
+            "error": "invalid_json",
+            "message": "Request body is not valid JSON.",
+        }, status=400)
 
     email = str(payload.get("email") or payload.get("user_email") or "").strip().lower()
     payment_system = str(payload.get("payment_system") or payload.get("payment_method") or "").strip()
@@ -3912,9 +3922,19 @@ async def website_purchase_webhook(request: web.Request):
     product_key, plan, plan_error = _webhook_plan_from_payload(payload)
 
     if not email or "@" not in email:
-        return web.json_response({"ok": False, "error": "email_required"}, status=400)
+        return web.json_response({
+            "ok": False,
+            "status": "email_required",
+            "error": "email_required",
+            "message": "A valid e-mail is required in webhook payload.",
+        }, status=400)
     if plan_error:
-        return web.json_response({"ok": False, "error": plan_error}, status=400)
+        return web.json_response({
+            "ok": False,
+            "status": "invalid_product",
+            "error": plan_error,
+            "message": f"Webhook payload could not be mapped to a valid product: {plan_error}.",
+        }, status=400)
     if not event_id:
         event_id = hashlib.sha256(raw_body).hexdigest()
     event_key = f"{payment_system or 'website'}:{event_id}"
@@ -3927,14 +3947,31 @@ async def website_purchase_webhook(request: web.Request):
                 await bot.send_message(aid, f"⚠️ *Webhook purchase without bot user*\n\n📧 `{email}`\n📦 `{product_key}`\n💳 `{payment_system}`", parse_mode="Markdown")
             except Exception:
                 pass
-        return web.json_response({"ok": False, "error": "email_not_registered"}, status=404)
+        return web.json_response({
+            "ok": False,
+            "status": "email_not_registered",
+            "error": "email_not_registered",
+            "message": "Purchase was received, but this e-mail is not registered in the bot yet.",
+            "email": email,
+            "product_key": product_key,
+            "event_id": event_id,
+        }, status=404)
 
     lang = user.get("lang", "ru")
     username = user.get("username") or ""
     payload_json = json.dumps(payload, ensure_ascii=False)
     claimed = await db.claim_webhook_event(event_key, email, product_key, payment_system, payload_json)
     if not claimed:
-        return web.json_response({"ok": True, "duplicate": True})
+        return web.json_response({
+            "ok": True,
+            "status": "duplicate",
+            "duplicate": True,
+            "message": "Webhook was already received and processed earlier.",
+            "telegram_user_id": user["user_id"],
+            "email": email,
+            "product_key": product_key,
+            "event_id": event_id,
+        })
     try:
         new_exp, plan_name, product_meta = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
     except Exception:
@@ -3949,9 +3986,12 @@ async def website_purchase_webhook(request: web.Request):
 
     return web.json_response({
         "ok": True,
+        "status": "processed",
+        "message": "Webhook received and purchase processed successfully.",
         "telegram_user_id": user["user_id"],
         "email": email,
         "product_key": product_key,
+        "event_id": event_id,
         "expires_at": new_exp.isoformat(),
     })
 
