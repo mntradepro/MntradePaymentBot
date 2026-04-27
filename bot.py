@@ -4009,6 +4009,8 @@ async def website_purchase_webhook(request: web.Request):
         }
         if user:
             response["telegram_user_id"] = user["user_id"]
+            if user.get("username"):
+                response["telegram_username"] = user["username"]
         return web.json_response(response)
 
     user = await db.get_user_by_email(email)
@@ -4075,6 +4077,7 @@ async def website_purchase_webhook(request: web.Request):
         "status": "processed",
         "message": "Webhook received and purchase processed successfully.",
         "telegram_user_id": user["user_id"],
+        "telegram_username": user.get("username") or "",
         "email": email,
         "product_key": product_key,
         "event_id": event_id,
