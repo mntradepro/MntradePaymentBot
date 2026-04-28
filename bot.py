@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import hashlib
 import hmac
 import json
@@ -7,78 +7,6 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command, CommandStart
-@router.callback_query(F.data == "get_access_links")
-async def get_access_links(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    user = await db.get_user(user_id)
-    lang = user.get("lang", "ru") if user else "ru"
-    active_subs = await db.get_active_user_subscriptions(user_id)
-    if not active_subs:
-        await callback.answer(
-            ui_text(
-                lang,
-                "Tev nav aktÄ«vu piekÄ¼uvju.",
-                "Ð£ Ñ‚ÐµÐ±Ñ Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ… Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð¾Ð².",
-                "You do not have any active access.",
-            ),
-            show_alert=True,
-        )
-        return
-
-    rows = []
-    for sub in active_subs:
-        try:
-            expires_at = datetime.fromisoformat(sub["expires_at"])
-        except Exception:
-            continue
-        product_meta = resolve_subscription_product(sub.get("product_key") or "", lang)
-        if not product_meta and (sub.get("chat_id") or sub.get("chat_link")):
-            product_meta = {
-                "product_key": sub.get("product_key") or "website_subscription",
-                "chat_id": sub.get("chat_id", 0) or 0,
-                "chat_link": sub.get("chat_link", "") or "",
-            }
-        invite = await invite_text_for_product(user_id, lang, product_meta, expires_at)
-        if not invite:
-            continue
-        product_name = sub.get("product_name") or sub.get("product_key") or "Access"
-        rows.append(
-            ui_text(
-                lang,
-                f"ðŸ“¦ *{product_name}*\nðŸ“… AktÄ«vs lÄ«dz: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-                f"ðŸ“¦ *{product_name}*\nðŸ“… ÐÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð´Ð¾: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-                f"ðŸ“¦ *{product_name}*\nðŸ“… Active until: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-            )
-        )
-
-    if not rows:
-        await callback.answer(
-            ui_text(
-                lang,
-                "NeizdevÄs izveidot piekÄ¼uves linku.",
-                "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ð·Ð´Ð°Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°.",
-                "Failed to create an access link.",
-            ),
-            show_alert=True,
-        )
-        return
-
-    text = ui_text(
-        lang,
-        "ðŸ”— *Tavi jaunie piekÄ¼uves linki*\n\n",
-        "ðŸ”— *Ð¢Ð²Ð¾Ð¸ Ð½Ð¾Ð²Ñ‹Ðµ ÑÑÑ‹Ð»ÐºÐ¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°*\n\n",
-        "ðŸ”— *Your new access links*\n\n",
-    ) + "\n\n".join(rows)
-    await callback.message.answer(text, parse_mode="Markdown")
-    await callback.answer(
-        ui_text(
-            lang,
-            "Jaunie linki nosÅ«tÄ«ti.",
-            "ÐÐ¾Ð²Ñ‹Ðµ ÑÑÑ‹Ð»ÐºÐ¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹.",
-            "Fresh access links sent.",
-        )
-    )
-
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -97,8 +25,8 @@ SUPPORTED_LANGS = ("ru", "en", "lv")
 DEFAULT_LANG = "lv"
 VIP_CHANNEL_LANGS = ("lv", "ru")
 VIP_CHANNEL_LABELS = {
-    "lv": "🇱🇻 Latviešu",
-    "ru": "🇷🇺 Русский",
+    "lv": "ðŸ‡±ðŸ‡» LatvieÅ¡u",
+    "ru": "ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹",
 }
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -106,186 +34,186 @@ scheduler = AsyncIOScheduler()
 
 TEXTS = {
     "ru": {
-        "welcome": "👋 Привет, {name}!\n\n🔐 Это эксклюзивный платный чат трейдеров.\n\n📋 *Выбери свой тарифный план:*",
-        "active_sub": "👋 Привет, {name}!\n\n✅ Подписка активна до *{expires}*\n📦 Тариф: *{plan}*\n⏳ Осталось: *{days}* дн.",
-        "inactive_welcome": "👋 Привет, {name}!\n\n❌ Сейчас у тебя нет активной подписки.\n\n📋 *Выбери продукт:*",
-        "inactive_welcome_note": "❌ Сейчас у тебя нет активной подписки.",
-        "choose_plan": "📋 *Выбери свой тарифный план:*",
-        "payment_title": "{emoji} *{name}*\n\n💰 Цена: *{price}* ({usdt} USDT)\n📅 Срок: *{days} дней*\n\n━━━━━━━━━━━━━━━━\n📤 Отправь ровно *{usdt} USDT (BEP-20)* на:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Важно:\n• Только *USDT BEP-20* (сеть BSC)\n• Сумма: *{usdt} USDT*\n• После отправки нажми кнопку ниже",
-        "paid_ok": "✅ *Платёж подтверждён!*\n\n📦 Тариф: *{name}*\n📅 Активен до: *{expires}*\n🔖 TX: `{tx}`",
-        "paid_fail": "❌ *Платёж не найден*\n\nУбедись что отправил ровно *{usdt} USDT (BEP-20)*",
-        "status_active": "🟢 *Статус подписки*\n\n📅 Истекает: {expires}\n⏳ Осталось: {days} дней\n📦 Тариф: {plan}",
-        "status_none": "❌ У тебя нет активной подписки.\n\nИспользуй /start чтобы купить.",
-        "remind_3": "⚠️ *Подписка истекает через 3 дня!*\n\n📅 Дата: {expires}\n\nПродли подписку:",
-        "remind_1": "🚨 *Подписка истекает ЗАВТРА!*\n\n📅 Дата: {expires}\n\nПродли:",
-        "kicked": "😔 *Подписка истекла*\n\nТы был удалён из канала.\nДля восстановления купи подписку:",
-        "btn_paid": "✅ Я оплатил",
-        "btn_qr": "📷 QR код",
-        "btn_back": "🔙 Назад",
-        "qr_caption": "📷 *QR код для оплаты*\n\n📋 Адрес: `{wallet}`\n💰 Сумма: *{usdt} USDT (BEP-20)*\n⚠️ Отсканируй QR → введи сумму вручную: *{usdt} USDT*\n🔗 Сеть: *BSC (BEP-20)*",
-        "invite": "\n\n🔗 [Вступить в канал]({link})",
+        "welcome": "ðŸ‘‹ ÐŸÑ€Ð¸Ð²ÐµÑ‚, {name}!\n\nðŸ” Ð­Ñ‚Ð¾ ÑÐºÑÐºÐ»ÑŽÐ·Ð¸Ð²Ð½Ñ‹Ð¹ Ð¿Ð»Ð°Ñ‚Ð½Ñ‹Ð¹ Ñ‡Ð°Ñ‚ Ñ‚Ñ€ÐµÐ¹Ð´ÐµÑ€Ð¾Ð².\n\nðŸ“‹ *Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ²Ð¾Ð¹ Ñ‚Ð°Ñ€Ð¸Ñ„Ð½Ñ‹Ð¹ Ð¿Ð»Ð°Ð½:*",
+        "active_sub": "ðŸ‘‹ ÐŸÑ€Ð¸Ð²ÐµÑ‚, {name}!\n\nâœ… ÐŸÐ¾Ð´Ð¿Ð¸ÑÐºÐ° Ð°ÐºÑ‚Ð¸Ð²Ð½Ð° Ð´Ð¾ *{expires}*\nðŸ“¦ Ð¢Ð°Ñ€Ð¸Ñ„: *{plan}*\nâ³ ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ: *{days}* Ð´Ð½.",
+        "inactive_welcome": "ðŸ‘‹ ÐŸÑ€Ð¸Ð²ÐµÑ‚, {name}!\n\nâŒ Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ñƒ Ñ‚ÐµÐ±Ñ Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¹ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸.\n\nðŸ“‹ *Ð’Ñ‹Ð±ÐµÑ€Ð¸ Ð¿Ñ€Ð¾Ð´ÑƒÐºÑ‚:*",
+        "inactive_welcome_note": "âŒ Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ñƒ Ñ‚ÐµÐ±Ñ Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¹ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸.",
+        "choose_plan": "ðŸ“‹ *Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ²Ð¾Ð¹ Ñ‚Ð°Ñ€Ð¸Ñ„Ð½Ñ‹Ð¹ Ð¿Ð»Ð°Ð½:*",
+        "payment_title": "{emoji} *{name}*\n\nðŸ’° Ð¦ÐµÐ½Ð°: *{price}* ({usdt} USDT)\nðŸ“… Ð¡Ñ€Ð¾Ðº: *{days} Ð´Ð½ÐµÐ¹*\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nðŸ“¤ ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ Ñ€Ð¾Ð²Ð½Ð¾ *{usdt} USDT (BEP-20)* Ð½Ð°:\n\n`{wallet}`\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nâš ï¸ Ð’Ð°Ð¶Ð½Ð¾:\nâ€¢ Ð¢Ð¾Ð»ÑŒÐºÐ¾ *USDT BEP-20* (ÑÐµÑ‚ÑŒ BSC)\nâ€¢ Ð¡ÑƒÐ¼Ð¼Ð°: *{usdt} USDT*\nâ€¢ ÐŸÐ¾ÑÐ»Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ Ð½Ð°Ð¶Ð¼Ð¸ ÐºÐ½Ð¾Ð¿ÐºÑƒ Ð½Ð¸Ð¶Ðµ",
+        "paid_ok": "âœ… *ÐŸÐ»Ð°Ñ‚Ñ‘Ð¶ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´Ñ‘Ð½!*\n\nðŸ“¦ Ð¢Ð°Ñ€Ð¸Ñ„: *{name}*\nðŸ“… ÐÐºÑ‚Ð¸Ð²ÐµÐ½ Ð´Ð¾: *{expires}*\nðŸ”– TX: `{tx}`",
+        "paid_fail": "âŒ *ÐŸÐ»Ð°Ñ‚Ñ‘Ð¶ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½*\n\nÐ£Ð±ÐµÐ´Ð¸ÑÑŒ Ñ‡Ñ‚Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ð» Ñ€Ð¾Ð²Ð½Ð¾ *{usdt} USDT (BEP-20)*",
+        "status_active": "ðŸŸ¢ *Ð¡Ñ‚Ð°Ñ‚ÑƒÑ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸*\n\nðŸ“… Ð˜ÑÑ‚ÐµÐºÐ°ÐµÑ‚: {expires}\nâ³ ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ: {days} Ð´Ð½ÐµÐ¹\nðŸ“¦ Ð¢Ð°Ñ€Ð¸Ñ„: {plan}",
+        "status_none": "âŒ Ð£ Ñ‚ÐµÐ±Ñ Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¹ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸.\n\nÐ˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ /start Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÐºÑƒÐ¿Ð¸Ñ‚ÑŒ.",
+        "remind_3": "âš ï¸ *ÐŸÐ¾Ð´Ð¿Ð¸ÑÐºÐ° Ð¸ÑÑ‚ÐµÐºÐ°ÐµÑ‚ Ñ‡ÐµÑ€ÐµÐ· 3 Ð´Ð½Ñ!*\n\nðŸ“… Ð”Ð°Ñ‚Ð°: {expires}\n\nÐŸÑ€Ð¾Ð´Ð»Ð¸ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ:",
+        "remind_1": "ðŸš¨ *ÐŸÐ¾Ð´Ð¿Ð¸ÑÐºÐ° Ð¸ÑÑ‚ÐµÐºÐ°ÐµÑ‚ Ð—ÐÐ’Ð¢Ð Ð!*\n\nðŸ“… Ð”Ð°Ñ‚Ð°: {expires}\n\nÐŸÑ€Ð¾Ð´Ð»Ð¸:",
+        "kicked": "ðŸ˜” *ÐŸÐ¾Ð´Ð¿Ð¸ÑÐºÐ° Ð¸ÑÑ‚ÐµÐºÐ»Ð°*\n\nÐ¢Ñ‹ Ð±Ñ‹Ð» ÑƒÐ´Ð°Ð»Ñ‘Ð½ Ð¸Ð· ÐºÐ°Ð½Ð°Ð»Ð°.\nÐ”Ð»Ñ Ð²Ð¾ÑÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ ÐºÑƒÐ¿Ð¸ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ:",
+        "btn_paid": "âœ… Ð¯ Ð¾Ð¿Ð»Ð°Ñ‚Ð¸Ð»",
+        "btn_qr": "ðŸ“· QR ÐºÐ¾Ð´",
+        "btn_back": "ðŸ”™ ÐÐ°Ð·Ð°Ð´",
+        "qr_caption": "ðŸ“· *QR ÐºÐ¾Ð´ Ð´Ð»Ñ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹*\n\nðŸ“‹ ÐÐ´Ñ€ÐµÑ: `{wallet}`\nðŸ’° Ð¡ÑƒÐ¼Ð¼Ð°: *{usdt} USDT (BEP-20)*\nâš ï¸ ÐžÑ‚ÑÐºÐ°Ð½Ð¸Ñ€ÑƒÐ¹ QR â†’ Ð²Ð²ÐµÐ´Ð¸ ÑÑƒÐ¼Ð¼Ñƒ Ð²Ñ€ÑƒÑ‡Ð½ÑƒÑŽ: *{usdt} USDT*\nðŸ”— Ð¡ÐµÑ‚ÑŒ: *BSC (BEP-20)*",
+        "invite": "\n\nðŸ”— [Ð’ÑÑ‚ÑƒÐ¿Ð¸Ñ‚ÑŒ Ð² ÐºÐ°Ð½Ð°Ð»]({link})",
         
-        "referral_info": "👥 *Реферальная программа*\n\n🎁 За каждую покупку друга ты получаешь *+10 бонусных дней*.\n\n📌 Твоя ссылка:\n`{ref_link}`\n\n📊 Приглашено: *{count}*\n🎁 Получено бонусов: *{bonuses}*",
+        "referral_info": "ðŸ‘¥ *Ð ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ð°Ñ Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð°*\n\nðŸŽ Ð—Ð° ÐºÐ°Ð¶Ð´ÑƒÑŽ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ Ð´Ñ€ÑƒÐ³Ð° Ñ‚Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑˆÑŒ *+10 Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n\nðŸ“Œ Ð¢Ð²Ð¾Ñ ÑÑÑ‹Ð»ÐºÐ°:\n`{ref_link}`\n\nðŸ“Š ÐŸÑ€Ð¸Ð³Ð»Ð°ÑˆÐµÐ½Ð¾: *{count}*\nðŸŽ ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ð¾ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²: *{bonuses}*",
         
-        "my_referrals": "👥 *Мои рефералы*\n\n📊 Всего: *{count}*\n🎁 Бонусов: *{bonuses}* × 10 дней\n📅 Итого: *{total_days}* дней\n\n{referral_list}",
-        "my_referrals_empty": "👥 *Мои рефералы*\n\nТы ещё никого не пригласил.",
-        "referral_row_bonus": "✅ {name} — бонус получен",
-        "referral_row_pending": "⏳ {name} — ожидает оплаты",
-        "referral_bonus_received": "🎉 *Бонус получен!*\n\nТвой друг оформил подписку — тебе *+10 дней*!\n📅 Активна до: *{expires}*",
+        "my_referrals": "ðŸ‘¥ *ÐœÐ¾Ð¸ Ñ€ÐµÑ„ÐµÑ€Ð°Ð»Ñ‹*\n\nðŸ“Š Ð’ÑÐµÐ³Ð¾: *{count}*\nðŸŽ Ð‘Ð¾Ð½ÑƒÑÐ¾Ð²: *{bonuses}* Ã— 10 Ð´Ð½ÐµÐ¹\nðŸ“… Ð˜Ñ‚Ð¾Ð³Ð¾: *{total_days}* Ð´Ð½ÐµÐ¹\n\n{referral_list}",
+        "my_referrals_empty": "ðŸ‘¥ *ÐœÐ¾Ð¸ Ñ€ÐµÑ„ÐµÑ€Ð°Ð»Ñ‹*\n\nÐ¢Ñ‹ ÐµÑ‰Ñ‘ Ð½Ð¸ÐºÐ¾Ð³Ð¾ Ð½Ðµ Ð¿Ñ€Ð¸Ð³Ð»Ð°ÑÐ¸Ð».",
+        "referral_row_bonus": "âœ… {name} â€” Ð±Ð¾Ð½ÑƒÑ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½",
+        "referral_row_pending": "â³ {name} â€” Ð¾Ð¶Ð¸Ð´Ð°ÐµÑ‚ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹",
+        "referral_bonus_received": "ðŸŽ‰ *Ð‘Ð¾Ð½ÑƒÑ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½!*\n\nÐ¢Ð²Ð¾Ð¹ Ð´Ñ€ÑƒÐ³ Ð¾Ñ„Ð¾Ñ€Ð¼Ð¸Ð» Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ â€” Ñ‚ÐµÐ±Ðµ *+10 Ð´Ð½ÐµÐ¹*!\nðŸ“… ÐÐºÑ‚Ð¸Ð²Ð½Ð° Ð´Ð¾: *{expires}*",
         
-        "referral_earnings": "🎁 *Бонусные дни referral*\n\nReferral программа теперь использует только бонусные дни для чатов.",
-        "withdrawal_button": "🎁 Бонусные дни",
-        "earnings_button": "📊 История referral",
-        "withdrawal_history_button": "📜 История bonus days",
-        "earnings_list": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
-        "earnings_empty": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
-        "earnings_row": "• {date} — {name}",
-        "withdrawal_request": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
-        "withdrawal_enter_address": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
-        "withdrawal_confirm": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
-        "withdrawal_submitted": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
-        "withdrawal_approved": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
-        "withdrawal_rejected": "🎁 Referral программа теперь использует только бонусные дни для чатов.",
-        "withdrawal_history": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
-        "withdrawal_history_empty": "🎁 *История referral*\n\nПрограмма referral теперь работает только с бонусными днями.",
-        "withdrawal_row_pending": "⏳ Referral bonus days",
-        "withdrawal_row_approved": "✅ Referral bonus days",
-        "withdrawal_row_rejected": "❌ Referral bonus days",
-        "withdrawal_error_banned": "❌ Денежные выплаты больше недоступны.",
-        "withdrawal_error_pending": "ℹ️ Referral программа теперь работает только с бонусными днями.",
-        "withdrawal_error_min": "ℹ️ Referral программа теперь работает только с бонусными днями.",
-        "withdrawal_error_no_email": "ℹ️ Referral программа теперь работает только с бонусными днями.",
-        "withdrawal_error_rate_limit": "ℹ️ Referral программа теперь работает только с бонусными днями.",
-        "referral_welcome": "👋 Тебя пригласил друг!\n\n🎁 Когда ты совершишь покупку, друг получит *+10 бонусных дней*.\n\n🔐 Выбери продукт:",
+        "referral_earnings": "ðŸŽ *Ð‘Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ referral*\n\nReferral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+        "withdrawal_button": "ðŸŽ Ð‘Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸",
+        "earnings_button": "ðŸ“Š Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ referral",
+        "withdrawal_history_button": "ðŸ“œ Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ bonus days",
+        "earnings_list": "ðŸŽ *Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ referral*\n\nÐŸÑ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° referral Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "earnings_empty": "ðŸŽ *Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ referral*\n\nÐŸÑ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° referral Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "earnings_row": "â€¢ {date} â€” {name}",
+        "withdrawal_request": "ðŸŽ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+        "withdrawal_enter_address": "ðŸŽ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+        "withdrawal_confirm": "ðŸŽ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+        "withdrawal_submitted": "ðŸŽ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+        "withdrawal_approved": "ðŸŽ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+        "withdrawal_rejected": "ðŸŽ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+        "withdrawal_history": "ðŸŽ *Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ referral*\n\nÐŸÑ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° referral Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "withdrawal_history_empty": "ðŸŽ *Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ referral*\n\nÐŸÑ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° referral Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "withdrawal_row_pending": "â³ Referral bonus days",
+        "withdrawal_row_approved": "âœ… Referral bonus days",
+        "withdrawal_row_rejected": "âŒ Referral bonus days",
+        "withdrawal_error_banned": "âŒ Ð”ÐµÐ½ÐµÐ¶Ð½Ñ‹Ðµ Ð²Ñ‹Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹.",
+        "withdrawal_error_pending": "â„¹ï¸ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "withdrawal_error_min": "â„¹ï¸ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "withdrawal_error_no_email": "â„¹ï¸ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "withdrawal_error_rate_limit": "â„¹ï¸ Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
+        "referral_welcome": "ðŸ‘‹ Ð¢ÐµÐ±Ñ Ð¿Ñ€Ð¸Ð³Ð»Ð°ÑÐ¸Ð» Ð´Ñ€ÑƒÐ³!\n\nðŸŽ ÐšÐ¾Ð³Ð´Ð° Ñ‚Ñ‹ ÑÐ¾Ð²ÐµÑ€ÑˆÐ¸ÑˆÑŒ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ, Ð´Ñ€ÑƒÐ³ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ *+10 Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n\nðŸ” Ð’Ñ‹Ð±ÐµÑ€Ð¸ Ð¿Ñ€Ð¾Ð´ÑƒÐºÑ‚:",
         
-        "help": "📖 *Команды:*\n\n/start — Начать\n/status — Статус\n/renew — Продлить\n/language — Язык\n/support — Поддержка\n/id — Мой ID\n/loyalty — Лояльность\n/help — Справка",
-        "support": "📩 *Поддержка*\n\nЕсли есть вопросы, напиши: https://t.me/mntrade_support",
-        "auto_found": "✅ *Платёж найден автоматически!*\n\n📦 Тариф: *{name}*\n📅 Активен до: *{expires}*\n🔖 TX: `{tx}`\n\n_Обнаружен фоновой проверкой._",
-        "upsell": "💡 *Специальное предложение!*\n\nТвоя подписка *{plan}* скоро заканчивается.\n\n🔥 Перейди на *годовой план* — экономия *{save}%*!\n💰 Цена: *{yearly_price} USDT* вместо {monthly_x12}",
+        "help": "ðŸ“– *ÐšÐ¾Ð¼Ð°Ð½Ð´Ñ‹:*\n\n/start â€” ÐÐ°Ñ‡Ð°Ñ‚ÑŒ\n/status â€” Ð¡Ñ‚Ð°Ñ‚ÑƒÑ\n/renew â€” ÐŸÑ€Ð¾Ð´Ð»Ð¸Ñ‚ÑŒ\n/language â€” Ð¯Ð·Ñ‹Ðº\n/support â€” ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ°\n/id â€” ÐœÐ¾Ð¹ ID\n/loyalty â€” Ð›Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚ÑŒ\n/help â€” Ð¡Ð¿Ñ€Ð°Ð²ÐºÐ°",
+        "support": "ðŸ“© *ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ°*\n\nÐ•ÑÐ»Ð¸ ÐµÑÑ‚ÑŒ Ð²Ð¾Ð¿Ñ€Ð¾ÑÑ‹, Ð½Ð°Ð¿Ð¸ÑˆÐ¸: https://t.me/mntrade_support",
+        "auto_found": "âœ… *ÐŸÐ»Ð°Ñ‚Ñ‘Ð¶ Ð½Ð°Ð¹Ð´ÐµÐ½ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸!*\n\nðŸ“¦ Ð¢Ð°Ñ€Ð¸Ñ„: *{name}*\nðŸ“… ÐÐºÑ‚Ð¸Ð²ÐµÐ½ Ð´Ð¾: *{expires}*\nðŸ”– TX: `{tx}`\n\n_ÐžÐ±Ð½Ð°Ñ€ÑƒÐ¶ÐµÐ½ Ñ„Ð¾Ð½Ð¾Ð²Ð¾Ð¹ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¾Ð¹._",
+        "upsell": "ðŸ’¡ *Ð¡Ð¿ÐµÑ†Ð¸Ð°Ð»ÑŒÐ½Ð¾Ðµ Ð¿Ñ€ÐµÐ´Ð»Ð¾Ð¶ÐµÐ½Ð¸Ðµ!*\n\nÐ¢Ð²Ð¾Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° *{plan}* ÑÐºÐ¾Ñ€Ð¾ Ð·Ð°ÐºÐ°Ð½Ñ‡Ð¸Ð²Ð°ÐµÑ‚ÑÑ.\n\nðŸ”¥ ÐŸÐµÑ€ÐµÐ¹Ð´Ð¸ Ð½Ð° *Ð³Ð¾Ð´Ð¾Ð²Ð¾Ð¹ Ð¿Ð»Ð°Ð½* â€” ÑÐºÐ¾Ð½Ð¾Ð¼Ð¸Ñ *{save}%*!\nðŸ’° Ð¦ÐµÐ½Ð°: *{yearly_price} USDT* Ð²Ð¼ÐµÑÑ‚Ð¾ {monthly_x12}",
     },
     "en": {
-        "welcome": "👋 Hello, {name}!\n\n🔐 This is an exclusive paid traders chat.\n\n📋 *Choose your subscription plan:*",
-        "active_sub": "👋 Hello, {name}!\n\n✅ Subscription active until *{expires}*\n📦 Plan: *{plan}*\n⏳ Days left: *{days}*",
-        "inactive_welcome": "👋 Hello, {name}!\n\n❌ You do not have an active subscription right now.\n\n📋 *Choose a product:*",
-        "inactive_welcome_note": "❌ You do not have an active subscription right now.",
-        "choose_plan": "📋 *Choose your subscription plan:*",
-        "payment_title": "{emoji} *{name}*\n\n💰 Price: *{price}* ({usdt} USDT)\n📅 Duration: *{days} days*\n\n━━━━━━━━━━━━━━━━\n📤 Send exactly *{usdt} USDT (BEP-20)* to:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Only *USDT BEP-20* (BSC)\n• Amount: *{usdt} USDT*\n• Press button after sending",
-        "paid_ok": "✅ *Payment confirmed!*\n\n📦 Plan: *{name}*\n📅 Active until: *{expires}*\n🔖 TX: `{tx}`",
-        "paid_fail": "❌ *Payment not found*\n\nMake sure you sent exactly *{usdt} USDT (BEP-20)*",
-        "status_active": "🟢 *Subscription*\n\n📅 Expires: {expires}\n⏳ Days left: {days}\n📦 Plan: {plan}",
-        "status_none": "❌ No active subscription.\n\nUse /start to purchase.",
-        "remind_3": "⚠️ *Subscription expires in 3 days!*\n\n📅 {expires}\n\nRenew:",
-        "remind_1": "🚨 *Expires TOMORROW!*\n\n📅 {expires}\n\nRenew now:",
-        "kicked": "😔 *Subscription expired*\n\nYou were removed. Purchase to restore:",
-        "btn_paid": "✅ I have paid",
-        "btn_qr": "📷 QR Code",
-        "btn_back": "🔙 Back",
-        "qr_caption": "📷 *QR Code*\n\n📋 Address: `{wallet}`\n💰 Amount: *{usdt} USDT (BEP-20)*\n⚠️ Scan QR → enter *{usdt} USDT*\n🔗 Network: *BSC (BEP-20)*",
-        "invite": "\n\n🔗 [Join channel]({link})",
+        "welcome": "ðŸ‘‹ Hello, {name}!\n\nðŸ” This is an exclusive paid traders chat.\n\nðŸ“‹ *Choose your subscription plan:*",
+        "active_sub": "ðŸ‘‹ Hello, {name}!\n\nâœ… Subscription active until *{expires}*\nðŸ“¦ Plan: *{plan}*\nâ³ Days left: *{days}*",
+        "inactive_welcome": "ðŸ‘‹ Hello, {name}!\n\nâŒ You do not have an active subscription right now.\n\nðŸ“‹ *Choose a product:*",
+        "inactive_welcome_note": "âŒ You do not have an active subscription right now.",
+        "choose_plan": "ðŸ“‹ *Choose your subscription plan:*",
+        "payment_title": "{emoji} *{name}*\n\nðŸ’° Price: *{price}* ({usdt} USDT)\nðŸ“… Duration: *{days} days*\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nðŸ“¤ Send exactly *{usdt} USDT (BEP-20)* to:\n\n`{wallet}`\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nâš ï¸ Only *USDT BEP-20* (BSC)\nâ€¢ Amount: *{usdt} USDT*\nâ€¢ Press button after sending",
+        "paid_ok": "âœ… *Payment confirmed!*\n\nðŸ“¦ Plan: *{name}*\nðŸ“… Active until: *{expires}*\nðŸ”– TX: `{tx}`",
+        "paid_fail": "âŒ *Payment not found*\n\nMake sure you sent exactly *{usdt} USDT (BEP-20)*",
+        "status_active": "ðŸŸ¢ *Subscription*\n\nðŸ“… Expires: {expires}\nâ³ Days left: {days}\nðŸ“¦ Plan: {plan}",
+        "status_none": "âŒ No active subscription.\n\nUse /start to purchase.",
+        "remind_3": "âš ï¸ *Subscription expires in 3 days!*\n\nðŸ“… {expires}\n\nRenew:",
+        "remind_1": "ðŸš¨ *Expires TOMORROW!*\n\nðŸ“… {expires}\n\nRenew now:",
+        "kicked": "ðŸ˜” *Subscription expired*\n\nYou were removed. Purchase to restore:",
+        "btn_paid": "âœ… I have paid",
+        "btn_qr": "ðŸ“· QR Code",
+        "btn_back": "ðŸ”™ Back",
+        "qr_caption": "ðŸ“· *QR Code*\n\nðŸ“‹ Address: `{wallet}`\nðŸ’° Amount: *{usdt} USDT (BEP-20)*\nâš ï¸ Scan QR â†’ enter *{usdt} USDT*\nðŸ”— Network: *BSC (BEP-20)*",
+        "invite": "\n\nðŸ”— [Join channel]({link})",
         
-        "referral_info": "👥 *Referral Program*\n\n🎁 For every friend purchase you receive *+10 bonus days*.\n\n📌 Your link:\n`{ref_link}`\n\n📊 Invited: *{count}*\n🎁 Bonuses received: *{bonuses}*",
+        "referral_info": "ðŸ‘¥ *Referral Program*\n\nðŸŽ For every friend purchase you receive *+10 bonus days*.\n\nðŸ“Œ Your link:\n`{ref_link}`\n\nðŸ“Š Invited: *{count}*\nðŸŽ Bonuses received: *{bonuses}*",
         
-        "my_referrals": "👥 *My Referrals*\n\n📊 Total: *{count}*\n🎁 Bonuses: *{bonuses}* × 10 days\n📅 Total: *{total_days}* days\n\n{referral_list}",
-        "my_referrals_empty": "👥 *My Referrals*\n\nYou haven't invited anyone yet.",
-        "referral_row_bonus": "✅ {name} — bonus received",
-        "referral_row_pending": "⏳ {name} — waiting",
-        "referral_bonus_received": "🎉 *Bonus received!*\n\nYour friend subscribed — *+10 days*!\n📅 Active until: *{expires}*",
+        "my_referrals": "ðŸ‘¥ *My Referrals*\n\nðŸ“Š Total: *{count}*\nðŸŽ Bonuses: *{bonuses}* Ã— 10 days\nðŸ“… Total: *{total_days}* days\n\n{referral_list}",
+        "my_referrals_empty": "ðŸ‘¥ *My Referrals*\n\nYou haven't invited anyone yet.",
+        "referral_row_bonus": "âœ… {name} â€” bonus received",
+        "referral_row_pending": "â³ {name} â€” waiting",
+        "referral_bonus_received": "ðŸŽ‰ *Bonus received!*\n\nYour friend subscribed â€” *+10 days*!\nðŸ“… Active until: *{expires}*",
         
-        "referral_earnings": "🎁 *Referral Bonus Days*\n\nThe referral program now uses only bonus days for chats.",
-        "withdrawal_button": "🎁 Bonus days",
-        "earnings_button": "📊 Referral history",
-        "withdrawal_history_button": "📜 Bonus day history",
-        "earnings_list": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
-        "earnings_empty": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
-        "earnings_row": "• {date} — {name}",
-        "withdrawal_request": "🎁 The referral program now uses only bonus days for chats.",
-        "withdrawal_enter_address": "🎁 The referral program now uses only bonus days for chats.",
-        "withdrawal_confirm": "🎁 The referral program now uses only bonus days for chats.",
-        "withdrawal_submitted": "🎁 The referral program now uses only bonus days for chats.",
-        "withdrawal_approved": "🎁 The referral program now uses only bonus days for chats.",
-        "withdrawal_rejected": "🎁 The referral program now uses only bonus days for chats.",
-        "withdrawal_history": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
-        "withdrawal_history_empty": "🎁 *Referral History*\n\nThe referral program now works only with bonus days.",
-        "withdrawal_row_pending": "⏳ Referral bonus days",
-        "withdrawal_row_approved": "✅ Referral bonus days",
-        "withdrawal_row_rejected": "❌ Referral bonus days",
-        "withdrawal_error_banned": "❌ Cash payouts are no longer available.",
-        "withdrawal_error_pending": "ℹ️ The referral program now works only with bonus days.",
-        "withdrawal_error_min": "ℹ️ The referral program now works only with bonus days.",
-        "withdrawal_error_no_email": "ℹ️ The referral program now works only with bonus days.",
-        "withdrawal_error_rate_limit": "ℹ️ The referral program now works only with bonus days.",
-        "referral_welcome": "👋 Invited by a friend!\n\n🎁 When you make a purchase, your friend gets *+10 bonus days*.\n\n🔐 Choose a product:",
+        "referral_earnings": "ðŸŽ *Referral Bonus Days*\n\nThe referral program now uses only bonus days for chats.",
+        "withdrawal_button": "ðŸŽ Bonus days",
+        "earnings_button": "ðŸ“Š Referral history",
+        "withdrawal_history_button": "ðŸ“œ Bonus day history",
+        "earnings_list": "ðŸŽ *Referral History*\n\nThe referral program now works only with bonus days.",
+        "earnings_empty": "ðŸŽ *Referral History*\n\nThe referral program now works only with bonus days.",
+        "earnings_row": "â€¢ {date} â€” {name}",
+        "withdrawal_request": "ðŸŽ The referral program now uses only bonus days for chats.",
+        "withdrawal_enter_address": "ðŸŽ The referral program now uses only bonus days for chats.",
+        "withdrawal_confirm": "ðŸŽ The referral program now uses only bonus days for chats.",
+        "withdrawal_submitted": "ðŸŽ The referral program now uses only bonus days for chats.",
+        "withdrawal_approved": "ðŸŽ The referral program now uses only bonus days for chats.",
+        "withdrawal_rejected": "ðŸŽ The referral program now uses only bonus days for chats.",
+        "withdrawal_history": "ðŸŽ *Referral History*\n\nThe referral program now works only with bonus days.",
+        "withdrawal_history_empty": "ðŸŽ *Referral History*\n\nThe referral program now works only with bonus days.",
+        "withdrawal_row_pending": "â³ Referral bonus days",
+        "withdrawal_row_approved": "âœ… Referral bonus days",
+        "withdrawal_row_rejected": "âŒ Referral bonus days",
+        "withdrawal_error_banned": "âŒ Cash payouts are no longer available.",
+        "withdrawal_error_pending": "â„¹ï¸ The referral program now works only with bonus days.",
+        "withdrawal_error_min": "â„¹ï¸ The referral program now works only with bonus days.",
+        "withdrawal_error_no_email": "â„¹ï¸ The referral program now works only with bonus days.",
+        "withdrawal_error_rate_limit": "â„¹ï¸ The referral program now works only with bonus days.",
+        "referral_welcome": "ðŸ‘‹ Invited by a friend!\n\nðŸŽ When you make a purchase, your friend gets *+10 bonus days*.\n\nðŸ” Choose a product:",
         
-        "help": "📖 *Commands:*\n\n/start — Start\n/status — Status\n/renew — Renew\n/language — Language\n/support — Support\n/id — My ID\n/loyalty — Loyalty\n/help — Help",
-        "support": "📩 *Support*\n\nIf you have questions, write: https://t.me/mntrade_support",
-        "auto_found": "✅ *Payment found automatically!*\n\n📦 Plan: *{name}*\n📅 Until: *{expires}*\n🔖 TX: `{tx}`\n\n_Detected by background check._",
-        "upsell": "💡 *Special offer!*\n\nYour *{plan}* is ending soon.\n\n🔥 Upgrade to *yearly* — save *{save}%*!\n💰 Price: *{yearly_price} USDT* instead of {monthly_x12}",
+        "help": "ðŸ“– *Commands:*\n\n/start â€” Start\n/status â€” Status\n/renew â€” Renew\n/language â€” Language\n/support â€” Support\n/id â€” My ID\n/loyalty â€” Loyalty\n/help â€” Help",
+        "support": "ðŸ“© *Support*\n\nIf you have questions, write: https://t.me/mntrade_support",
+        "auto_found": "âœ… *Payment found automatically!*\n\nðŸ“¦ Plan: *{name}*\nðŸ“… Until: *{expires}*\nðŸ”– TX: `{tx}`\n\n_Detected by background check._",
+        "upsell": "ðŸ’¡ *Special offer!*\n\nYour *{plan}* is ending soon.\n\nðŸ”¥ Upgrade to *yearly* â€” save *{save}%*!\nðŸ’° Price: *{yearly_price} USDT* instead of {monthly_x12}",
     }
 }
 
 TEXTS["ru"]["referral_info"] = (
-    "👥 *Реферальная программа*\n\n"
-    f"🎁 За каждого друга, который оформит покупку: *+{REFERRAL_BONUS_DAYS} дней* бесплатного доступа.\n\n"
-    "📌 Твоя ссылка:\n`{ref_link}`\n\n"
-    "📊 Приглашено: *{count}*\n🎁 Получено бонусов: *{bonuses}*"
+    "ðŸ‘¥ *Ð ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ð°Ñ Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð°*\n\n"
+    f"ðŸŽ Ð—Ð° ÐºÐ°Ð¶Ð´Ð¾Ð³Ð¾ Ð´Ñ€ÑƒÐ³Ð°, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ð¹ Ð¾Ñ„Ð¾Ñ€Ð¼Ð¸Ñ‚ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ: *+{REFERRAL_BONUS_DAYS} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°.\n\n"
+    "ðŸ“Œ Ð¢Ð²Ð¾Ñ ÑÑÑ‹Ð»ÐºÐ°:\n`{ref_link}`\n\n"
+    "ðŸ“Š ÐŸÑ€Ð¸Ð³Ð»Ð°ÑˆÐµÐ½Ð¾: *{count}*\nðŸŽ ÐŸÐ¾Ð»ÑƒÑ‡ÐµÐ½Ð¾ Ð±Ð¾Ð½ÑƒÑÐ¾Ð²: *{bonuses}*"
 )
 TEXTS["en"]["referral_info"] = (
-    "👥 *Referral Program*\n\n"
-    f"🎁 For every friend who makes a purchase: *+{REFERRAL_BONUS_DAYS} free days*.\n\n"
-    "📌 Your link:\n`{ref_link}`\n\n"
-    "📊 Invited: *{count}*\n🎁 Bonuses received: *{bonuses}*"
+    "ðŸ‘¥ *Referral Program*\n\n"
+    f"ðŸŽ For every friend who makes a purchase: *+{REFERRAL_BONUS_DAYS} free days*.\n\n"
+    "ðŸ“Œ Your link:\n`{ref_link}`\n\n"
+    "ðŸ“Š Invited: *{count}*\nðŸŽ Bonuses received: *{bonuses}*"
 )
-TEXTS["ru"]["referral_welcome"] = "👋 Тебя пригласил друг!\n\n🎁 Когда ты оформишь покупку, друг получит *+10 дней* доступа.\n\n🔐 Выбери продукт:"
-TEXTS["en"]["referral_welcome"] = "👋 Invited by a friend!\n\n🎁 When you make a purchase, your friend gets *+10 free days*.\n\n🔐 Choose a product:"
+TEXTS["ru"]["referral_welcome"] = "ðŸ‘‹ Ð¢ÐµÐ±Ñ Ð¿Ñ€Ð¸Ð³Ð»Ð°ÑÐ¸Ð» Ð´Ñ€ÑƒÐ³!\n\nðŸŽ ÐšÐ¾Ð³Ð´Ð° Ñ‚Ñ‹ Ð¾Ñ„Ð¾Ñ€Ð¼Ð¸ÑˆÑŒ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ, Ð´Ñ€ÑƒÐ³ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸Ñ‚ *+10 Ð´Ð½ÐµÐ¹* Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°.\n\nðŸ” Ð’Ñ‹Ð±ÐµÑ€Ð¸ Ð¿Ñ€Ð¾Ð´ÑƒÐºÑ‚:"
+TEXTS["en"]["referral_welcome"] = "ðŸ‘‹ Invited by a friend!\n\nðŸŽ When you make a purchase, your friend gets *+10 free days*.\n\nðŸ” Choose a product:"
 TEXTS["lv"] = {
     **TEXTS["en"],
-    "welcome": "👋 Sveiks, {name}!\n\n🔐 Šis ir slēgts maksas treideru community.\n\n📋 *Izvēlies abonementa plānu:*",
-    "active_sub": "👋 Sveiks, {name}!\n\n✅ Abonements aktīvs līdz *{expires}*\n📦 Plāns: *{plan}*\n⏳ Atlikušas dienas: *{days}*",
-    "inactive_welcome": "👋 Sveiks, {name}!\n\n❌ Tev šobrīd nav aktīva abonementa.\n\n📋 *Izvēlies produktu:*",
-    "inactive_welcome_note": "❌ Tev šobrīd nav aktīva abonementa.",
-    "choose_plan": "📋 *Izvēlies abonementa plānu:*",
-    "payment_title": "{emoji} *{name}*\n\n💰 Cena: *{price}* ({usdt} USDT)\n📅 Termiņš: *{days} dienas*\n\n━━━━━━━━━━━━━━━━\n📤 Nosūti tieši *{usdt} USDT (BEP-20)* uz:\n\n`{wallet}`\n\n━━━━━━━━━━━━━━━━\n⚠️ Tikai *USDT BEP-20* (BSC)\n• Summa: *{usdt} USDT*\n• Pēc maksājuma nospied pogu zemāk",
-    "paid_ok": "✅ *Maksājums apstiprināts!*\n\n📦 Plāns: *{name}*\n📅 Aktīvs līdz: *{expires}*\n🔖 TX: `{tx}`",
-    "paid_fail": "❌ *Maksājums nav atrasts*\n\nPārliecinies, ka nosūtīji tieši *{usdt} USDT (BEP-20)*",
-    "status_active": "🟢 *Abonements*\n\n📅 Beidzas: {expires}\n⏳ Atlikušas dienas: {days}\n📦 Plāns: {plan}",
-    "status_none": "❌ Tev nav aktīva abonementa.\n\nIzmanto /start, lai iegādātos piekļuvi.",
-    "btn_paid": "✅ Es samaksāju",
-    "btn_qr": "📷 QR kods",
-    "btn_back": "🔙 Atpakaļ",
-    "qr_caption": "📷 *QR kods maksājumam*\n\n📋 Adrese: `{wallet}`\n💰 Summa: *{usdt} USDT (BEP-20)*\n⚠️ Noskenē QR un ievadi summu manuāli: *{usdt} USDT*\n🔗 Tīkls: *BSC (BEP-20)*",
-    "invite": "\n\n🔗 [Pievienoties kanālam]({link})",
-    "referral_info": "👥 *Referral programma*\n\n🎁 Par katru draugu, kurš veic pirkumu: *+10 bezmaksas dienas*.\n\n📌 Tava saite:\n`{ref_link}`\n\n📊 Uzaicināti: *{count}*\n🎁 Bonusi saņemti: *{bonuses}*",
-    "my_referrals": "👥 *Mani referrals*\n\n📊 Kopā: *{count}*\n🎁 Bonusi: *{bonuses}* × 10 dienas\n📅 Kopā: *{total_days}* dienas\n\n{referral_list}",
-    "my_referrals_empty": "👥 *Mani referrals*\n\nTu vēl nevienu neesi uzaicinājis.",
-    "referral_row_bonus": "✅ {name} — bonuss saņemts",
-    "referral_row_pending": "⏳ {name} — gaida pirkumu",
-    "referral_bonus_received": "🎉 *Bonuss saņemts!*\n\nTavs draugs veica pirkumu — tev *+10 dienas*!\n📅 Aktīvs līdz: *{expires}*",
-    "referral_earnings": "🎁 *Referral bonusu dienas*\n\nReferral programma tagad izmanto tikai bonusu dienas čatiem.",
-    "withdrawal_button": "🎁 Bonusu dienas",
-    "earnings_button": "📊 Referral vēsture",
-    "withdrawal_history_button": "📜 Bonusu dienu vēsture",
-    "earnings_list": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
-    "earnings_empty": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
-    "earnings_row": "• {date} — {name}",
-    "withdrawal_request": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
-    "withdrawal_enter_address": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
-    "withdrawal_confirm": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
-    "withdrawal_submitted": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
-    "withdrawal_approved": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
-    "withdrawal_rejected": "🎁 Referral programma tagad izmanto tikai bonusu dienas čatiem.",
-    "withdrawal_history": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
-    "withdrawal_history_empty": "🎁 *Referral vēsture*\n\nReferral programma tagad strādā tikai ar bonusu dienām.",
-    "withdrawal_row_pending": "⏳ Referral bonusu dienas",
-    "withdrawal_row_approved": "✅ Referral bonusu dienas",
-    "withdrawal_row_rejected": "❌ Referral bonusu dienas",
-    "withdrawal_error_banned": "❌ Naudas izmaksas vairs nav pieejamas.",
-    "withdrawal_error_pending": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
-    "withdrawal_error_min": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
-    "withdrawal_error_no_email": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
-    "withdrawal_error_rate_limit": "ℹ️ Referral programma tagad strādā tikai ar bonusu dienām.",
-    "referral_welcome": "👋 Tevi uzaicināja draugs!\n\n🎁 Kad tu veiksi pirkumu, draugs saņems *+10 bezmaksas dienas*.\n\n🔐 Izvēlies produktu:",
-    "help": "📖 *Komandas:*\n\n/start — Sākt\n/status — Statuss\n/renew — Pagarināt\n/language — Valoda\n/support — Atbalsts\n/id — Mans ID\n/loyalty — Lojalitāte\n/help — Palīdzība",
-    "support": "📩 *Atbalsts*\n\nJa rodas jautājumi raksti https://t.me/mntrade_support",
+    "welcome": "ðŸ‘‹ Sveiks, {name}!\n\nðŸ” Å is ir slÄ“gts maksas treideru community.\n\nðŸ“‹ *IzvÄ“lies abonementa plÄnu:*",
+    "active_sub": "ðŸ‘‹ Sveiks, {name}!\n\nâœ… Abonements aktÄ«vs lÄ«dz *{expires}*\nðŸ“¦ PlÄns: *{plan}*\nâ³ AtlikuÅ¡as dienas: *{days}*",
+    "inactive_welcome": "ðŸ‘‹ Sveiks, {name}!\n\nâŒ Tev Å¡obrÄ«d nav aktÄ«va abonementa.\n\nðŸ“‹ *IzvÄ“lies produktu:*",
+    "inactive_welcome_note": "âŒ Tev Å¡obrÄ«d nav aktÄ«va abonementa.",
+    "choose_plan": "ðŸ“‹ *IzvÄ“lies abonementa plÄnu:*",
+    "payment_title": "{emoji} *{name}*\n\nðŸ’° Cena: *{price}* ({usdt} USDT)\nðŸ“… TermiÅ†Å¡: *{days} dienas*\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nðŸ“¤ NosÅ«ti tieÅ¡i *{usdt} USDT (BEP-20)* uz:\n\n`{wallet}`\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nâš ï¸ Tikai *USDT BEP-20* (BSC)\nâ€¢ Summa: *{usdt} USDT*\nâ€¢ PÄ“c maksÄjuma nospied pogu zemÄk",
+    "paid_ok": "âœ… *MaksÄjums apstiprinÄts!*\n\nðŸ“¦ PlÄns: *{name}*\nðŸ“… AktÄ«vs lÄ«dz: *{expires}*\nðŸ”– TX: `{tx}`",
+    "paid_fail": "âŒ *MaksÄjums nav atrasts*\n\nPÄrliecinies, ka nosÅ«tÄ«ji tieÅ¡i *{usdt} USDT (BEP-20)*",
+    "status_active": "ðŸŸ¢ *Abonements*\n\nðŸ“… Beidzas: {expires}\nâ³ AtlikuÅ¡as dienas: {days}\nðŸ“¦ PlÄns: {plan}",
+    "status_none": "âŒ Tev nav aktÄ«va abonementa.\n\nIzmanto /start, lai iegÄdÄtos piekÄ¼uvi.",
+    "btn_paid": "âœ… Es samaksÄju",
+    "btn_qr": "ðŸ“· QR kods",
+    "btn_back": "ðŸ”™ AtpakaÄ¼",
+    "qr_caption": "ðŸ“· *QR kods maksÄjumam*\n\nðŸ“‹ Adrese: `{wallet}`\nðŸ’° Summa: *{usdt} USDT (BEP-20)*\nâš ï¸ NoskenÄ“ QR un ievadi summu manuÄli: *{usdt} USDT*\nðŸ”— TÄ«kls: *BSC (BEP-20)*",
+    "invite": "\n\nðŸ”— [Pievienoties kanÄlam]({link})",
+    "referral_info": "ðŸ‘¥ *Referral programma*\n\nðŸŽ Par katru draugu, kurÅ¡ veic pirkumu: *+10 bezmaksas dienas*.\n\nðŸ“Œ Tava saite:\n`{ref_link}`\n\nðŸ“Š UzaicinÄti: *{count}*\nðŸŽ Bonusi saÅ†emti: *{bonuses}*",
+    "my_referrals": "ðŸ‘¥ *Mani referrals*\n\nðŸ“Š KopÄ: *{count}*\nðŸŽ Bonusi: *{bonuses}* Ã— 10 dienas\nðŸ“… KopÄ: *{total_days}* dienas\n\n{referral_list}",
+    "my_referrals_empty": "ðŸ‘¥ *Mani referrals*\n\nTu vÄ“l nevienu neesi uzaicinÄjis.",
+    "referral_row_bonus": "âœ… {name} â€” bonuss saÅ†emts",
+    "referral_row_pending": "â³ {name} â€” gaida pirkumu",
+    "referral_bonus_received": "ðŸŽ‰ *Bonuss saÅ†emts!*\n\nTavs draugs veica pirkumu â€” tev *+10 dienas*!\nðŸ“… AktÄ«vs lÄ«dz: *{expires}*",
+    "referral_earnings": "ðŸŽ *Referral bonusu dienas*\n\nReferral programma tagad izmanto tikai bonusu dienas Äatiem.",
+    "withdrawal_button": "ðŸŽ Bonusu dienas",
+    "earnings_button": "ðŸ“Š Referral vÄ“sture",
+    "withdrawal_history_button": "ðŸ“œ Bonusu dienu vÄ“sture",
+    "earnings_list": "ðŸŽ *Referral vÄ“sture*\n\nReferral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "earnings_empty": "ðŸŽ *Referral vÄ“sture*\n\nReferral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "earnings_row": "â€¢ {date} â€” {name}",
+    "withdrawal_request": "ðŸŽ Referral programma tagad izmanto tikai bonusu dienas Äatiem.",
+    "withdrawal_enter_address": "ðŸŽ Referral programma tagad izmanto tikai bonusu dienas Äatiem.",
+    "withdrawal_confirm": "ðŸŽ Referral programma tagad izmanto tikai bonusu dienas Äatiem.",
+    "withdrawal_submitted": "ðŸŽ Referral programma tagad izmanto tikai bonusu dienas Äatiem.",
+    "withdrawal_approved": "ðŸŽ Referral programma tagad izmanto tikai bonusu dienas Äatiem.",
+    "withdrawal_rejected": "ðŸŽ Referral programma tagad izmanto tikai bonusu dienas Äatiem.",
+    "withdrawal_history": "ðŸŽ *Referral vÄ“sture*\n\nReferral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "withdrawal_history_empty": "ðŸŽ *Referral vÄ“sture*\n\nReferral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "withdrawal_row_pending": "â³ Referral bonusu dienas",
+    "withdrawal_row_approved": "âœ… Referral bonusu dienas",
+    "withdrawal_row_rejected": "âŒ Referral bonusu dienas",
+    "withdrawal_error_banned": "âŒ Naudas izmaksas vairs nav pieejamas.",
+    "withdrawal_error_pending": "â„¹ï¸ Referral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "withdrawal_error_min": "â„¹ï¸ Referral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "withdrawal_error_no_email": "â„¹ï¸ Referral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "withdrawal_error_rate_limit": "â„¹ï¸ Referral programma tagad strÄdÄ tikai ar bonusu dienÄm.",
+    "referral_welcome": "ðŸ‘‹ Tevi uzaicinÄja draugs!\n\nðŸŽ Kad tu veiksi pirkumu, draugs saÅ†ems *+10 bezmaksas dienas*.\n\nðŸ” IzvÄ“lies produktu:",
+    "help": "ðŸ“– *Komandas:*\n\n/start â€” SÄkt\n/status â€” Statuss\n/renew â€” PagarinÄt\n/language â€” Valoda\n/support â€” Atbalsts\n/id â€” Mans ID\n/loyalty â€” LojalitÄte\n/help â€” PalÄ«dzÄ«ba",
+    "support": "ðŸ“© *Atbalsts*\n\nJa rodas jautÄjumi raksti https://t.me/mntrade_support",
 }
 
 def t(lang, key, **kw):
@@ -312,11 +240,11 @@ async def build_active_access_text(user_id: int, lang: str, name: str = None) ->
         name = md_escape((user or {}).get("first_name") or "Trader")
 
     if lang == "lv":
-        header = f"👋 *Sveiks, {name}!*\n\n✅ *Aktīvās piekļuves:*"
+        header = f"ðŸ‘‹ *Sveiks, {name}!*\n\nâœ… *AktÄ«vÄs piekÄ¼uves:*"
     elif lang == "ru":
-        header = f"👋 *Привет, {name}!*\n\n✅ *Активные подписки:*"
+        header = f"ðŸ‘‹ *ÐŸÑ€Ð¸Ð²ÐµÑ‚, {name}!*\n\nâœ… *ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ðµ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸:*"
     else:
-        header = f"👋 *Hello, {name}!*\n\n✅ *Active subscriptions:*"
+        header = f"ðŸ‘‹ *Hello, {name}!*\n\nâœ… *Active subscriptions:*"
 
     rows = []
     nearest_days = None
@@ -329,8 +257,8 @@ async def build_active_access_text(user_id: int, lang: str, name: str = None) ->
         days_left = max(0, (expires_dt - now).days)
         if nearest_days is None or days_left < nearest_days:
             nearest_days = days_left
-        product_name = sub.get("product_name") or sub.get("product_key") or "—"
-        rows.append(f"• *{product_name}* — {expires_dt.strftime('%d.%m.%Y')} ({days_left}d)")
+        product_name = sub.get("product_name") or sub.get("product_key") or "â€”"
+        rows.append(f"â€¢ *{product_name}* â€” {expires_dt.strftime('%d.%m.%Y')} ({days_left}d)")
 
     loyalty_data = await db.get_user_loyalty(user_id)
     if not loyalty_data:
@@ -338,25 +266,25 @@ async def build_active_access_text(user_id: int, lang: str, name: str = None) ->
         loyalty_data = {'current_tier': 'rookie', 'consecutive_months': 0}
     current_tier = loyalty_data.get('current_tier', 'rookie')
     tier_data = config.LOYALTY_TIERS.get(current_tier, {})
-    tier_emoji = tier_data.get('emoji', '🌱')
+    tier_emoji = tier_data.get('emoji', 'ðŸŒ±')
     tier_tag = tier_data.get('tag', 'Rookie')
     if lang == "lv":
-        loyalty_line = f"\n\n{tier_emoji} Lojalitātes līmenis: *{tier_tag}*"
+        loyalty_line = f"\n\n{tier_emoji} LojalitÄtes lÄ«menis: *{tier_tag}*"
     elif lang == "ru":
-        loyalty_line = f"\n\n{tier_emoji} Уровень лояльности: *{tier_tag}*"
+        loyalty_line = f"\n\n{tier_emoji} Ð£Ñ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸: *{tier_tag}*"
     else:
         loyalty_line = f"\n\n{tier_emoji} Loyalty level: *{tier_tag}*"
 
     urgency = ""
     if nearest_days is not None and nearest_days <= 3:
         if nearest_days == 0:
-            urgency = ui_text(lang, "\n\n🚨 *Viena no piekļuvēm beidzas šodien!*", "\n\n🚨 *Одна из подписок истекает сегодня!*", "\n\n🚨 *One of your subscriptions expires today!*")
+            urgency = ui_text(lang, "\n\nðŸš¨ *Viena no piekÄ¼uvÄ“m beidzas Å¡odien!*", "\n\nðŸš¨ *ÐžÐ´Ð½Ð° Ð¸Ð· Ð¿Ð¾Ð´Ð¿Ð¸ÑÐ¾Ðº Ð¸ÑÑ‚ÐµÐºÐ°ÐµÑ‚ ÑÐµÐ³Ð¾Ð´Ð½Ñ!*", "\n\nðŸš¨ *One of your subscriptions expires today!*")
         else:
             urgency = ui_text(
                 lang,
-                f"\n\n⚠️ *Tuvākā piekļuve beidzas pēc {nearest_days} dienām!*",
-                f"\n\n⚠️ *Ближайшая подписка истекает через {nearest_days} дн.*",
-                f"\n\n⚠️ *Your nearest subscription expires in {nearest_days} days!*"
+                f"\n\nâš ï¸ *TuvÄkÄ piekÄ¼uve beidzas pÄ“c {nearest_days} dienÄm!*",
+                f"\n\nâš ï¸ *Ð‘Ð»Ð¸Ð¶Ð°Ð¹ÑˆÐ°Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° Ð¸ÑÑ‚ÐµÐºÐ°ÐµÑ‚ Ñ‡ÐµÑ€ÐµÐ· {nearest_days} Ð´Ð½.*",
+                f"\n\nâš ï¸ *Your nearest subscription expires in {nearest_days} days!*"
             )
 
     return header + "\n\n" + "\n".join(rows) + loyalty_line + urgency
@@ -392,29 +320,29 @@ async def build_referral_overview_text(user_id: int, lang: str) -> str:
     return ui_text(
         lang,
         (
-            "👥 *Referral programma*\n\n"
-            f"📌 Tava saite:\n`{ref_link}`\n\n"
-            f"📊 Uzaicināti: *{ref_count}*\n"
-            f"✅ Draugi ar saņemtu bonusu: *{bonus_count}*\n"
-            f"🎁 Pieejamās bonusu dienas: *{bonus_days_balance}*\n\n"
-            f"Par katru draugu, kurš veic pirkumu, tu saņem *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
-            "Bonusu dienas vari izmantot pats un izvēlēties, kuram aktīvajam čatam tās pielikt."
+            "ðŸ‘¥ *Referral programma*\n\n"
+            f"ðŸ“Œ Tava saite:\n`{ref_link}`\n\n"
+            f"ðŸ“Š UzaicinÄti: *{ref_count}*\n"
+            f"âœ… Draugi ar saÅ†emtu bonusu: *{bonus_count}*\n"
+            f"ðŸŽ PieejamÄs bonusu dienas: *{bonus_days_balance}*\n\n"
+            f"Par katru draugu, kurÅ¡ veic pirkumu, tu saÅ†em *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
+            "Bonusu dienas vari izmantot pats un izvÄ“lÄ“ties, kuram aktÄ«vajam Äatam tÄs pielikt."
         ),
         (
-            "👥 *Реферальная программа*\n\n"
-            f"📌 Твоя ссылка:\n`{ref_link}`\n\n"
-            f"📊 Приглашено: *{ref_count}*\n"
-            f"✅ Друзья с начисленным бонусом: *{bonus_count}*\n"
-            f"🎁 Доступно бонусных дней: *{bonus_days_balance}*\n\n"
-            f"За каждого друга, который совершит покупку, ты получаешь *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
-            "Бонусные дни ты используешь сам и выбираешь, к какому активному чату их применить."
+            "ðŸ‘¥ *Ð ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ð°Ñ Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð°*\n\n"
+            f"ðŸ“Œ Ð¢Ð²Ð¾Ñ ÑÑÑ‹Ð»ÐºÐ°:\n`{ref_link}`\n\n"
+            f"ðŸ“Š ÐŸÑ€Ð¸Ð³Ð»Ð°ÑˆÐµÐ½Ð¾: *{ref_count}*\n"
+            f"âœ… Ð”Ñ€ÑƒÐ·ÑŒÑ Ñ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð½Ñ‹Ð¼ Ð±Ð¾Ð½ÑƒÑÐ¾Ð¼: *{bonus_count}*\n"
+            f"ðŸŽ Ð”Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹: *{bonus_days_balance}*\n\n"
+            f"Ð—Ð° ÐºÐ°Ð¶Ð´Ð¾Ð³Ð¾ Ð´Ñ€ÑƒÐ³Ð°, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ð¹ ÑÐ¾Ð²ÐµÑ€ÑˆÐ¸Ñ‚ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ, Ñ‚Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑˆÑŒ *+{REFERRAL_BONUS_DAYS} Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n"
+            "Ð‘Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ñ‚Ñ‹ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑˆÑŒ ÑÐ°Ð¼ Ð¸ Ð²Ñ‹Ð±Ð¸Ñ€Ð°ÐµÑˆÑŒ, Ðº ÐºÐ°ÐºÐ¾Ð¼Ñƒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñƒ Ð¸Ñ… Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ."
         ),
         (
-            "👥 *Referral Program*\n\n"
-            f"📌 Your link:\n`{ref_link}`\n\n"
-            f"📊 Invited: *{ref_count}*\n"
-            f"✅ Friends with granted bonus: *{bonus_count}*\n"
-            f"🎁 Available bonus days: *{bonus_days_balance}*\n\n"
+            "ðŸ‘¥ *Referral Program*\n\n"
+            f"ðŸ“Œ Your link:\n`{ref_link}`\n\n"
+            f"ðŸ“Š Invited: *{ref_count}*\n"
+            f"âœ… Friends with granted bonus: *{bonus_count}*\n"
+            f"ðŸŽ Available bonus days: *{bonus_days_balance}*\n\n"
             f"For every friend who makes a purchase, you get *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
             "You can use those bonus days yourself and choose which active chat to apply them to."
         ),
@@ -428,22 +356,22 @@ def ui_text(lang, lv, ru, en):
     return en
 
 def back_button_text(lang):
-    return "🔙 " + ui_text(lang, "Atpakaļ", "Назад", "Back")
+    return "ðŸ”™ " + ui_text(lang, "AtpakaÄ¼", "ÐÐ°Ð·Ð°Ð´", "Back")
 
 def paid_button_text(lang):
-    return "✅ " + ui_text(lang, "Es samaksāju", "Я оплатил", "I paid")
+    return "âœ… " + ui_text(lang, "Es samaksÄju", "Ð¯ Ð¾Ð¿Ð»Ð°Ñ‚Ð¸Ð»", "I paid")
 
 def menu_button(emoji, label):
     return f"{emoji}  {label}"
 
 def market_scanner_label(lang):
-    return ui_text(lang, "Tirgus Skaneris/AI signāli", "Сканер рынка/AI сигналы", "Market Scanner/AI Signals")
+    return ui_text(lang, "Tirgus Skaneris/AI signÄli", "Ð¡ÐºÐ°Ð½ÐµÑ€ Ñ€Ñ‹Ð½ÐºÐ°/AI ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹", "Market Scanner/AI Signals")
 
 def email_binding_notice(lang):
     return ui_text(
         lang,
-        "E-pasts piesaista tavu piekļuvi un pirkumus no mājaslapas - tāpēc norādi derīgu epastu.",
-        "E-mail привязывает твой доступ и покупки с сайта - поэтому укажи действительный e-mail.",
+        "E-pasts piesaista tavu piekÄ¼uvi un pirkumus no mÄjaslapas - tÄpÄ“c norÄdi derÄ«gu epastu.",
+        "E-mail Ð¿Ñ€Ð¸Ð²ÑÐ·Ñ‹Ð²Ð°ÐµÑ‚ Ñ‚Ð²Ð¾Ð¹ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð¸ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ñ ÑÐ°Ð¹Ñ‚Ð° - Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ ÑƒÐºÐ°Ð¶Ð¸ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ð¹ e-mail.",
         "E-mail links your access and website purchases - so enter a valid e-mail.",
     )
 
@@ -496,17 +424,17 @@ def resolve_subscription_product(product_key: str, user_lang: str) -> dict:
         "vip_chat_lv": {
             "chat_id": config.CHAT_IDS.get("lv", config.CHAT_ID),
             "chat_link": config.CHAT_LINKS.get("lv", config.CHAT_LINK),
-            "name": {"lv": "VIP Treideru čats", "ru": "VIP чат трейдеров (LV)", "en": "VIP Traders Chat (LV)"},
+            "name": {"lv": "VIP Treideru Äats", "ru": "VIP Ñ‡Ð°Ñ‚ Ñ‚Ñ€ÐµÐ¹Ð´ÐµÑ€Ð¾Ð² (LV)", "en": "VIP Traders Chat (LV)"},
         },
         "vip_chat_ru": {
             "chat_id": config.CHAT_IDS.get("ru", config.CHAT_ID),
             "chat_link": config.CHAT_LINKS.get("ru", config.CHAT_LINK),
-            "name": {"lv": "VIP Treideru čats (RU)", "ru": "VIP чат трейдеров", "en": "VIP Traders Chat (RU)"},
+            "name": {"lv": "VIP Treideru Äats (RU)", "ru": "VIP Ñ‡Ð°Ñ‚ Ñ‚Ñ€ÐµÐ¹Ð´ÐµÑ€Ð¾Ð²", "en": "VIP Traders Chat (RU)"},
         },
         "scanner_chat": {
             "chat_id": getattr(config, "SCANNER_CHAT_ID", 0),
             "chat_link": getattr(config, "SCANNER_CHAT_LINK", "https://t.me/promarketscanner"),
-            "name": {"lv": "Tirgus Skaneris/AI signāli", "ru": "Сканер рынка/AI сигналы", "en": "Market Scanner/AI Signals"},
+            "name": {"lv": "Tirgus Skaneris/AI signÄli", "ru": "Ð¡ÐºÐ°Ð½ÐµÑ€ Ñ€Ñ‹Ð½ÐºÐ°/AI ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹", "en": "Market Scanner/AI Signals"},
         },
     }
     meta = catalog.get(key)
@@ -530,7 +458,7 @@ async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, e
             return t(lang, "invite", link=link.invite_link)
         except Exception:
             pass
-    return f"\n\n📢 {chat_link}" if chat_link else ""
+    return f"\n\nðŸ“¢ {chat_link}" if chat_link else ""
 
 
 async def attach_pending_email_purchases(user_id: int, email: str, lang: str, username: str = ""):
@@ -563,8 +491,8 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
                 "chat_id": sub.get("chat_id", 0) or 0,
                 "chat_link": sub.get("chat_link", "") or "",
                 "name": {
-                    "lv": sub.get("product_name") or sub.get("product_key") or "Piekļuve",
-                    "ru": sub.get("product_name") or sub.get("product_key") or "Доступ",
+                    "lv": sub.get("product_name") or sub.get("product_key") or "PiekÄ¼uve",
+                    "ru": sub.get("product_name") or sub.get("product_key") or "Ð”Ð¾ÑÑ‚ÑƒÐ¿",
                     "en": sub.get("product_name") or sub.get("product_key") or "Access",
                 },
             }
@@ -574,9 +502,9 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
                 product_name = sub.get("product_name") or sub.get("product_key") or "Access"
                 invite_text = ui_text(
                     lang,
-                    f"✅ Atrasta iepriekšēja apmaksa: *{product_name}*\n📅 Aktīvs līdz: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-                    f"✅ Найдена предыдущая оплата: *{product_name}*\n📅 Активно до: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-                    f"✅ Previous purchase found: *{product_name}*\n📅 Active until: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                    f"âœ… Atrasta iepriekÅ¡Ä“ja apmaksa: *{product_name}*\nðŸ“… AktÄ«vs lÄ«dz: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                    f"âœ… ÐÐ°Ð¹Ð´ÐµÐ½Ð° Ð¿Ñ€ÐµÐ´Ñ‹Ð´ÑƒÑ‰Ð°Ñ Ð¾Ð¿Ð»Ð°Ñ‚Ð°: *{product_name}*\nðŸ“… ÐÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð´Ð¾: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                    f"âœ… Previous purchase found: *{product_name}*\nðŸ“… Active until: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
                 )
                 await bot.send_message(user_id, invite_text, parse_mode="Markdown")
         except Exception as e:
@@ -587,39 +515,39 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
 
 def lang_keyboard():
     b = InlineKeyboardBuilder()
-    b.button(text="🇷🇺 Русский", callback_data="lang_ru")
-    b.button(text="🇬🇧 English", callback_data="lang_en")
-    b.button(text="🇱🇻 Latviešu", callback_data="lang_lv")
+    b.button(text="ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="lang_ru")
+    b.button(text="ðŸ‡¬ðŸ‡§ English", callback_data="lang_en")
+    b.button(text="ðŸ‡±ðŸ‡» LatvieÅ¡u", callback_data="lang_lv")
     b.adjust(2, 1)
     return b.as_markup()
 
 def main_menu_keyboard(lang):
-    """Galvenā izvēlne — vienots dizains"""
+    """GalvenÄ izvÄ“lne â€” vienots dizains"""
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ’Ž", "VIP Treideru Äats"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "IestatÄ«jumi"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ’Ž", "VIP Ñ‡Ð°Ñ‚ Ñ‚Ñ€ÐµÐ¹Ð´ÐµÑ€Ð¾Ð²"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ“š", "ÐšÑƒÑ€ÑÑ‹ MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ°"), callback_data="user_support")
     else:
-        b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ’Ž", "VIP Traders Chat"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
 
 def plans_keyboard(lang):
-    """VIP kanāla valodas izvēle. Pirkums notiek mājaslapā."""
+    """VIP kanÄla valodas izvÄ“le. Pirkums notiek mÄjaslapÄ."""
     b = InlineKeyboardBuilder()
     for code in VIP_CHANNEL_LANGS:
         b.button(text=VIP_CHANNEL_LABELS[code], callback_data=f"vip_checkout_{code}")
@@ -642,43 +570,43 @@ async def vip_channel_keyboard(lang):
 
 
 def active_keyboard(lang):
-    """Keyboard aktīvajiem abonentiem — vienots dizains"""
+    """Keyboard aktÄ«vajiem abonentiem â€” vienots dizains"""
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ”„", "MainÄ«t / pagarinÄt plÄnu"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "Mans lojalitÄtes lÄ«menis"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "IestatÄ«jumi"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ”„", "Ð¡Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ / Ð¿Ñ€Ð¾Ð´Ð»Ð¸Ñ‚ÑŒ Ñ‚Ð°Ñ€Ð¸Ñ„"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "ÐœÐ¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "ÐšÑƒÑ€ÑÑ‹ MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ°"), callback_data="user_support")
     else:
-        b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ”„", "Change / Renew Plan"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
-# ─── FIRST-TIME LANGUAGE SELECTION ───
+# â”€â”€â”€ FIRST-TIME LANGUAGE SELECTION â”€â”€â”€
 
 class RegistrationEmailState(StatesGroup):
     waiting_email = State()
 
 def _first_time_lang_keyboard(ref_param=None):
-    """Valodas izvēle jaunajiem lietotājiem"""
+    """Valodas izvÄ“le jaunajiem lietotÄjiem"""
     b = InlineKeyboardBuilder()
-    b.button(text="🇷🇺  Русский", callback_data="first_lang_ru")
-    b.button(text="🇬🇧  English", callback_data="first_lang_en")
-    b.button(text="🇱🇻  Latviešu", callback_data="first_lang_lv")
+    b.button(text="ðŸ‡·ðŸ‡º  Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="first_lang_ru")
+    b.button(text="ðŸ‡¬ðŸ‡§  English", callback_data="first_lang_en")
+    b.button(text="ðŸ‡±ðŸ‡»  LatvieÅ¡u", callback_data="first_lang_lv")
     b.adjust(2, 1)
     return b.as_markup()
 
@@ -689,7 +617,7 @@ def _is_registered_user(user):
 
 @dp.callback_query(F.data.startswith("first_lang_"))
 async def first_lang_selected(callback: CallbackQuery, state: FSMContext):
-    """Jauns lietotājs izvēlējās valodu — startē onboarding"""
+    """Jauns lietotÄjs izvÄ“lÄ“jÄs valodu â€” startÄ“ onboarding"""
     lang = callback.data.replace("first_lang_", "")
     if lang not in SUPPORTED_LANGS:
         lang = DEFAULT_LANG
@@ -697,7 +625,7 @@ async def first_lang_selected(callback: CallbackQuery, state: FSMContext):
     await db.set_user_lang(user_id, lang)
     name = md_escape(callback.from_user.first_name)
     
-    # Dzēst valodas izvēles ziņu
+    # DzÄ“st valodas izvÄ“les ziÅ†u
     try:
         await callback.message.delete()
     except:
@@ -705,19 +633,19 @@ async def first_lang_selected(callback: CallbackQuery, state: FSMContext):
     
     if lang == "lv":
         text = (
-            "📧 *Ievadi savu e-pastu*\n\n"
-            "Pie šī e-pasta tiks piesaistīts abonements un piekļuve. Pēc maksājuma mājaslapā bots pirkumu pārbaudīs pēc šī e-pasta.\n\n"
-            "_Atsūti e-pastu vienā ziņā:_"
+            "ðŸ“§ *Ievadi savu e-pastu*\n\n"
+            "Pie Å¡Ä« e-pasta tiks piesaistÄ«ts abonements un piekÄ¼uve. PÄ“c maksÄjuma mÄjaslapÄ bots pirkumu pÄrbaudÄ«s pÄ“c Å¡Ä« e-pasta.\n\n"
+            "_AtsÅ«ti e-pastu vienÄ ziÅ†Ä:_"
         )
     elif lang == "ru":
         text = (
-            "📧 *Укажи свой e-mail*\n\n"
-            "К нему будет привязана подписка и доступ. После оплаты на сайте бот сверит покупку по этому e-mail.\n\n"
-            "_Отправь e-mail одним сообщением:_"
+            "ðŸ“§ *Ð£ÐºÐ°Ð¶Ð¸ ÑÐ²Ð¾Ð¹ e-mail*\n\n"
+            "Ðš Ð½ÐµÐ¼Ñƒ Ð±ÑƒÐ´ÐµÑ‚ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½Ð° Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° Ð¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿. ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ Ð±Ð¾Ñ‚ ÑÐ²ÐµÑ€Ð¸Ñ‚ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ Ð¿Ð¾ ÑÑ‚Ð¾Ð¼Ñƒ e-mail.\n\n"
+            "_ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ e-mail Ð¾Ð´Ð½Ð¸Ð¼ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸ÐµÐ¼:_"
         )
     else:
         text = (
-            "📧 *Enter your e-mail*\n\n"
+            "ðŸ“§ *Enter your e-mail*\n\n"
             "Your subscription and access will be linked to it. After website payment the bot will verify the purchase by this e-mail.\n\n"
             "_Send your e-mail as one message:_"
         )
@@ -734,94 +662,94 @@ async def registration_receive_email(message: Message, state: FSMContext):
     lang = data.get("reg_lang", "ru")
     name = data.get("reg_name", md_escape(message.from_user.first_name))
     if "@" not in email or "." not in email or len(email) < 5:
-        await message.answer("❌ " + ("Nepareizs e-pasta formāts. Pamēģini vēlreiz:" if lang == "lv" else ("Неверный e-mail. Попробуй ещё:" if lang == "ru" else "Invalid e-mail. Try again:")))
+        await message.answer("âŒ " + ("Nepareizs e-pasta formÄts. PamÄ“Ä£ini vÄ“lreiz:" if lang == "lv" else ("ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÐµÑ‰Ñ‘:" if lang == "ru" else "Invalid e-mail. Try again:")))
         return
     await db.set_user_lang(message.from_user.id, lang)
     await db.set_user_email(message.from_user.id, email)
     claimed = await attach_pending_email_purchases(message.from_user.id, email, lang, message.from_user.username or "")
     uname = f"@{message.from_user.username}" if message.from_user.username else f"ID {message.from_user.id}"
     await notify_admins(
-        "📧 *Lietotājs piesaistīja e-pastu*\n\n"
-        f"👤 {uname} (`{message.from_user.id}`)\n"
-        f"📧 `{email}`\n"
-        f"📦 Aktivizēti gaidošie pirkumi: *{len(claimed)}*"
+        "ðŸ“§ *LietotÄjs piesaistÄ«ja e-pastu*\n\n"
+        f"ðŸ‘¤ {uname} (`{message.from_user.id}`)\n"
+        f"ðŸ“§ `{email}`\n"
+        f"ðŸ“¦ AktivizÄ“ti gaidoÅ¡ie pirkumi: *{len(claimed)}*"
     )
     await state.clear()
-    await message.answer(("✅ E-pasts saglabāts." if lang == "lv" else ("✅ E-mail сохранён." if lang == "ru" else "✅ E-mail saved.")), parse_mode="Markdown")
+    await message.answer(("âœ… E-pasts saglabÄts." if lang == "lv" else ("âœ… E-mail ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½." if lang == "ru" else "âœ… E-mail saved.")), parse_mode="Markdown")
     if claimed:
-        await message.answer(ui_text(lang, f"âœ… Atrasti iepriekÅ¡Ä“ji pirkumi pÄ“c e-pasta. AktivizÄ“tas {len(claimed)} piekÄ¼uves.", f"âœ… ÐÐ°Ð¹Ð´ÐµÐ½Ñ‹ Ñ€Ð°Ð½ÐµÐµ Ð¾Ð¿Ð»Ð°Ñ‡ÐµÐ½Ð½Ñ‹Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ð¿Ð¾ e-mail. ÐÐºÑ‚Ð¸Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð¾Ð²: {len(claimed)}.", f"âœ… Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
+        await message.answer(ui_text(lang, f"Ã¢Å“â€¦ Atrasti iepriekÃ…Â¡Ã„â€œji pirkumi pÃ„â€œc e-pasta. AktivizÃ„â€œtas {len(claimed)} piekÃ„Â¼uves.", f"Ã¢Å“â€¦ ÃÂÃÂ°ÃÂ¹ÃÂ´ÃÂµÃÂ½Ã‘â€¹ Ã‘â‚¬ÃÂ°ÃÂ½ÃÂµÃÂµ ÃÂ¾ÃÂ¿ÃÂ»ÃÂ°Ã‘â€¡ÃÂµÃÂ½ÃÂ½Ã‘â€¹ÃÂµ ÃÂ¿ÃÂ¾ÃÂºÃ‘Æ’ÃÂ¿ÃÂºÃÂ¸ ÃÂ¿ÃÂ¾ e-mail. ÃÂÃÂºÃ‘â€šÃÂ¸ÃÂ²ÃÂ¸Ã‘â‚¬ÃÂ¾ÃÂ²ÃÂ°ÃÂ½ÃÂ¾ ÃÂ´ÃÂ¾Ã‘ÂÃ‘â€šÃ‘Æ’ÃÂ¿ÃÂ¾ÃÂ²: {len(claimed)}.", f"Ã¢Å“â€¦ Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
     await _send_onboarding(message, lang, name)
 
 
-# ─── ONBOARDING FLOW ───
+# â”€â”€â”€ ONBOARDING FLOW â”€â”€â”€
 
 async def _send_onboarding(message, lang, name):
-    """3 ziņu karuselis jaunajiem lietotājiem"""
+    """3 ziÅ†u karuselis jaunajiem lietotÄjiem"""
     if lang == "lv":
         msg1 = (
-            f"👋 *Sveiks, {name}!*\n\n"
-            f"Laipni lūgts *MNtradepro*! 🚀\n\n"
-            f"💎 *VIP Treideru čats*\n"
-            f"Slēgta community ar signāliem, analītiku un atbalstu.\n"
-            f"Izvēlies plānu un pievienojies!"
+            f"ðŸ‘‹ *Sveiks, {name}!*\n\n"
+            f"Laipni lÅ«gts *MNtradepro*! ðŸš€\n\n"
+            f"ðŸ’Ž *VIP Treideru Äats*\n"
+            f"SlÄ“gta community ar signÄliem, analÄ«tiku un atbalstu.\n"
+            f"IzvÄ“lies plÄnu un pievienojies!"
         )
         msg2 = (
-            f"📚 *MNtradepro kursi*\n\n"
-            f"No iesācēja līdz pārliecinātam treiderim — soli pa solim.\n"
-            f"Audzē zināšanas un izmanto community pieredzi."
+            f"ðŸ“š *MNtradepro kursi*\n\n"
+            f"No iesÄcÄ“ja lÄ«dz pÄrliecinÄtam treiderim â€” soli pa solim.\n"
+            f"AudzÄ“ zinÄÅ¡anas un izmanto community pieredzi."
         )
         msg3 = (
-            f"🏆 *Lojalitātes programma*\n\n"
-            f"Jo ilgāk esi community biedrs, jo lielākus bonusus iegūsti:\n"
-            f"🔥 Audzē savu statusu ar aktivitāti\n"
-            f"🎁 Saņem bezmaksas bonusa dienas\n"
-            f"🎓 Atbloķē papildu privilēģijas aktīvākajiem biedriem\n\n"
-            f"Sāc tagad! 👇"
+            f"ðŸ† *LojalitÄtes programma*\n\n"
+            f"Jo ilgÄk esi community biedrs, jo lielÄkus bonusus iegÅ«sti:\n"
+            f"ðŸ”¥ AudzÄ“ savu statusu ar aktivitÄti\n"
+            f"ðŸŽ SaÅ†em bezmaksas bonusa dienas\n"
+            f"ðŸŽ“ AtbloÄ·Ä“ papildu privilÄ“Ä£ijas aktÄ«vÄkajiem biedriem\n\n"
+            f"SÄc tagad! ðŸ‘‡"
         )
     elif lang == "ru":
-        # Ziņa 1 — VIP čats
+        # ZiÅ†a 1 â€” VIP Äats
         msg1 = (
-            f"👋 *Привет, {name}!*\n\n"
-            f"Добро пожаловать в *MNtradepro*! 🚀\n\n"
-            f"💎 *VIP чат трейдеров*\n"
-            f"Закрытое сообщество с сигналами, аналитикой и поддержкой от профессионалов.\n"
-            f"Выбирай тариф и присоединяйся!"
+            f"ðŸ‘‹ *ÐŸÑ€Ð¸Ð²ÐµÑ‚, {name}!*\n\n"
+            f"Ð”Ð¾Ð±Ñ€Ð¾ Ð¿Ð¾Ð¶Ð°Ð»Ð¾Ð²Ð°Ñ‚ÑŒ Ð² *MNtradepro*! ðŸš€\n\n"
+            f"ðŸ’Ž *VIP Ñ‡Ð°Ñ‚ Ñ‚Ñ€ÐµÐ¹Ð´ÐµÑ€Ð¾Ð²*\n"
+            f"Ð—Ð°ÐºÑ€Ñ‹Ñ‚Ð¾Ðµ ÑÐ¾Ð¾Ð±Ñ‰ÐµÑÑ‚Ð²Ð¾ Ñ ÑÐ¸Ð³Ð½Ð°Ð»Ð°Ð¼Ð¸, Ð°Ð½Ð°Ð»Ð¸Ñ‚Ð¸ÐºÐ¾Ð¹ Ð¸ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ¾Ð¹ Ð¾Ñ‚ Ð¿Ñ€Ð¾Ñ„ÐµÑÑÐ¸Ð¾Ð½Ð°Ð»Ð¾Ð².\n"
+            f"Ð’Ñ‹Ð±Ð¸Ñ€Ð°Ð¹ Ñ‚Ð°Ñ€Ð¸Ñ„ Ð¸ Ð¿Ñ€Ð¸ÑÐ¾ÐµÐ´Ð¸Ð½ÑÐ¹ÑÑ!"
         )
-        # Ziņa 2 — Kursi
+        # ZiÅ†a 2 â€” Kursi
         msg2 = (
-            f"📚 *Курсы MNtradepro Academy*\n\n"
-            f"От новичка до профи — пошаговое обучение трейдингу.\n"
-            f"Каждый нюанс может принести тебе серьёзные деньги! 💰"
+            f"ðŸ“š *ÐšÑƒÑ€ÑÑ‹ MNtradepro Academy*\n\n"
+            f"ÐžÑ‚ Ð½Ð¾Ð²Ð¸Ñ‡ÐºÐ° Ð´Ð¾ Ð¿Ñ€Ð¾Ñ„Ð¸ â€” Ð¿Ð¾ÑˆÐ°Ð³Ð¾Ð²Ð¾Ðµ Ð¾Ð±ÑƒÑ‡ÐµÐ½Ð¸Ðµ Ñ‚Ñ€ÐµÐ¹Ð´Ð¸Ð½Ð³Ñƒ.\n"
+            f"ÐšÐ°Ð¶Ð´Ñ‹Ð¹ Ð½ÑŽÐ°Ð½Ñ Ð¼Ð¾Ð¶ÐµÑ‚ Ð¿Ñ€Ð¸Ð½ÐµÑÑ‚Ð¸ Ñ‚ÐµÐ±Ðµ ÑÐµÑ€ÑŒÑ‘Ð·Ð½Ñ‹Ðµ Ð´ÐµÐ½ÑŒÐ³Ð¸! ðŸ’°"
         )
-        # Ziņa 3 — Loyalty
+        # ZiÅ†a 3 â€” Loyalty
         msg3 = (
-            f"🏆 *Программа лояльности*\n\n"
-            f"Чем дольше ты в community — тем больше бонусов получаешь:\n"
-            f"🔥 Расти в статусе через активность\n"
-            f"🎁 Получай бесплатные бонусные дни\n"
-            f"🎓 Открывай дополнительные привилегии для топ-участников\n\n"
-            f"Начни прямо сейчас! 👇"
+            f"ðŸ† *ÐŸÑ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
+            f"Ð§ÐµÐ¼ Ð´Ð¾Ð»ÑŒÑˆÐµ Ñ‚Ñ‹ Ð² community â€” Ñ‚ÐµÐ¼ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð±Ð¾Ð½ÑƒÑÐ¾Ð² Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑˆÑŒ:\n"
+            f"ðŸ”¥ Ð Ð°ÑÑ‚Ð¸ Ð² ÑÑ‚Ð°Ñ‚ÑƒÑÐµ Ñ‡ÐµÑ€ÐµÐ· Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾ÑÑ‚ÑŒ\n"
+            f"ðŸŽ ÐŸÐ¾Ð»ÑƒÑ‡Ð°Ð¹ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ðµ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸\n"
+            f"ðŸŽ“ ÐžÑ‚ÐºÑ€Ñ‹Ð²Ð°Ð¹ Ð´Ð¾Ð¿Ð¾Ð»Ð½Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ðµ Ð¿Ñ€Ð¸Ð²Ð¸Ð»ÐµÐ³Ð¸Ð¸ Ð´Ð»Ñ Ñ‚Ð¾Ð¿-ÑƒÑ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ¾Ð²\n\n"
+            f"ÐÐ°Ñ‡Ð½Ð¸ Ð¿Ñ€ÑÐ¼Ð¾ ÑÐµÐ¹Ñ‡Ð°Ñ! ðŸ‘‡"
         )
     else:
         msg1 = (
-            f"👋 *Hi, {name}!*\n\n"
-            f"Welcome to *MNtradepro*! 🚀\n\n"
-            f"💎 *VIP Traders Chat*\n"
+            f"ðŸ‘‹ *Hi, {name}!*\n\n"
+            f"Welcome to *MNtradepro*! ðŸš€\n\n"
+            f"ðŸ’Ž *VIP Traders Chat*\n"
             f"Exclusive community with signals, analytics and professional support.\n"
             f"Pick a plan and join!"
         )
         msg2 = (
-            f"📚 *MNtradepro Academy Courses*\n\n"
-            f"From beginner to pro — step-by-step trading education.\n"
-            f"Every detail can bring you serious money! 💰"
+            f"ðŸ“š *MNtradepro Academy Courses*\n\n"
+            f"From beginner to pro â€” step-by-step trading education.\n"
+            f"Every detail can bring you serious money! ðŸ’°"
         )
         msg3 = (
-            f"🏆 *Loyalty Program*\n\n"
-            f"The longer you stay in the community — the bigger bonuses you unlock:\n"
-            f"🔥 Grow your status through activity\n"
-            f"🎁 Earn free bonus days\n"
-            f"🎓 Unlock extra perks for top members\n\n"
-            f"Start now! 👇"
+            f"ðŸ† *Loyalty Program*\n\n"
+            f"The longer you stay in the community â€” the bigger bonuses you unlock:\n"
+            f"ðŸ”¥ Grow your status through activity\n"
+            f"ðŸŽ Earn free bonus days\n"
+            f"ðŸŽ“ Unlock extra perks for top members\n\n"
+            f"Start now! ðŸ‘‡"
         )
     
     await message.answer(msg1, parse_mode="Markdown")
@@ -832,29 +760,29 @@ async def _send_onboarding(message, lang, name):
 
 
 def _urgency_keyboard(lang):
-    """Keyboard ar urgency — Pagarināt tagad pogu augšā"""
+    """Keyboard ar urgency â€” PagarinÄt tagad pogu augÅ¡Ä"""
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+        b.button(text=menu_button("ðŸš¨", "PagarinÄt tagad!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "Mans lojalitÄtes lÄ«menis"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "IestatÄ«jumi"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+        b.button(text=menu_button("ðŸš¨", "ÐŸÑ€Ð¾Ð´Ð»Ð¸Ñ‚ÑŒ ÑÐµÐ¹Ñ‡Ð°Ñ!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "ÐœÐ¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "ÐšÑƒÑ€ÑÑ‹ MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ°"), callback_data="user_support")
     else:
-        b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+        b.button(text=menu_button("ðŸš¨", "Renew Now!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
@@ -862,29 +790,29 @@ def _urgency_keyboard(lang):
 def active_keyboard(lang):
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
-        b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ”—", "SaÅ†emt piekÄ¼uves linku"), callback_data="get_access_links")
+        b.button(text=menu_button("ðŸ”„", "MainÄ«t / pagarinÄt plÄnu"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "Mans lojalitÄtes lÄ«menis"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "IestatÄ«jumi"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
-        b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ”—", "ÐŸÐ¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°"), callback_data="get_access_links")
+        b.button(text=menu_button("ðŸ”„", "Ð¡Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ / Ð¿Ñ€Ð¾Ð´Ð»Ð¸Ñ‚ÑŒ Ñ‚Ð°Ñ€Ð¸Ñ„"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "ÐœÐ¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "ÐšÑƒÑ€ÑÑ‹ MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ°"), callback_data="user_support")
     else:
-        b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
-        b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+        b.button(text=menu_button("ðŸ”—", "Get Access Link"), callback_data="get_access_links")
+        b.button(text=menu_button("ðŸ”„", "Change / Renew Plan"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ’Ž", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
@@ -892,62 +820,62 @@ def active_keyboard(lang):
 def _urgency_keyboard(lang):
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
-        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+        b.button(text=menu_button("ðŸš¨", "PagarinÄt tagad!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ”—", "SaÅ†emt piekÄ¼uves linku"), callback_data="get_access_links")
+        b.button(text=menu_button("ðŸ’Ž", "Mans lojalitÄtes lÄ«menis"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "IestatÄ«jumi"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
-        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+        b.button(text=menu_button("ðŸš¨", "ÐŸÑ€Ð¾Ð´Ð»Ð¸Ñ‚ÑŒ ÑÐµÐ¹Ñ‡Ð°Ñ!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ”—", "ÐŸÐ¾Ð»ÑƒÑ‡Ð¸Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°"), callback_data="get_access_links")
+        b.button(text=menu_button("ðŸ’Ž", "ÐœÐ¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "ÐšÑƒÑ€ÑÑ‹ MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "ÐŸÐ¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ°"), callback_data="user_support")
     else:
-        b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
-        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
-        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
-        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+        b.button(text=menu_button("ðŸš¨", "Renew Now!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("ðŸ”—", "Get Access Link"), callback_data="get_access_links")
+        b.button(text=menu_button("ðŸ’Ž", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("ðŸ“š", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("ðŸ“¡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("âš™ï¸", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("ðŸ“©", "Support"), callback_data="user_support")
     b.adjust(1)
     return b.as_markup()
 
 
 async def _send_referral_reminder(user_id, lang):
-    """Nosūta referral reminder 5 min pēc maksājuma"""
+    """NosÅ«ta referral reminder 5 min pÄ“c maksÄjuma"""
     return
-    await asyncio.sleep(300)  # 5 minūtes
+    await asyncio.sleep(300)  # 5 minÅ«tes
     try:
         bot_info = await bot.get_me()
         ref_link = f"https://t.me/{bot_info.username}?start=ref_{user_id}"
         if lang == "ru":
             text = (
-                f"💡 *Кстати!*\n\n"
-                f"Пригласи друга — и получай бонусные дни:\n\n"
-                f"🎁 За каждую покупку друга тебе начисляется *+{config.REFERRAL_BONUS_DAYS} бонусных дней*\n"
-                f"📅 Ты сам выбираешь, к какому активному чату их применить.\n\n"
-                f"📌 Твоя ссылка:\n`{ref_link}`"
+                f"ðŸ’¡ *ÐšÑÑ‚Ð°Ñ‚Ð¸!*\n\n"
+                f"ÐŸÑ€Ð¸Ð³Ð»Ð°ÑÐ¸ Ð´Ñ€ÑƒÐ³Ð° â€” Ð¸ Ð¿Ð¾Ð»ÑƒÑ‡Ð°Ð¹ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸:\n\n"
+                f"ðŸŽ Ð—Ð° ÐºÐ°Ð¶Ð´ÑƒÑŽ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ Ð´Ñ€ÑƒÐ³Ð° Ñ‚ÐµÐ±Ðµ Ð½Ð°Ñ‡Ð¸ÑÐ»ÑÐµÑ‚ÑÑ *+{config.REFERRAL_BONUS_DAYS} Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*\n"
+                f"ðŸ“… Ð¢Ñ‹ ÑÐ°Ð¼ Ð²Ñ‹Ð±Ð¸Ñ€Ð°ÐµÑˆÑŒ, Ðº ÐºÐ°ÐºÐ¾Ð¼Ñƒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñƒ Ð¸Ñ… Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ.\n\n"
+                f"ðŸ“Œ Ð¢Ð²Ð¾Ñ ÑÑÑ‹Ð»ÐºÐ°:\n`{ref_link}`"
             )
         else:
             text = (
-                f"💡 *By the way!*\n\n"
+                f"ðŸ’¡ *By the way!*\n\n"
                 f"Invite a friend and collect bonus days:\n\n"
-                f"🎁 For every friend purchase you receive *+{config.REFERRAL_BONUS_DAYS} bonus days*\n"
-                f"📅 You choose which active chat to apply them to.\n\n"
-                f"📌 Your link:\n`{ref_link}`"
+                f"ðŸŽ For every friend purchase you receive *+{config.REFERRAL_BONUS_DAYS} bonus days*\n"
+                f"ðŸ“… You choose which active chat to apply them to.\n\n"
+                f"ðŸ“Œ Your link:\n`{ref_link}`"
             )
         await bot.send_message(user_id, text, parse_mode="Markdown")
     except Exception as e:
         logger.warning(f"Referral reminder failed for {user_id}: {e}")
 
 
-# ─── HANDLERS ───
+# â”€â”€â”€ HANDLERS â”€â”€â”€
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
@@ -961,9 +889,9 @@ async def cmd_start(message: Message, state: FSMContext):
     if not existing_user:
         uname = f"@{message.from_user.username}" if message.from_user.username else f"ID {user_id}"
         await notify_admins(
-            "🆕 *Jauns lietotājs botā*\n\n"
-            f"👤 {uname} (`{user_id}`)\n"
-            f"🌐 Valoda: `{auto_lang}`"
+            "ðŸ†• *Jauns lietotÄjs botÄ*\n\n"
+            f"ðŸ‘¤ {uname} (`{user_id}`)\n"
+            f"ðŸŒ Valoda: `{auto_lang}`"
         )
     if ref_param and ref_param.startswith("ref_"):
         try:
@@ -979,25 +907,25 @@ async def cmd_start(message: Message, state: FSMContext):
     lang = user.get("lang", auto_lang) if user else auto_lang
     has_registered_email = _is_registered_user(user)
     
-    # Reģistrācija = DB ieraksts ar e-pastu. Ja e-pasts jau ir, neprasām to atkārtoti.
+    # ReÄ£istrÄcija = DB ieraksts ar e-pastu. Ja e-pasts jau ir, neprasÄm to atkÄrtoti.
     if not has_registered_email:
-        # Ja TG ID jau eksistē DB, valodu vairs neprasām — tikai trūkstošo e-pastu.
+        # Ja TG ID jau eksistÄ“ DB, valodu vairs neprasÄm â€” tikai trÅ«kstoÅ¡o e-pastu.
         if existing_user:
             if lang == "lv":
                 text = (
-                    "📧 *Ievadi savu e-pastu*\n\n"
+                    "ðŸ“§ *Ievadi savu e-pastu*\n\n"
                     f"{email_binding_notice(lang)}\n\n"
-                    "_Atsūti e-pastu vienā ziņā:_"
+                    "_AtsÅ«ti e-pastu vienÄ ziÅ†Ä:_"
                 )
             elif lang == "ru":
                 text = (
-                    "📧 *Укажи свой e-mail*\n\n"
+                    "ðŸ“§ *Ð£ÐºÐ°Ð¶Ð¸ ÑÐ²Ð¾Ð¹ e-mail*\n\n"
                     f"{email_binding_notice(lang)}\n\n"
-                    "_Отправь e-mail одним сообщением:_"
+                    "_ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ e-mail Ð¾Ð´Ð½Ð¸Ð¼ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸ÐµÐ¼:_"
                 )
             else:
                 text = (
-                    "📧 *Enter your e-mail*\n\n"
+                    "ðŸ“§ *Enter your e-mail*\n\n"
                     f"{email_binding_notice(lang)}\n\n"
                     "_Send your e-mail as one message:_"
                 )
@@ -1006,7 +934,7 @@ async def cmd_start(message: Message, state: FSMContext):
             await message.answer(text, parse_mode="Markdown")
             return
         await message.answer(
-            "🌐 Izvēlies valodu / Choose language / Выбери язык:",
+            "ðŸŒ IzvÄ“lies valodu / Choose language / Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ·Ñ‹Ðº:",
             reply_markup=_first_time_lang_keyboard(ref_param)
         )
         return
@@ -1018,7 +946,7 @@ async def cmd_start(message: Message, state: FSMContext):
         expires_dt = datetime.fromisoformat(user['expires_at'])
         expires = expires_dt.strftime("%d.%m.%Y")
         days_left = max(0, (expires_dt - datetime.utcnow()).days)
-        plan_name = user.get('plan_name', '—')
+        plan_name = user.get('plan_name', 'â€”')
         
         # Loyalty info
         loyalty_data = await db.get_user_loyalty(user_id)
@@ -1029,7 +957,7 @@ async def cmd_start(message: Message, state: FSMContext):
         current_tier = loyalty_data.get('current_tier', 'rookie')
         consecutive_months = loyalty_data.get('consecutive_months', 0)
         tier_data = config.LOYALTY_TIERS.get(current_tier, {})
-        tier_emoji = tier_data.get('emoji', '🌱')
+        tier_emoji = tier_data.get('emoji', 'ðŸŒ±')
         tier_tag = tier_data.get('tag', 'Rookie')
         tier_discount = tier_data.get('chat_discount', 0)
         
@@ -1037,20 +965,20 @@ async def cmd_start(message: Message, state: FSMContext):
         urgency = ""
         if days_left <= 3 and days_left > 0:
             if lang == "ru":
-                urgency = f"\n\n⚠️ *Внимание! До окончания подписки {days_left} {'день' if days_left == 1 else 'дня'}!*"
+                urgency = f"\n\nâš ï¸ *Ð’Ð½Ð¸Ð¼Ð°Ð½Ð¸Ðµ! Ð”Ð¾ Ð¾ÐºÐ¾Ð½Ñ‡Ð°Ð½Ð¸Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸ {days_left} {'Ð´ÐµÐ½ÑŒ' if days_left == 1 else 'Ð´Ð½Ñ'}!*"
             elif lang == "lv":
-                urgency = f"\n\n⚠️ *Uzmanību! Līdz abonementa beigām palikušas {days_left} {'diena' if days_left == 1 else 'dienas'}!*"
+                urgency = f"\n\nâš ï¸ *UzmanÄ«bu! LÄ«dz abonementa beigÄm palikuÅ¡as {days_left} {'diena' if days_left == 1 else 'dienas'}!*"
             else:
-                urgency = f"\n\n⚠️ *Warning! Only {days_left} day{'s' if days_left != 1 else ''} left!*"
+                urgency = f"\n\nâš ï¸ *Warning! Only {days_left} day{'s' if days_left != 1 else ''} left!*"
         elif days_left == 0:
             if lang == "ru":
-                urgency = "\n\n🚨 *Подписка заканчивается сегодня!*"
+                urgency = "\n\nðŸš¨ *ÐŸÐ¾Ð´Ð¿Ð¸ÑÐºÐ° Ð·Ð°ÐºÐ°Ð½Ñ‡Ð¸Ð²Ð°ÐµÑ‚ÑÑ ÑÐµÐ³Ð¾Ð´Ð½Ñ!*"
             elif lang == "lv":
-                urgency = "\n\n🚨 *Abonements beidzas šodien!*"
+                urgency = "\n\nðŸš¨ *Abonements beidzas Å¡odien!*"
             else:
-                urgency = "\n\n🚨 *Subscription expires today!*"
+                urgency = "\n\nðŸš¨ *Subscription expires today!*"
         
-        # Nākamā līmeņa info ar % gamification
+        # NÄkamÄ lÄ«meÅ†a info ar % gamification
         next_tier_info = ""
         for tier_name in ['active', 'pro', 'elite', 'master', 'legend']:
             ti = config.LOYALTY_TIERS[tier_name]
@@ -1064,31 +992,31 @@ async def cmd_start(message: Message, state: FSMContext):
                 progress_pct = int((consecutive_months / target_months) * 100) if target_months > 0 else 0
                 if lang == "ru":
                     next_tier_info = (
-                        f"\n\n🎯 Следующий: {next_emoji} *{next_tag}* — {progress_pct}% пройдено\n"
-                        f"🎁 +{next_bonus} дн. бесплатно, скидка {next_discount}%"
+                        f"\n\nðŸŽ¯ Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¹: {next_emoji} *{next_tag}* â€” {progress_pct}% Ð¿Ñ€Ð¾Ð¹Ð´ÐµÐ½Ð¾\n"
+                        f"ðŸŽ +{next_bonus} Ð´Ð½. Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾, ÑÐºÐ¸Ð´ÐºÐ° {next_discount}%"
                     )
                 elif lang == "lv":
                     next_tier_info = (
-                        f"\n\n🎯 Nākamais: {next_emoji} *{next_tag}* — {progress_pct}% pabeigts\n"
-                        f"🎁 +{next_bonus} bezmaksas dienas, {next_discount}% atlaide"
+                        f"\n\nðŸŽ¯ NÄkamais: {next_emoji} *{next_tag}* â€” {progress_pct}% pabeigts\n"
+                        f"ðŸŽ +{next_bonus} bezmaksas dienas, {next_discount}% atlaide"
                     )
                 else:
                     next_tier_info = (
-                        f"\n\n🎯 Next: {next_emoji} *{next_tag}* — {progress_pct}% complete\n"
-                        f"🎁 +{next_bonus} days free, {next_discount}% off"
+                        f"\n\nðŸŽ¯ Next: {next_emoji} *{next_tag}* â€” {progress_pct}% complete\n"
+                        f"ðŸŽ +{next_bonus} days free, {next_discount}% off"
                     )
                 break
         
         if lang == "ru":
-            loyalty_line = f"\n\n{tier_emoji} Уровень: *{tier_tag}*" + (f" ({tier_discount}% скидка)" if tier_discount > 0 else "")
+            loyalty_line = f"\n\n{tier_emoji} Ð£Ñ€Ð¾Ð²ÐµÐ½ÑŒ: *{tier_tag}*" + (f" ({tier_discount}% ÑÐºÐ¸Ð´ÐºÐ°)" if tier_discount > 0 else "")
         elif lang == "lv":
-            loyalty_line = f"\n\n{tier_emoji} Līmenis: *{tier_tag}*" + (f" ({tier_discount}% atlaide)" if tier_discount > 0 else "")
+            loyalty_line = f"\n\n{tier_emoji} LÄ«menis: *{tier_tag}*" + (f" ({tier_discount}% atlaide)" if tier_discount > 0 else "")
         else:
             loyalty_line = f"\n\n{tier_emoji} Level: *{tier_tag}*" + (f" ({tier_discount}% discount)" if tier_discount > 0 else "")
         
         welcome_text = t(lang, "active_sub", name=name, expires=expires, plan=plan_name, days=days_left) + loyalty_line + next_tier_info + urgency
         
-        # Ja urgency — pievienot speciālu keyboard ar "Pagarināt tagad" pogu augšā
+        # Ja urgency â€” pievienot speciÄlu keyboard ar "PagarinÄt tagad" pogu augÅ¡Ä
         if days_left <= 3:
             kb = _urgency_keyboard(lang)
         else:
@@ -1112,24 +1040,24 @@ async def lang_selected(callback: CallbackQuery):
         text, kb = await build_active_home_view(callback.from_user.id, lang, name)
         await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     elif user and user.get("expires_at") and datetime.fromisoformat(user["expires_at"]) > datetime.utcnow():
-        expires_dt = datetime.fromisoformat(user["expires_at"]); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
+        expires_dt = datetime.fromisoformat(user["expires_at"]); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "â€”"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
-        # Custom welcome no DB (tāpat kā cmd_start)
+        # Custom welcome no DB (tÄpat kÄ cmd_start)
         welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
 @dp.message(Command("id"))
 async def cmd_id(message: Message):
-    """Parāda lietotāja Telegram ID"""
+    """ParÄda lietotÄja Telegram ID"""
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     if lang == "lv":
-        text = f"🆔 *Tavs Telegram ID:*\n\n`{message.from_user.id}`\n\n_Nokopē un nosūti adminam, ja nepieciešams._"
+        text = f"ðŸ†” *Tavs Telegram ID:*\n\n`{message.from_user.id}`\n\n_NokopÄ“ un nosÅ«ti adminam, ja nepiecieÅ¡ams._"
     elif lang == "ru":
-        text = f"🆔 *Твой Telegram ID:*\n\n`{message.from_user.id}`\n\n_Скопируй и отправь админу если нужно._"
+        text = f"ðŸ†” *Ð¢Ð²Ð¾Ð¹ Telegram ID:*\n\n`{message.from_user.id}`\n\n_Ð¡ÐºÐ¾Ð¿Ð¸Ñ€ÑƒÐ¹ Ð¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÑŒ Ð°Ð´Ð¼Ð¸Ð½Ñƒ ÐµÑÐ»Ð¸ Ð½ÑƒÐ¶Ð½Ð¾._"
     else:
-        text = f"🆔 *Your Telegram ID:*\n\n`{message.from_user.id}`\n\n_Copy and send to admin if needed._"
+        text = f"ðŸ†” *Your Telegram ID:*\n\n`{message.from_user.id}`\n\n_Copy and send to admin if needed._"
     await message.answer(text, parse_mode="Markdown")
 
 @dp.message(Command("help"))
@@ -1140,7 +1068,7 @@ async def cmd_help(message: Message):
 
 @dp.message(Command("language"))
 async def cmd_language(message: Message):
-    await message.answer("🌐 Izvēlies valodu / Choose language / Выбери язык:", reply_markup=lang_keyboard())
+    await message.answer("ðŸŒ IzvÄ“lies valodu / Choose language / Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ·Ñ‹Ðº:", reply_markup=lang_keyboard())
 
 @dp.message(Command("support"))
 async def cmd_support(message: Message):
@@ -1164,24 +1092,24 @@ async def cb_market_scanner(callback: CallbackQuery):
         await callback.message.answer(
             ui_text(
                 lang,
-                "📧 Vispirms iestati e-pastu botā. Pēc pirkuma piekļuve tiks piesaistīta pēc šī e-pasta.",
-                "📧 Сначала укажи e-mail в боте. После покупки доступ будет привязан по этому e-mail.",
-                "📧 Please set your e-mail first. After purchase access will be linked by this e-mail.",
+                "ðŸ“§ Vispirms iestati e-pastu botÄ. PÄ“c pirkuma piekÄ¼uve tiks piesaistÄ«ta pÄ“c Å¡Ä« e-pasta.",
+                "ðŸ“§ Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑƒÐºÐ°Ð¶Ð¸ e-mail Ð² Ð±Ð¾Ñ‚Ðµ. ÐŸÐ¾ÑÐ»Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð±ÑƒÐ´ÐµÑ‚ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½ Ð¿Ð¾ ÑÑ‚Ð¾Ð¼Ñƒ e-mail.",
+                "ðŸ“§ Please set your e-mail first. After purchase access will be linked by this e-mail.",
             )
         )
         return
     checkout_url = await checkout_url_for_subscription_product("scanner_chat", lang)
     text = ui_text(
         lang,
-        "📡 *Tirgus Skaneris/AI signāli*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski iedos jaunu piekļuvi.",
-        "📡 *Сканер рынка/AI сигналы*\n\nПокупка происходит на сайте. После оплаты бот автоматически выдаст доступ.",
-        "📡 *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
+        "ðŸ“¡ *Tirgus Skaneris/AI signÄli*\n\nPirkums notiek mÄjaslapÄ. PÄ“c apmaksas bots automÄtiski iedos jaunu piekÄ¼uvi.",
+        "ðŸ“¡ *Ð¡ÐºÐ°Ð½ÐµÑ€ Ñ€Ñ‹Ð½ÐºÐ°/AI ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹*\n\nÐŸÐ¾ÐºÑƒÐ¿ÐºÐ° Ð¿Ñ€Ð¾Ð¸ÑÑ…Ð¾Ð´Ð¸Ñ‚ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ. ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ñ‚ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ð´Ð°ÑÑ‚ Ð´Ð¾ÑÑ‚ÑƒÐ¿.",
+        "ðŸ“¡ *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
     )
     b = InlineKeyboardBuilder()
     if checkout_url:
-        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), url=checkout_url)
+        b.button(text=ui_text(lang, "ðŸ’³ MaksÄt ar karti / banku / crypto", "ðŸ’³ ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto", "ðŸ’³ Pay with card / bank / crypto"), url=checkout_url)
     else:
-        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), callback_data="scanner_checkout_missing")
+        b.button(text=ui_text(lang, "ðŸ’³ MaksÄt ar karti / banku / crypto", "ðŸ’³ ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto", "ðŸ’³ Pay with card / bank / crypto"), callback_data="scanner_checkout_missing")
     b.button(text=back_button_text(lang), callback_data="back_to_main")
     b.adjust(1)
     await callback.message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1189,7 +1117,7 @@ async def cb_market_scanner(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "scanner_checkout_missing")
 async def scanner_checkout_missing(callback: CallbackQuery):
-    await callback.answer("Scanner checkout links vēl nav iestatīts admin panelī.", show_alert=True)
+    await callback.answer("Scanner checkout links vÄ“l nav iestatÄ«ts admin panelÄ«.", show_alert=True)
 
 @dp.message(Command("status"))
 async def cmd_status(message: Message):
@@ -1201,15 +1129,15 @@ async def cmd_status(message: Message):
         for sub in active_subs:
             expires = datetime.fromisoformat(sub["expires_at"])
             days = max(0, (expires - datetime.utcnow()).days)
-            rows.append(f"• *{sub.get('product_name', sub.get('product_key', '—'))}* — {expires.strftime('%d.%m.%Y')} ({days}d)")
-        header = ui_text(lang, "🟢 *Aktīvās piekļuves:*", "🟢 *Активные подписки:*", "🟢 *Active subscriptions:*")
+            rows.append(f"â€¢ *{sub.get('product_name', sub.get('product_key', 'â€”'))}* â€” {expires.strftime('%d.%m.%Y')} ({days}d)")
+        header = ui_text(lang, "ðŸŸ¢ *AktÄ«vÄs piekÄ¼uves:*", "ðŸŸ¢ *ÐÐºÑ‚Ð¸Ð²Ð½Ñ‹Ðµ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸:*", "ðŸŸ¢ *Active subscriptions:*")
         await message.answer(header + "\n\n" + "\n".join(rows), parse_mode="Markdown")
         return
     if not user or not user.get('expires_at'):
         await message.answer(t(lang, "status_none"), parse_mode="Markdown"); return
     expires = datetime.fromisoformat(user['expires_at'])
     if expires > datetime.utcnow():
-        await message.answer(t(lang, "status_active", expires=expires.strftime('%d.%m.%Y'), days=max(0, (expires - datetime.utcnow()).days), plan=user.get('plan_name', '—')), parse_mode="Markdown")
+        await message.answer(t(lang, "status_active", expires=expires.strftime('%d.%m.%Y'), days=max(0, (expires - datetime.utcnow()).days), plan=user.get('plan_name', 'â€”')), parse_mode="Markdown")
     else:
         await message.answer(t(lang, "status_none"), parse_mode="Markdown")
 
@@ -1217,7 +1145,7 @@ async def cmd_status(message: Message):
 async def cmd_renew(message: Message):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    text = "💎 *Izvēlies VIP čatu:*" if lang == "lv" else ("💎 *Выбери VIP чат:*" if lang == "ru" else "💎 *Choose VIP chat:*")
+    text = "ðŸ’Ž *IzvÄ“lies VIP Äatu:*" if lang == "lv" else ("ðŸ’Ž *Ð’Ñ‹Ð±ÐµÑ€Ð¸ VIP Ñ‡Ð°Ñ‚:*" if lang == "ru" else "ðŸ’Ž *Choose VIP chat:*")
     await message.answer(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
 
 @dp.message(Command("referral"))
@@ -1227,9 +1155,9 @@ async def cmd_referral(message: Message):
     await message.answer(
         ui_text(
             lang,
-            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
-            "ℹ️ Referral система сейчас отключена.",
-            "ℹ️ The referral system is currently disabled.",
+            "â„¹ï¸ Referral sistÄ“ma Å¡obrÄ«d ir izslÄ“gta.",
+            "â„¹ï¸ Referral ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°.",
+            "â„¹ï¸ The referral system is currently disabled.",
         )
     )
 
@@ -1240,9 +1168,9 @@ async def ref_main(callback: CallbackQuery):
     await callback.message.edit_text(
         ui_text(
             lang,
-            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
-            "ℹ️ Referral система сейчас отключена.",
-            "ℹ️ The referral system is currently disabled.",
+            "â„¹ï¸ Referral sistÄ“ma Å¡obrÄ«d ir izslÄ“gta.",
+            "â„¹ï¸ Referral ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°.",
+            "â„¹ï¸ The referral system is currently disabled.",
         )
     )
     await callback.answer()
@@ -1254,9 +1182,9 @@ async def ref_my_link(callback: CallbackQuery):
     await callback.message.edit_text(
         ui_text(
             lang,
-            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
-            "ℹ️ Referral система сейчас отключена.",
-            "ℹ️ The referral system is currently disabled.",
+            "â„¹ï¸ Referral sistÄ“ma Å¡obrÄ«d ir izslÄ“gta.",
+            "â„¹ï¸ Referral ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°.",
+            "â„¹ï¸ The referral system is currently disabled.",
         )
     )
     await callback.answer()
@@ -1268,9 +1196,9 @@ async def ref_my_list(callback: CallbackQuery):
     await callback.message.edit_text(
         ui_text(
             lang,
-            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
-            "ℹ️ Referral система сейчас отключена.",
-            "ℹ️ The referral system is currently disabled.",
+            "â„¹ï¸ Referral sistÄ“ma Å¡obrÄ«d ir izslÄ“gta.",
+            "â„¹ï¸ Referral ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°.",
+            "â„¹ï¸ The referral system is currently disabled.",
         )
     )
     await callback.answer()
@@ -1285,7 +1213,7 @@ async def ref_back_start(callback: CallbackQuery):
         text, kb = await build_active_home_view(callback.from_user.id, lang, name)
         await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     elif user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
-        expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
+        expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "â€”"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
         welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
@@ -1298,8 +1226,8 @@ async def ref_use_bonus(callback: CallbackQuery):
     await callback.answer(
         ui_text(
             lang,
-            "Referral sistēma šobrīd ir izslēgta.",
-            "Referral система сейчас отключена.",
+            "Referral sistÄ“ma Å¡obrÄ«d ir izslÄ“gta.",
+            "Referral ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°.",
             "The referral system is currently disabled.",
         ),
         show_alert=True
@@ -1307,9 +1235,9 @@ async def ref_use_bonus(callback: CallbackQuery):
     await callback.message.edit_text(
         ui_text(
             lang,
-            "ℹ️ Referral sistēma šobrīd ir izslēgta.",
-            "ℹ️ Referral система сейчас отключена.",
-            "ℹ️ The referral system is currently disabled.",
+            "â„¹ï¸ Referral sistÄ“ma Å¡obrÄ«d ir izslÄ“gta.",
+            "â„¹ï¸ Referral ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°.",
+            "â„¹ï¸ The referral system is currently disabled.",
         )
     )
 
@@ -1320,14 +1248,87 @@ async def ref_apply_bonus(callback: CallbackQuery):
     await callback.answer(
         ui_text(
             lang,
-            "Referral sistēma šobrīd ir izslēgta.",
-            "Referral система сейчас отключена.",
+            "Referral sistÄ“ma Å¡obrÄ«d ir izslÄ“gta.",
+            "Referral ÑÐ¸ÑÑ‚ÐµÐ¼Ð° ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ð°.",
             "The referral system is currently disabled.",
         ),
         show_alert=True
     )
 
-# ─── USER SETTINGS ───
+
+@dp.callback_query(F.data == "get_access_links")
+async def get_access_links(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    user = await db.get_user(user_id)
+    lang = user.get("lang", "ru") if user else "ru"
+    active_subs = await db.get_active_user_subscriptions(user_id)
+    if not active_subs:
+        await callback.answer(
+            ui_text(
+                lang,
+                "Tev nav aktivu piekljuvju.",
+                "U tebya net aktivnyh dostupov.",
+                "You do not have any active access.",
+            ),
+            show_alert=True,
+        )
+        return
+
+    rows = []
+    for sub in active_subs:
+        try:
+            expires_at = datetime.fromisoformat(sub["expires_at"])
+        except Exception:
+            continue
+        product_meta = resolve_subscription_product(sub.get("product_key") or "", lang)
+        if not product_meta and (sub.get("chat_id") or sub.get("chat_link")):
+            product_meta = {
+                "product_key": sub.get("product_key") or "website_subscription",
+                "chat_id": sub.get("chat_id", 0) or 0,
+                "chat_link": sub.get("chat_link", "") or "",
+            }
+        invite = await invite_text_for_product(user_id, lang, product_meta, expires_at)
+        if not invite:
+            continue
+        product_name = sub.get("product_name") or sub.get("product_key") or "Access"
+        rows.append(
+            ui_text(
+                lang,
+                f"📦 *{product_name}*\n📅 Aktivs lidz: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                f"📦 *{product_name}*\n📅 Aktivno do: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                f"📦 *{product_name}*\n📅 Active until: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+            )
+        )
+
+    if not rows:
+        await callback.answer(
+            ui_text(
+                lang,
+                "Neizdevas izveidot piekljuves linku.",
+                "Ne udalos sozdat ssylku dostupa.",
+                "Failed to create an access link.",
+            ),
+            show_alert=True,
+        )
+        return
+
+    text = ui_text(
+        lang,
+        "🔗 *Tavi jaunie piekljuves linki*\n\n",
+        "🔗 *Tvoi novye ssylki dostupa*\n\n",
+        "🔗 *Your new access links*\n\n",
+    ) + "\n\n".join(rows)
+    await callback.message.answer(text, parse_mode="Markdown")
+    await callback.answer(
+        ui_text(
+            lang,
+            "Jaunie linki nosutiti.",
+            "Novye ssylki otpravleny.",
+            "Fresh access links sent.",
+        )
+    )
+
+# â”€â”€â”€ USER SETTINGS â”€â”€â”€
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -1339,28 +1340,28 @@ class UserSettingsState(StatesGroup):
     waiting_email = State()
 
 def settings_text(lang, email, selected=False):
-    email_display = email if email else ui_text(lang, "— nav norādīts", "— не указан", "— not set")
-    check = " ✅" if selected else ""
+    email_display = email if email else ui_text(lang, "â€” nav norÄdÄ«ts", "â€” Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½", "â€” not set")
+    check = " âœ…" if selected else ""
     if lang == "lv":
         return (
-            "⚙️ *Iestatījumi*\n\n"
-            f"🌐 Valoda: *Latviešu*{check}\n"
-            f"📧 E-pasts: *{email_display}*\n\n"
+            "âš™ï¸ *IestatÄ«jumi*\n\n"
+            f"ðŸŒ Valoda: *LatvieÅ¡u*{check}\n"
+            f"ðŸ“§ E-pasts: *{email_display}*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "Izvēlies, ko mainīt:"
+            "IzvÄ“lies, ko mainÄ«t:"
         )
     if lang == "ru":
         return (
-            "⚙️ *Настройки*\n\n"
-            f"🌐 Язык: *Русский*{check}\n"
-            f"📧 E-mail: *{email_display}*\n\n"
+            "âš™ï¸ *ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸*\n\n"
+            f"ðŸŒ Ð¯Ð·Ñ‹Ðº: *Ð ÑƒÑÑÐºÐ¸Ð¹*{check}\n"
+            f"ðŸ“§ E-mail: *{email_display}*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "Выбери, что изменить:"
+            "Ð’Ñ‹Ð±ÐµÑ€Ð¸, Ñ‡Ñ‚Ð¾ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ:"
         )
     return (
-        "⚙️ *Settings*\n\n"
-        f"🌐 Language: *English*{check}\n"
-        f"📧 E-mail: *{email_display}*\n\n"
+        "âš™ï¸ *Settings*\n\n"
+        f"ðŸŒ Language: *English*{check}\n"
+        f"ðŸ“§ E-mail: *{email_display}*\n\n"
         f"{email_binding_notice(lang)}\n\n"
         "Choose what to change:"
     )
@@ -1373,10 +1374,10 @@ async def user_settings(callback: CallbackQuery):
     text = settings_text(lang, email)
 
     b = InlineKeyboardBuilder()
-    b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
-    b.button(text="🇬🇧 English", callback_data="settings_lang_en")
-    b.button(text="🇱🇻 Latviešu", callback_data="settings_lang_lv")
-    email_btn = "📧 " + ui_text(lang, "Ievadīt e-pastu", "Указать e-mail", "Set e-mail")
+    b.button(text="ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="settings_lang_ru")
+    b.button(text="ðŸ‡¬ðŸ‡§ English", callback_data="settings_lang_en")
+    b.button(text="ðŸ‡±ðŸ‡» LatvieÅ¡u", callback_data="settings_lang_lv")
+    email_btn = "ðŸ“§ " + ui_text(lang, "IevadÄ«t e-pastu", "Ð£ÐºÐ°Ð·Ð°Ñ‚ÑŒ e-mail", "Set e-mail")
     b.button(text=email_btn, callback_data="settings_email")
     b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(2, 1, 1, 1)
@@ -1389,15 +1390,15 @@ async def settings_lang(callback: CallbackQuery):
     lang = callback.data.replace("settings_lang_", "")
     if lang not in SUPPORTED_LANGS: lang = DEFAULT_LANG
     await db.set_user_lang(callback.from_user.id, lang)
-    # Rāda atjaunotu settings
+    # RÄda atjaunotu settings
     user = await db.get_user(callback.from_user.id)
     email = user.get("email", "") if user else ""
     text = settings_text(lang, email, selected=True)
     b = InlineKeyboardBuilder()
-    b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
-    b.button(text="🇬🇧 English", callback_data="settings_lang_en")
-    b.button(text="🇱🇻 Latviešu", callback_data="settings_lang_lv")
-    b.button(text="📧 " + ui_text(lang, "Ievadīt e-pastu", "Указать e-mail", "Set e-mail"), callback_data="settings_email")
+    b.button(text="ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="settings_lang_ru")
+    b.button(text="ðŸ‡¬ðŸ‡§ English", callback_data="settings_lang_en")
+    b.button(text="ðŸ‡±ðŸ‡» LatvieÅ¡u", callback_data="settings_lang_lv")
+    b.button(text="ðŸ“§ " + ui_text(lang, "IevadÄ«t e-pastu", "Ð£ÐºÐ°Ð·Ð°Ñ‚ÑŒ e-mail", "Set e-mail"), callback_data="settings_email")
     b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(2, 1, 1, 1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1410,21 +1411,21 @@ async def settings_email(callback: CallbackQuery, state: FSMContext):
     lang = user.get("lang", "ru") if user else "ru"
     if lang == "lv":
         text = (
-            "📧 *Ievadi savu e-pastu:*\n\n"
+            "ðŸ“§ *Ievadi savu e-pastu:*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "_Atsūti savu e-pastu ziņā:_\n\n"
+            "_AtsÅ«ti savu e-pastu ziÅ†Ä:_\n\n"
             "/cancel lai atceltu"
         )
     elif lang == "ru":
         text = (
-            "📧 *Укажи свой e-mail:*\n\n"
+            "ðŸ“§ *Ð£ÐºÐ°Ð¶Ð¸ ÑÐ²Ð¾Ð¹ e-mail:*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "_Отправь свой e-mail сообщением:_\n\n"
-            "/cancel для отмены"
+            "_ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ ÑÐ²Ð¾Ð¹ e-mail ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸ÐµÐ¼:_\n\n"
+            "/cancel Ð´Ð»Ñ Ð¾Ñ‚Ð¼ÐµÐ½Ñ‹"
         )
     else:
         text = (
-            "📧 *Enter your e-mail:*\n\n"
+            "ðŸ“§ *Enter your e-mail:*\n\n"
             f"{email_binding_notice(lang)}\n\n"
             "_Send your e-mail as a message:_\n\n"
             "/cancel to cancel"
@@ -1440,14 +1441,14 @@ async def receive_email(message: Message, state: FSMContext):
         await state.clear()
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
+        await message.answer("âŒ " + ui_text(lang, "Atcelts", "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", "Cancelled"))
         return
     email = message.text.strip()
-    # Vienkārša validācija
+    # VienkÄrÅ¡a validÄcija
     if "@" not in email or "." not in email or len(email) < 5:
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ("Nepareizs e-pasta formāts. Pamēģini vēlreiz:" if lang == "lv" else ("Неверный формат e-mail. Попробуй ещё:" if lang == "ru" else "Invalid e-mail format. Try again:")))
+        await message.answer("âŒ " + ("Nepareizs e-pasta formÄts. PamÄ“Ä£ini vÄ“lreiz:" if lang == "lv" else ("ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÐµÑ‰Ñ‘:" if lang == "ru" else "Invalid e-mail format. Try again:")))
         return
     await state.clear()
     await db.set_user_email(message.from_user.id, email)
@@ -1455,15 +1456,15 @@ async def receive_email(message: Message, state: FSMContext):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     if lang == "lv":
-        await message.answer(f"✅ E-pasts saglabāts: *{email}*", parse_mode="Markdown")
+        await message.answer(f"âœ… E-pasts saglabÄts: *{email}*", parse_mode="Markdown")
     elif lang == "ru":
-        await message.answer(f"✅ E-mail сохранён: *{email}*", parse_mode="Markdown")
+        await message.answer(f"âœ… E-mail ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½: *{email}*", parse_mode="Markdown")
     else:
-        await message.answer(f"✅ E-mail saved: *{email}*", parse_mode="Markdown")
+        await message.answer(f"âœ… E-mail saved: *{email}*", parse_mode="Markdown")
 
 
     if claimed:
-        await message.answer(ui_text(lang, f"âœ… Atrasti ieprÅ¡Ä“ji pirkumi pÄ“c e-pasta. AktivizÄ“tas {len(claimed)} piekÄ¼uves.", f"âœ… ÐÐ°Ð¹Ð´ÐµÐ½Ñ‹ Ñ€Ð°Ð½ÐµÐµ Ð¾Ð¿Ð»Ð°Ñ‡ÐµÐ½Ð½Ñ‹Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ð¿Ð¾ e-mail. ÐÐºÑ‚Ð¸Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð¾Ð²: {len(claimed)}.", f"âœ… Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
+        await message.answer(ui_text(lang, f"Ã¢Å“â€¦ Atrasti ieprÃ…Â¡Ã„â€œji pirkumi pÃ„â€œc e-pasta. AktivizÃ„â€œtas {len(claimed)} piekÃ„Â¼uves.", f"Ã¢Å“â€¦ ÃÂÃÂ°ÃÂ¹ÃÂ´ÃÂµÃÂ½Ã‘â€¹ Ã‘â‚¬ÃÂ°ÃÂ½ÃÂµÃÂµ ÃÂ¾ÃÂ¿ÃÂ»ÃÂ°Ã‘â€¡ÃÂµÃÂ½ÃÂ½Ã‘â€¹ÃÂµ ÃÂ¿ÃÂ¾ÃÂºÃ‘Æ’ÃÂ¿ÃÂºÃÂ¸ ÃÂ¿ÃÂ¾ e-mail. ÃÂÃÂºÃ‘â€šÃÂ¸ÃÂ²ÃÂ¸Ã‘â‚¬ÃÂ¾ÃÂ²ÃÂ°ÃÂ½ÃÂ¾ ÃÂ´ÃÂ¾Ã‘ÂÃ‘â€šÃ‘Æ’ÃÂ¿ÃÂ¾ÃÂ²: {len(claimed)}.", f"Ã¢Å“â€¦ Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "settings_back")
 async def settings_back(callback: CallbackQuery):
@@ -1477,7 +1478,7 @@ async def settings_back(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     elif has_active:
         expires = datetime.fromisoformat(user['expires_at']).strftime("%d.%m.%Y")
-        expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
+        expires_dt = datetime.fromisoformat(user['expires_at']); await callback.message.edit_text(t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "â€”"), days=max(0, (expires_dt - datetime.utcnow()).days)), reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
         welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
@@ -1489,7 +1490,7 @@ class GiveawayEmailState(StatesGroup):
 
 
 async def _giveaway_settings():
-    """Nolasīt giveaway settings no DB (admin var mainīt)"""
+    """NolasÄ«t giveaway settings no DB (admin var mainÄ«t)"""
     winners_raw = await db.get_setting("giveaway_winners_count")
     days_raw = await db.get_setting("giveaway_prize_days")
     winners_count = int(winners_raw) if winners_raw and winners_raw.isdigit() else 1
@@ -1504,8 +1505,8 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
     await callback.answer(
         ui_text(
             lang,
-            "Giveaway pašlaik ir izslēgts.",
-            "Розыгрыш сейчас отключён.",
+            "Giveaway paÅ¡laik ir izslÄ“gts.",
+            "Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ ÑÐµÐ¹Ñ‡Ð°Ñ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡Ñ‘Ð½.",
             "Giveaway is currently disabled.",
         ),
         show_alert=True,
@@ -1521,29 +1522,29 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
     current_month = now.strftime("%Y-%m")
     _, prize_days = await _giveaway_settings()
 
-    # PĀRBAUDE: aktīvs abonements
+    # PÄ€RBAUDE: aktÄ«vs abonements
     has_active = user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > now
     if not has_active:
         if lang == "ru":
             text = (
-                "🎟 *Розыгрыш месяца*\n\n"
-                "⚠️ Для участия в розыгрыше необходима *активная подписка*.\n\n"
-                f"🏆 Приз: *+{prize_days} дней* бесплатного доступа к чату!\n\n"
-                "📋 Оформи подписку и возвращайся!"
+                "ðŸŽŸ *Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ Ð¼ÐµÑÑÑ†Ð°*\n\n"
+                "âš ï¸ Ð”Ð»Ñ ÑƒÑ‡Ð°ÑÑ‚Ð¸Ñ Ð² Ñ€Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹ÑˆÐµ Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð° *Ð°ÐºÑ‚Ð¸Ð²Ð½Ð°Ñ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ°*.\n\n"
+                f"ðŸ† ÐŸÑ€Ð¸Ð·: *+{prize_days} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð° Ðº Ñ‡Ð°Ñ‚Ñƒ!\n\n"
+                "ðŸ“‹ ÐžÑ„Ð¾Ñ€Ð¼Ð¸ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ Ð¸ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°Ð¹ÑÑ!"
             )
         elif lang == "lv":
             text = (
-                "🎟 *Mēneša izloze*\n\n"
-                "⚠️ Lai piedalītos izlozē, nepieciešams *aktīvs abonements*.\n\n"
-                f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei čatam!\n\n"
-                "📋 Noformē abonementu un atgriezies!"
+                "ðŸŽŸ *MÄ“neÅ¡a izloze*\n\n"
+                "âš ï¸ Lai piedalÄ«tos izlozÄ“, nepiecieÅ¡ams *aktÄ«vs abonements*.\n\n"
+                f"ðŸ† Balva: *+{prize_days} dienas* bezmaksas piekÄ¼uvei Äatam!\n\n"
+                "ðŸ“‹ NoformÄ“ abonementu un atgriezies!"
             )
         else:
             text = (
-                "🎟 *Monthly Giveaway*\n\n"
-                "⚠️ An *active subscription* is required to participate.\n\n"
-                f"🏆 Prize: *+{prize_days} days* of free chat access!\n\n"
-                "📋 Subscribe and come back!"
+                "ðŸŽŸ *Monthly Giveaway*\n\n"
+                "âš ï¸ An *active subscription* is required to participate.\n\n"
+                f"ðŸ† Prize: *+{prize_days} days* of free chat access!\n\n"
+                "ðŸ“‹ Subscribe and come back!"
             )
         b = InlineKeyboardBuilder()
         b.button(text=back_button_text(lang), callback_data="settings_back")
@@ -1551,33 +1552,33 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
 
-    # Ja nav e-pasta — obligāti jānorāda
+    # Ja nav e-pasta â€” obligÄti jÄnorÄda
     if not email:
         if lang == "ru":
             text = (
-                "🎟 *Розыгрыш месяца*\n\n"
-                f"Каждый месяц среди подписчиков разыгрывается *+{prize_days} дней* бесплатного доступа!\n\n"
-                "⚠️ Для участия нужно указать *e-mail*.\n\n"
+                "ðŸŽŸ *Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ Ð¼ÐµÑÑÑ†Ð°*\n\n"
+                f"ÐšÐ°Ð¶Ð´Ñ‹Ð¹ Ð¼ÐµÑÑÑ† ÑÑ€ÐµÐ´Ð¸ Ð¿Ð¾Ð´Ð¿Ð¸ÑÑ‡Ð¸ÐºÐ¾Ð² Ñ€Ð°Ð·Ñ‹Ð³Ñ€Ñ‹Ð²Ð°ÐµÑ‚ÑÑ *+{prize_days} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°!\n\n"
+                "âš ï¸ Ð”Ð»Ñ ÑƒÑ‡Ð°ÑÑ‚Ð¸Ñ Ð½ÑƒÐ¶Ð½Ð¾ ÑƒÐºÐ°Ð·Ð°Ñ‚ÑŒ *e-mail*.\n\n"
                 f"{email_binding_notice(lang)}\n\n"
-                "📧 _Отправь свой e-mail сообщением:_\n"
-                "/cancel для отмены"
+                "ðŸ“§ _ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ ÑÐ²Ð¾Ð¹ e-mail ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸ÐµÐ¼:_\n"
+                "/cancel Ð´Ð»Ñ Ð¾Ñ‚Ð¼ÐµÐ½Ñ‹"
             )
         elif lang == "lv":
             text = (
-                "🎟 *Mēneša izloze*\n\n"
-                f"Katru mēnesi abonenti var laimēt *+{prize_days} dienas* bezmaksas piekļuvi!\n\n"
-                "⚠️ Lai piedalītos, jānorāda *e-pasts*.\n\n"
+                "ðŸŽŸ *MÄ“neÅ¡a izloze*\n\n"
+                f"Katru mÄ“nesi abonenti var laimÄ“t *+{prize_days} dienas* bezmaksas piekÄ¼uvi!\n\n"
+                "âš ï¸ Lai piedalÄ«tos, jÄnorÄda *e-pasts*.\n\n"
                 f"{email_binding_notice(lang)}\n\n"
-                "📧 _Atsūti savu e-pastu ziņā:_\n"
+                "ðŸ“§ _AtsÅ«ti savu e-pastu ziÅ†Ä:_\n"
                 "/cancel lai atceltu"
             )
         else:
             text = (
-                "🎟 *Monthly Giveaway*\n\n"
+                "ðŸŽŸ *Monthly Giveaway*\n\n"
                 f"Every month subscribers can win *+{prize_days} days* of free access!\n\n"
-                "⚠️ To participate you need to provide your *e-mail*.\n\n"
+                "âš ï¸ To participate you need to provide your *e-mail*.\n\n"
                 f"{email_binding_notice(lang)}\n\n"
-                "📧 _Send your e-mail as a message:_\n"
+                "ðŸ“§ _Send your e-mail as a message:_\n"
                 "/cancel to cancel"
             )
         await state.set_state(GiveawayEmailState.waiting_email)
@@ -1586,36 +1587,36 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
 
-    # Pārbaudām vai jau pieteicies šomēnes
+    # PÄrbaudÄm vai jau pieteicies Å¡omÄ“nes
     already = await db.is_giveaway_entered(user_id, current_month)
     if already:
         count = await db.get_giveaway_count(current_month)
         if lang == "ru":
             text = (
-                "🎟 *Розыгрыш месяца*\n\n"
-                "✅ Ты уже участвуешь в розыгрыше этого месяца!\n\n"
-                f"👥 Участников: *{count}*\n"
-                "📅 Розыгрыш: *1 числа следующего месяца*\n"
-                f"🏆 Приз: *+{prize_days} дней* бесплатного доступа\n\n"
-                "🍀 Удачи!"
+                "ðŸŽŸ *Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ Ð¼ÐµÑÑÑ†Ð°*\n\n"
+                "âœ… Ð¢Ñ‹ ÑƒÐ¶Ðµ ÑƒÑ‡Ð°ÑÑ‚Ð²ÑƒÐµÑˆÑŒ Ð² Ñ€Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹ÑˆÐµ ÑÑ‚Ð¾Ð³Ð¾ Ð¼ÐµÑÑÑ†Ð°!\n\n"
+                f"ðŸ‘¥ Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ¾Ð²: *{count}*\n"
+                "ðŸ“… Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ: *1 Ñ‡Ð¸ÑÐ»Ð° ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ³Ð¾ Ð¼ÐµÑÑÑ†Ð°*\n"
+                f"ðŸ† ÐŸÑ€Ð¸Ð·: *+{prize_days} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°\n\n"
+                "ðŸ€ Ð£Ð´Ð°Ñ‡Ð¸!"
             )
         elif lang == "lv":
             text = (
-                "🎟 *Mēneša izloze*\n\n"
-                "✅ Tu jau piedalies šī mēneša izlozē!\n\n"
-                f"👥 Dalībnieki: *{count}*\n"
-                "📅 Izloze: *nākamā mēneša 1. datumā*\n"
-                f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei\n\n"
-                "🍀 Lai veicas!"
+                "ðŸŽŸ *MÄ“neÅ¡a izloze*\n\n"
+                "âœ… Tu jau piedalies Å¡Ä« mÄ“neÅ¡a izlozÄ“!\n\n"
+                f"ðŸ‘¥ DalÄ«bnieki: *{count}*\n"
+                "ðŸ“… Izloze: *nÄkamÄ mÄ“neÅ¡a 1. datumÄ*\n"
+                f"ðŸ† Balva: *+{prize_days} dienas* bezmaksas piekÄ¼uvei\n\n"
+                "ðŸ€ Lai veicas!"
             )
         else:
             text = (
-                "🎟 *Monthly Giveaway*\n\n"
-                "✅ You're already entered for this month!\n\n"
-                f"👥 Participants: *{count}*\n"
-                "📅 Drawing: *1st of next month*\n"
-                f"🏆 Prize: *+{prize_days} days* free access\n\n"
-                "🍀 Good luck!"
+                "ðŸŽŸ *Monthly Giveaway*\n\n"
+                "âœ… You're already entered for this month!\n\n"
+                f"ðŸ‘¥ Participants: *{count}*\n"
+                "ðŸ“… Drawing: *1st of next month*\n"
+                f"ðŸ† Prize: *+{prize_days} days* free access\n\n"
+                "ðŸ€ Good luck!"
             )
         b = InlineKeyboardBuilder()
         b.button(text=back_button_text(lang), callback_data="settings_back")
@@ -1628,30 +1629,30 @@ async def giveaway_join(callback: CallbackQuery, state: FSMContext):
     count = await db.get_giveaway_count(current_month)
     if lang == "ru":
         text = (
-            "🎟 *Розыгрыш месяца*\n\n"
-            "🎉 *Ты успешно зарегистрирован!*\n\n"
-            f"👥 Участников: *{count}*\n"
-            "📅 Розыгрыш: *1 числа следующего месяца*\n"
-            f"🏆 Приз: *+{prize_days} дней* бесплатного доступа\n\n"
-            "🍀 Удачи!"
+            "ðŸŽŸ *Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ Ð¼ÐµÑÑÑ†Ð°*\n\n"
+            "ðŸŽ‰ *Ð¢Ñ‹ ÑƒÑÐ¿ÐµÑˆÐ½Ð¾ Ð·Ð°Ñ€ÐµÐ³Ð¸ÑÑ‚Ñ€Ð¸Ñ€Ð¾Ð²Ð°Ð½!*\n\n"
+            f"ðŸ‘¥ Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ¾Ð²: *{count}*\n"
+            "ðŸ“… Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ: *1 Ñ‡Ð¸ÑÐ»Ð° ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ³Ð¾ Ð¼ÐµÑÑÑ†Ð°*\n"
+            f"ðŸ† ÐŸÑ€Ð¸Ð·: *+{prize_days} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°\n\n"
+            "ðŸ€ Ð£Ð´Ð°Ñ‡Ð¸!"
         )
     elif lang == "lv":
         text = (
-            "🎟 *Mēneša izloze*\n\n"
-            "🎉 *Tu esi veiksmīgi reģistrēts!*\n\n"
-            f"👥 Dalībnieki: *{count}*\n"
-            "📅 Izloze: *nākamā mēneša 1. datumā*\n"
-            f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei\n\n"
-            "🍀 Lai veicas!"
+            "ðŸŽŸ *MÄ“neÅ¡a izloze*\n\n"
+            "ðŸŽ‰ *Tu esi veiksmÄ«gi reÄ£istrÄ“ts!*\n\n"
+            f"ðŸ‘¥ DalÄ«bnieki: *{count}*\n"
+            "ðŸ“… Izloze: *nÄkamÄ mÄ“neÅ¡a 1. datumÄ*\n"
+            f"ðŸ† Balva: *+{prize_days} dienas* bezmaksas piekÄ¼uvei\n\n"
+            "ðŸ€ Lai veicas!"
         )
     else:
         text = (
-            "🎟 *Monthly Giveaway*\n\n"
-            "🎉 *You're registered!*\n\n"
-            f"👥 Participants: *{count}*\n"
-            "📅 Drawing: *1st of next month*\n"
-            f"🏆 Prize: *+{prize_days} days* free access\n\n"
-            "🍀 Good luck!"
+            "ðŸŽŸ *Monthly Giveaway*\n\n"
+            "ðŸŽ‰ *You're registered!*\n\n"
+            f"ðŸ‘¥ Participants: *{count}*\n"
+            "ðŸ“… Drawing: *1st of next month*\n"
+            f"ðŸ† Prize: *+{prize_days} days* free access\n\n"
+            "ðŸ€ Good luck!"
         )
     b = InlineKeyboardBuilder()
     b.button(text=back_button_text(lang), callback_data="settings_back")
@@ -1665,13 +1666,13 @@ async def giveaway_receive_email(message: Message, state: FSMContext):
         await state.clear()
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
+        await message.answer("âŒ " + ui_text(lang, "Atcelts", "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", "Cancelled"))
         return
     email = message.text.strip()
     if "@" not in email or "." not in email or len(email) < 5:
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ui_text(lang, "Nepareizs e-pasta formāts. Pamēģini vēlreiz:", "Неверный формат e-mail. Попробуй ещё:", "Invalid e-mail format. Try again:"))
+        await message.answer("âŒ " + ui_text(lang, "Nepareizs e-pasta formÄts. PamÄ“Ä£ini vÄ“lreiz:", "ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÐµÑ‰Ñ‘:", "Invalid e-mail format. Try again:"))
         return
 
     data = await state.get_data()
@@ -1689,35 +1690,35 @@ async def giveaway_receive_email(message: Message, state: FSMContext):
     lang = user.get("lang", "ru") if user else "ru"
     if lang == "ru":
         text = (
-            f"✅ E-mail сохранён: *{email}*\n\n"
-            "🎟 *Ты зарегистрирован в розыгрыше!*\n\n"
-            f"👥 Участников: *{count}*\n"
-            "📅 Розыгрыш: *1 числа следующего месяца*\n"
-            f"🏆 Приз: *+{prize_days} дней* бесплатного доступа\n\n"
-            "🍀 Удачи!"
+            f"âœ… E-mail ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½: *{email}*\n\n"
+            "ðŸŽŸ *Ð¢Ñ‹ Ð·Ð°Ñ€ÐµÐ³Ð¸ÑÑ‚Ñ€Ð¸Ñ€Ð¾Ð²Ð°Ð½ Ð² Ñ€Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹ÑˆÐµ!*\n\n"
+            f"ðŸ‘¥ Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ¾Ð²: *{count}*\n"
+            "ðŸ“… Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ: *1 Ñ‡Ð¸ÑÐ»Ð° ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ³Ð¾ Ð¼ÐµÑÑÑ†Ð°*\n"
+            f"ðŸ† ÐŸÑ€Ð¸Ð·: *+{prize_days} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°\n\n"
+            "ðŸ€ Ð£Ð´Ð°Ñ‡Ð¸!"
         )
     elif lang == "lv":
         text = (
-            f"✅ E-pasts saglabāts: *{email}*\n\n"
-            "🎟 *Tu esi reģistrēts izlozei!*\n\n"
-            f"👥 Dalībnieki: *{count}*\n"
-            "📅 Izloze: *nākamā mēneša 1. datumā*\n"
-            f"🏆 Balva: *+{prize_days} dienas* bezmaksas piekļuvei\n\n"
-            "🍀 Lai veicas!"
+            f"âœ… E-pasts saglabÄts: *{email}*\n\n"
+            "ðŸŽŸ *Tu esi reÄ£istrÄ“ts izlozei!*\n\n"
+            f"ðŸ‘¥ DalÄ«bnieki: *{count}*\n"
+            "ðŸ“… Izloze: *nÄkamÄ mÄ“neÅ¡a 1. datumÄ*\n"
+            f"ðŸ† Balva: *+{prize_days} dienas* bezmaksas piekÄ¼uvei\n\n"
+            "ðŸ€ Lai veicas!"
         )
     else:
         text = (
-            f"✅ E-mail saved: *{email}*\n\n"
-            "🎟 *You're registered for the giveaway!*\n\n"
-            f"👥 Participants: *{count}*\n"
-            "📅 Drawing: *1st of next month*\n"
-            f"🏆 Prize: *+{prize_days} days* free access\n\n"
-            "🍀 Good luck!"
+            f"âœ… E-mail saved: *{email}*\n\n"
+            "ðŸŽŸ *You're registered for the giveaway!*\n\n"
+            f"ðŸ‘¥ Participants: *{count}*\n"
+            "ðŸ“… Drawing: *1st of next month*\n"
+            f"ðŸ† Prize: *+{prize_days} days* free access\n\n"
+            "ðŸ€ Good luck!"
         )
     await message.answer(text, parse_mode="Markdown")
 
 
-# ─── PROMO CODE (USER) ───
+# â”€â”€â”€ PROMO CODE (USER) â”€â”€â”€
 
 
 class WithdrawalState(StatesGroup):
@@ -1739,11 +1740,11 @@ async def promo_enter(callback: CallbackQuery, state: FSMContext):
     await state.set_state(PromoCodeState.waiting_code)
     await state.update_data(promo_target=target)
     if lang == "ru":
-        text = "🎟 *Введи промокод:*\n\n/cancel для отмены"
+        text = "ðŸŽŸ *Ð’Ð²ÐµÐ´Ð¸ Ð¿Ñ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´:*\n\n/cancel Ð´Ð»Ñ Ð¾Ñ‚Ð¼ÐµÐ½Ñ‹"
     elif lang == "lv":
-        text = "🎟 *Ievadi promokodu:*\n\n/cancel lai atceltu"
+        text = "ðŸŽŸ *Ievadi promokodu:*\n\n/cancel lai atceltu"
     else:
-        text = "🎟 *Enter promo code:*\n\n/cancel to cancel"
+        text = "ðŸŽŸ *Enter promo code:*\n\n/cancel to cancel"
     await callback.message.edit_text(text, parse_mode="Markdown")
     await callback.answer()
 
@@ -1754,7 +1755,7 @@ async def promo_apply(message: Message, state: FSMContext):
         await state.clear()
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
+        await message.answer("âŒ " + ui_text(lang, "Atcelts", "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", "Cancelled"))
         return
 
     code = message.text.strip().upper()
@@ -1766,26 +1767,26 @@ async def promo_apply(message: Message, state: FSMContext):
     lang = user.get("lang", "ru") if user else "ru"
     user_id = message.from_user.id
 
-    # Pārbaudīt kodu DB
+    # PÄrbaudÄ«t kodu DB
     promo = await db.get_promo_code(code)
     if not promo:
-        await message.answer("❌ " + ui_text(lang, "Promokods nav atrasts.", "Промокод не найден.", "Promo code not found."))
+        await message.answer("âŒ " + ui_text(lang, "Promokods nav atrasts.", "ÐŸÑ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½.", "Promo code not found."))
         return
 
-    # Pārbaudīt derīgumu
+    # PÄrbaudÄ«t derÄ«gumu
     if promo.get("max_uses") and promo.get("max_uses") > 0 and promo.get("used_count", 0) >= promo["max_uses"]:
-        await message.answer("❌ " + ui_text(lang, "Promokods ir izlietots.", "Промокод исчерпан.", "Promo code exhausted."))
+        await message.answer("âŒ " + ui_text(lang, "Promokods ir izlietots.", "ÐŸÑ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´ Ð¸ÑÑ‡ÐµÑ€Ð¿Ð°Ð½.", "Promo code exhausted."))
         return
 
     if promo.get("expires_at"):
         try:
             exp = datetime.fromisoformat(promo["expires_at"])
             if exp < datetime.utcnow():
-                await message.answer("❌ " + ui_text(lang, "Promokodam beidzies termiņš.", "Промокод истёк.", "Promo code expired."))
+                await message.answer("âŒ " + ui_text(lang, "Promokodam beidzies termiÅ†Å¡.", "ÐŸÑ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´ Ð¸ÑÑ‚Ñ‘Ðº.", "Promo code expired."))
                 return
         except: pass
 
-    # Pārbaudīt vai promo attiecas uz šo plānu/kursu
+    # PÄrbaudÄ«t vai promo attiecas uz Å¡o plÄnu/kursu
     promo_plan = promo.get("plan_key")
     is_course = target.startswith("course_")
 
@@ -1793,10 +1794,10 @@ async def promo_apply(message: Message, state: FSMContext):
         # None = visiem, "all_courses" = visiem kursiem
         if promo_plan == "all_courses":
             if not is_course:
-                await message.answer("❌ " + ui_text(lang, "Promokods der tikai kursiem.", "Промокод только для курсов.", "Promo code is for courses only."))
+                await message.answer("âŒ " + ui_text(lang, "Promokods der tikai kursiem.", "ÐŸÑ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð´Ð»Ñ ÐºÑƒÑ€ÑÐ¾Ð².", "Promo code is for courses only."))
                 return
         elif promo_plan != target:
-            await message.answer("❌ " + ui_text(lang, "Promokods neder šim produktam.", "Промокод не подходит для этого продукта.", "Promo code not valid for this product."))
+            await message.answer("âŒ " + ui_text(lang, "Promokods neder Å¡im produktam.", "ÐŸÑ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´ Ð½Ðµ Ð¿Ð¾Ð´Ñ…Ð¾Ð´Ð¸Ñ‚ Ð´Ð»Ñ ÑÑ‚Ð¾Ð³Ð¾ Ð¿Ñ€Ð¾Ð´ÑƒÐºÑ‚Ð°.", "Promo code not valid for this product."))
             return
 
     discount = promo.get("discount_percent", 0)
@@ -1805,17 +1806,17 @@ async def promo_apply(message: Message, state: FSMContext):
     if is_course:
         ckey = target.replace("course_", "")
         item = config.COURSES.get(ckey)
-        if not item: await message.answer("❌"); return
+        if not item: await message.answer("âŒ"); return
         saved = await db.get_setting(f"course_price_{ckey}")
         base_price = float(saved) if saved else item['price_usdt']
     else:
         pkey = target.replace("plan_", "") if target.startswith("plan_") else target
         item = config.PLANS.get(pkey)
-        if not item: await message.answer("❌"); return
+        if not item: await message.answer("âŒ"); return
         saved = await db.get_setting(f"price_{pkey}")
         base_price = float(saved) if saved else item['price_usdt']
 
-    # Piemērot atlaidi
+    # PiemÄ“rot atlaidi
     discounted = round(base_price * (1 - discount / 100), 2)
     unique_amount = await _get_unique_amount(target, user_id, discounted)
 
@@ -1825,29 +1826,29 @@ async def promo_apply(message: Message, state: FSMContext):
         pkey = target.replace("plan_", "") if target.startswith("plan_") else target
         await db.set_pending_payment(user_id, pkey, unique_amount)
 
-    # Atzīmē kā aktīvu lietotāja promokodu; izlietojam tikai pēc veiksmīga pirkuma
+    # AtzÄ«mÄ“ kÄ aktÄ«vu lietotÄja promokodu; izlietojam tikai pÄ“c veiksmÄ«ga pirkuma
     await db.apply_promo_to_user(user_id, code)
 
     name = item['name'][lang] if isinstance(item['name'], dict) else item['name']
     if lang == "ru":
         text = (
-            f"🎟 *Промокод `{code}` применён!*\n\n"
-            f"{'📚 Курс' if is_course else '📋 Тариф'}: *{name}*\n"
-            f"💰 Цена: ~{base_price}~ → *{unique_amount} USDT* (-{discount}%)\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Отправь *{unique_amount} USDT (BEP-20)* на:\n\n"
+            f"ðŸŽŸ *ÐŸÑ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´ `{code}` Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ñ‘Ð½!*\n\n"
+            f"{'ðŸ“š ÐšÑƒÑ€Ñ' if is_course else 'ðŸ“‹ Ð¢Ð°Ñ€Ð¸Ñ„'}: *{name}*\n"
+            f"ðŸ’° Ð¦ÐµÐ½Ð°: ~{base_price}~ â†’ *{unique_amount} USDT* (-{discount}%)\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ *{unique_amount} USDT (BEP-20)* Ð½Ð°:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"⚠️ Только *USDT BEP-20* (BSC)"
+            f"âš ï¸ Ð¢Ð¾Ð»ÑŒÐºÐ¾ *USDT BEP-20* (BSC)"
         )
     else:
         text = (
-            f"🎟 *Promo code `{code}` applied!*\n\n"
-            f"{'📚 Course' if is_course else '📋 Plan'}: *{name}*\n"
-            f"💰 Price: ~{base_price}~ → *{unique_amount} USDT* (-{discount}%)\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Send *{unique_amount} USDT (BEP-20)* to:\n\n"
+            f"ðŸŽŸ *Promo code `{code}` applied!*\n\n"
+            f"{'ðŸ“š Course' if is_course else 'ðŸ“‹ Plan'}: *{name}*\n"
+            f"ðŸ’° Price: ~{base_price}~ â†’ *{unique_amount} USDT* (-{discount}%)\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ Send *{unique_amount} USDT (BEP-20)* to:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"⚠️ Only *USDT BEP-20* (BSC)"
+            f"âš ï¸ Only *USDT BEP-20* (BSC)"
         )
 
     b = InlineKeyboardBuilder()
@@ -1861,7 +1862,7 @@ async def promo_apply(message: Message, state: FSMContext):
     await message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
 
-# ─── COURSES ───
+# â”€â”€â”€ COURSES â”€â”€â”€
 
 class CourseEmailState(StatesGroup):
     waiting_email = State()
@@ -1878,29 +1879,29 @@ def _course_ui_lang(lang):
 
 @dp.callback_query(F.data == "courses_menu")
 async def courses_menu(callback: CallbackQuery):
-    """Kursu izvēlne - uzreiz rāda kursus"""
+    """Kursu izvÄ“lne - uzreiz rÄda kursus"""
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     ui_lang = _course_ui_lang(lang)
     
     if ui_lang == "lv":
         text = (
-            "📚 *MNtradepro kursi*\n\n"
-            "Izvēlies kursu, lai apskatītu detaļas un apmaksas iespējas:"
+            "ðŸ“š *MNtradepro kursi*\n\n"
+            "IzvÄ“lies kursu, lai apskatÄ«tu detaÄ¼as un apmaksas iespÄ“jas:"
         )
     elif ui_lang == "ru":
         text = (
-            "📚 *Курсы MNtradepro*\n\n"
-            "Выбери курс, чтобы узнать детали и способы оплаты:"
+            "ðŸ“š *ÐšÑƒÑ€ÑÑ‹ MNtradepro*\n\n"
+            "Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÐºÑƒÑ€Ñ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑƒÐ·Ð½Ð°Ñ‚ÑŒ Ð´ÐµÑ‚Ð°Ð»Ð¸ Ð¸ ÑÐ¿Ð¾ÑÐ¾Ð±Ñ‹ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹:"
         )
     else:
         text = (
-            "📚 *MNtradepro Courses*\n\n"
+            "ðŸ“š *MNtradepro Courses*\n\n"
             "Choose a course to see details and payment options:"
         )
     
     b = InlineKeyboardBuilder()
-    # Rādām visus kursus
+    # RÄdÄm visus kursus
     for key, course in config.COURSES.items():
         saved_price = await db.get_setting(f"course_price_{key}")
         if saved_price:
@@ -1912,9 +1913,9 @@ async def courses_menu(callback: CallbackQuery):
         else:
             price_str = course['price_usd']
         name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
-        b.button(text=f"{course['emoji']} {name} — {price_str}", callback_data=f"course_info_{key}")
+        b.button(text=f"{course['emoji']} {name} â€” {price_str}", callback_data=f"course_info_{key}")
     
-    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="settings_back")
+    b.button(text="ðŸ”™ " + ("AtpakaÄ¼" if ui_lang == "lv" else "ÐÐ°Ð·Ð°Ð´"), callback_data="settings_back")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1923,11 +1924,11 @@ async def courses_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("course_info_"))
 async def course_info_menu(callback: CallbackQuery):
-    """Rāda kursa info un payment metodes"""
+    """RÄda kursa info un payment metodes"""
     course_key = callback.data.replace("course_info_", "")
     course = config.COURSES.get(course_key)
     if not course:
-        await callback.answer("❌")
+        await callback.answer("âŒ")
         return
     
     user = await db.get_user(callback.from_user.id)
@@ -1943,23 +1944,23 @@ async def course_info_menu(callback: CallbackQuery):
     if ui_lang == "lv":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Cena: *{price_str}*\n\n"
-            "📖 Detalizēts kursa apraksts un programma ir pieejama MNtradepro mājaslapā.\n\n"
-            "Izvēlies apmaksas veidu:"
+            f"ðŸ’° Cena: *{price_str}*\n\n"
+            "ðŸ“– DetalizÄ“ts kursa apraksts un programma ir pieejama MNtradepro mÄjaslapÄ.\n\n"
+            "IzvÄ“lies apmaksas veidu:"
         )
     elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Цена: *{price_str}*\n\n"
-            "📖 Подробное описание курса и программу "
-            "можно посмотреть на сайте MNtradepro.\n\n"
-            "Выбери способ оплаты:"
+            f"ðŸ’° Ð¦ÐµÐ½Ð°: *{price_str}*\n\n"
+            "ðŸ“– ÐŸÐ¾Ð´Ñ€Ð¾Ð±Ð½Ð¾Ðµ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ ÐºÑƒÑ€ÑÐ° Ð¸ Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ñƒ "
+            "Ð¼Ð¾Ð¶Ð½Ð¾ Ð¿Ð¾ÑÐ¼Ð¾Ñ‚Ñ€ÐµÑ‚ÑŒ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ MNtradepro.\n\n"
+            "Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ¿Ð¾ÑÐ¾Ð± Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹:"
         )
     else:
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Price: *{price_str}*\n\n"
-            "📖 Detailed course description and curriculum "
+            f"ðŸ’° Price: *{price_str}*\n\n"
+            "ðŸ“– Detailed course description and curriculum "
             "available on MNtradepro website.\n\n"
             "Choose payment method:"
         )
@@ -1968,10 +1969,10 @@ async def course_info_menu(callback: CallbackQuery):
     
     b = InlineKeyboardBuilder()
     if checkout_url:
-        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), url=checkout_url)
+        b.button(text="ðŸ’³ " + ("MaksÄt ar karti / banku / crypto" if ui_lang == "lv" else "ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto"), url=checkout_url)
     else:
-        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), callback_data=f"course_checkout_missing_{course_key}")
-    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_menu")
+        b.button(text="ðŸ’³ " + ("MaksÄt ar karti / banku / crypto" if ui_lang == "lv" else "ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto"), callback_data=f"course_checkout_missing_{course_key}")
+    b.button(text="ðŸ”™ " + ("AtpakaÄ¼" if ui_lang == "lv" else "ÐÐ°Ð·Ð°Ð´"), callback_data="courses_menu")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1980,7 +1981,7 @@ async def course_info_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("course_checkout_missing_"))
 async def course_checkout_missing(callback: CallbackQuery):
-    await callback.answer("Checkout links šim kursam vēl nav iestatīts admin panelī.", show_alert=True)
+    await callback.answer("Checkout links Å¡im kursam vÄ“l nav iestatÄ«ts admin panelÄ«.", show_alert=True)
 
 
 @dp.callback_query(F.data.startswith("course_crypto_"))
@@ -1990,18 +1991,18 @@ async def course_crypto_selected(callback: CallbackQuery, state: FSMContext):
     await callback.answer(
         ui_text(
             lang,
-            "Kursu crypto apmaksa botā vairs netiek izmantota. Izmanto kursa checkout pogu.",
-            "Crypto-оплата курсов в боте больше не используется. Используй checkout-кнопку курса.",
+            "Kursu crypto apmaksa botÄ vairs netiek izmantota. Izmanto kursa checkout pogu.",
+            "Crypto-Ð¾Ð¿Ð»Ð°Ñ‚Ð° ÐºÑƒÑ€ÑÐ¾Ð² Ð² Ð±Ð¾Ñ‚Ðµ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ. Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ checkout-ÐºÐ½Ð¾Ð¿ÐºÑƒ ÐºÑƒÑ€ÑÐ°.",
             "Course crypto payment inside the bot is no longer used. Please use the course checkout button.",
         ),
         show_alert=True,
     )
     return
-    """User izvēlējās crypto payment konkrētam kursam"""
+    """User izvÄ“lÄ“jÄs crypto payment konkrÄ“tam kursam"""
     course_key = callback.data.replace("course_crypto_", "")
     course = config.COURSES.get(course_key)
     if not course:
-        await callback.answer("❌")
+        await callback.answer("âŒ")
         return
     
     user = await db.get_user(callback.from_user.id)
@@ -2009,27 +2010,27 @@ async def course_crypto_selected(callback: CallbackQuery, state: FSMContext):
     ui_lang = _course_ui_lang(lang)
     email = user.get("email", "") if user else ""
     
-    # Pārbauda email
+    # PÄrbauda email
     if not email:
         if ui_lang == "lv":
             text = (
-                "📚 *Kursa iegāde*\n\n"
-                "⚠️ Kursa iegādei nepieciešams *e-pasts* — tas tiks izmantots kā tavs piekļuves e-pasts.\n\n"
-                "📧 _Atsūti savu e-pastu:_\n/cancel lai atceltu"
+                "ðŸ“š *Kursa iegÄde*\n\n"
+                "âš ï¸ Kursa iegÄdei nepiecieÅ¡ams *e-pasts* â€” tas tiks izmantots kÄ tavs piekÄ¼uves e-pasts.\n\n"
+                "ðŸ“§ _AtsÅ«ti savu e-pastu:_\n/cancel lai atceltu"
             )
         elif ui_lang == "ru":
             text = (
-                "📚 *Покупка курса*\n\n"
-                "⚠️ Для покупки курса необходимо указать *e-mail* — "
-                "он будет использован как логин в обучающей платформе.\n\n"
-                "📧 _Отправь свой e-mail:_\n/cancel для отмены"
+                "ðŸ“š *ÐŸÐ¾ÐºÑƒÐ¿ÐºÐ° ÐºÑƒÑ€ÑÐ°*\n\n"
+                "âš ï¸ Ð”Ð»Ñ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ ÐºÑƒÑ€ÑÐ° Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ ÑƒÐºÐ°Ð·Ð°Ñ‚ÑŒ *e-mail* â€” "
+                "Ð¾Ð½ Ð±ÑƒÐ´ÐµÑ‚ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ð½ ÐºÐ°Ðº Ð»Ð¾Ð³Ð¸Ð½ Ð² Ð¾Ð±ÑƒÑ‡Ð°ÑŽÑ‰ÐµÐ¹ Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ðµ.\n\n"
+                "ðŸ“§ _ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ ÑÐ²Ð¾Ð¹ e-mail:_\n/cancel Ð´Ð»Ñ Ð¾Ñ‚Ð¼ÐµÐ½Ñ‹"
             )
         else:
             text = (
-                "📚 *Course Purchase*\n\n"
-                "⚠️ An *e-mail* is required to purchase a course — "
+                "ðŸ“š *Course Purchase*\n\n"
+                "âš ï¸ An *e-mail* is required to purchase a course â€” "
                 "it will be used as your login for the learning platform.\n\n"
-                "📧 _Send your e-mail:_\n/cancel to cancel"
+                "ðŸ“§ _Send your e-mail:_\n/cancel to cancel"
             )
         await state.set_state(CourseEmailState.waiting_email)
         await state.update_data(selected_course=course_key)
@@ -2037,12 +2038,12 @@ async def course_crypto_selected(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
     
-    # Ir email - rādām payment
+    # Ir email - rÄdÄm payment
     await _show_course_payment(callback, course_key, email, lang)
 
 
 async def _show_course_payment(callback, course_key, email, lang):
-    """Rāda crypto payment info konkrētam kursam"""
+    """RÄda crypto payment info konkrÄ“tam kursam"""
     course = config.COURSES.get(course_key)
     if not course:
         return
@@ -2054,7 +2055,7 @@ async def _show_course_payment(callback, course_key, email, lang):
     saved_price = await db.get_setting(f"course_price_{course_key}")
     base_price = float(saved_price) if saved_price else course['price_usdt']
     
-    # FIX: Ja jau ir pending ar šo kursu — reuse
+    # FIX: Ja jau ir pending ar Å¡o kursu â€” reuse
     pending_key = f"course_{course_key}"
     existing_pending = await db.get_pending_payment(user_id)
     if existing_pending and existing_pending.get("plan_key") == pending_key and existing_pending.get("amount_usdt"):
@@ -2068,43 +2069,43 @@ async def _show_course_payment(callback, course_key, email, lang):
     if ui_lang == "lv":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Cena: *{unique_amount} USDT*\n"
-            f"📧 E-pasts: *{email}*\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Nosūti *{unique_amount} USDT (BEP-20)* uz:\n\n"
+            f"ðŸ’° Cena: *{unique_amount} USDT*\n"
+            f"ðŸ“§ E-pasts: *{email}*\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ NosÅ«ti *{unique_amount} USDT (BEP-20)* uz:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"⚠️ Tikai *USDT BEP-20* (BSC tīkls)\n"
-            f"Pēc apmaksas nospied pogu zemāk"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"âš ï¸ Tikai *USDT BEP-20* (BSC tÄ«kls)\n"
+            f"PÄ“c apmaksas nospied pogu zemÄk"
         )
     elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Цена: *{unique_amount} USDT*\n"
-            f"📧 Логин: *{email}*\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Отправь *{unique_amount} USDT (BEP-20)* на:\n\n"
+            f"ðŸ’° Ð¦ÐµÐ½Ð°: *{unique_amount} USDT*\n"
+            f"ðŸ“§ Ð›Ð¾Ð³Ð¸Ð½: *{email}*\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ *{unique_amount} USDT (BEP-20)* Ð½Ð°:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"⚠️ Только *USDT BEP-20* (сеть BSC)\n"
-            f"После оплаты нажми кнопку ниже"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"âš ï¸ Ð¢Ð¾Ð»ÑŒÐºÐ¾ *USDT BEP-20* (ÑÐµÑ‚ÑŒ BSC)\n"
+            f"ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð½Ð°Ð¶Ð¼Ð¸ ÐºÐ½Ð¾Ð¿ÐºÑƒ Ð½Ð¸Ð¶Ðµ"
         )
     else:
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Price: *{unique_amount} USDT*\n"
-            f"📧 Login: *{email}*\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Send *{unique_amount} USDT (BEP-20)* to:\n\n"
+            f"ðŸ’° Price: *{unique_amount} USDT*\n"
+            f"ðŸ“§ Login: *{email}*\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ Send *{unique_amount} USDT (BEP-20)* to:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"⚠️ Only *USDT BEP-20* (BSC network)\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"âš ï¸ Only *USDT BEP-20* (BSC network)\n"
             f"After payment press the button below"
         )
     
     b = InlineKeyboardBuilder()
-    b.button(text="✅ " + ("Esmu apmaksājis" if ui_lang == "lv" else "Я оплатил"), callback_data=f"check_course_{course_key}")
-    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data=f"course_info_{course_key}")
+    b.button(text="âœ… " + ("Esmu apmaksÄjis" if ui_lang == "lv" else "Ð¯ Ð¾Ð¿Ð»Ð°Ñ‚Ð¸Ð»"), callback_data=f"check_course_{course_key}")
+    b.button(text="ðŸ”™ " + ("AtpakaÄ¼" if ui_lang == "lv" else "ÐÐ°Ð·Ð°Ð´"), callback_data=f"course_info_{course_key}")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -2118,34 +2119,34 @@ async def courses_crypto(callback: CallbackQuery, state: FSMContext):
     ui_lang = _course_ui_lang(lang)
     email = user.get("email", "") if user else ""
 
-    # E-pasts obligāts kursiem
+    # E-pasts obligÄts kursiem
     if not email:
         if ui_lang == "lv":
             text = (
-                "📚 *Kursa iegāde*\n\n"
-                "⚠️ Kursa iegādei nepieciešams *e-pasts* — tas tiks izmantots kā tavs piekļuves e-pasts.\n\n"
-                "📧 _Atsūti savu e-pastu:_\n/cancel lai atceltu"
+                "ðŸ“š *Kursa iegÄde*\n\n"
+                "âš ï¸ Kursa iegÄdei nepiecieÅ¡ams *e-pasts* â€” tas tiks izmantots kÄ tavs piekÄ¼uves e-pasts.\n\n"
+                "ðŸ“§ _AtsÅ«ti savu e-pastu:_\n/cancel lai atceltu"
             )
         elif ui_lang == "ru":
             text = (
-                "📚 *Покупка курса*\n\n"
-                "⚠️ Для покупки курса необходимо указать *e-mail* — "
-                "он будет использован как логин в обучающей платформе.\n\n"
-                "📧 _Отправь свой e-mail:_\n/cancel для отмены"
+                "ðŸ“š *ÐŸÐ¾ÐºÑƒÐ¿ÐºÐ° ÐºÑƒÑ€ÑÐ°*\n\n"
+                "âš ï¸ Ð”Ð»Ñ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ ÐºÑƒÑ€ÑÐ° Ð½ÐµÐ¾Ð±Ñ…Ð¾Ð´Ð¸Ð¼Ð¾ ÑƒÐºÐ°Ð·Ð°Ñ‚ÑŒ *e-mail* â€” "
+                "Ð¾Ð½ Ð±ÑƒÐ´ÐµÑ‚ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ð½ ÐºÐ°Ðº Ð»Ð¾Ð³Ð¸Ð½ Ð² Ð¾Ð±ÑƒÑ‡Ð°ÑŽÑ‰ÐµÐ¹ Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ðµ.\n\n"
+                "ðŸ“§ _ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ ÑÐ²Ð¾Ð¹ e-mail:_\n/cancel Ð´Ð»Ñ Ð¾Ñ‚Ð¼ÐµÐ½Ñ‹"
             )
         else:
             text = (
-                "📚 *Course Purchase*\n\n"
-                "⚠️ An *e-mail* is required to purchase a course — "
+                "ðŸ“š *Course Purchase*\n\n"
+                "âš ï¸ An *e-mail* is required to purchase a course â€” "
                 "it will be used as your login for the learning platform.\n\n"
-                "📧 _Send your e-mail:_\n/cancel to cancel"
+                "ðŸ“§ _Send your e-mail:_\n/cancel to cancel"
             )
         await state.set_state(CourseEmailState.waiting_email)
         await callback.message.edit_text(text, parse_mode="Markdown")
         await callback.answer()
         return
 
-    # Ir e-pasts — rādām kursu izvēlni
+    # Ir e-pasts â€” rÄdÄm kursu izvÄ“lni
     await _show_courses_list(callback, lang)
     await callback.answer()
 
@@ -2161,11 +2162,11 @@ async def courses_crypto_after(callback: CallbackQuery):
 async def _show_courses_list(callback, lang):
     ui_lang = _course_ui_lang(lang)
     if ui_lang == "lv":
-        text = "📚 *Izvēlies kursu:*"
+        text = "ðŸ“š *IzvÄ“lies kursu:*"
     elif ui_lang == "ru":
-        text = "📚 *Выбери курс:*"
+        text = "ðŸ“š *Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÐºÑƒÑ€Ñ:*"
     else:
-        text = "📚 *Choose a course:*"
+        text = "ðŸ“š *Choose a course:*"
     b = InlineKeyboardBuilder()
     for key, course in config.COURSES.items():
         # Cena no DB settings vai config
@@ -2178,8 +2179,8 @@ async def _show_courses_list(callback, lang):
         else:
             price_str = course['price_usd']
         name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
-        b.button(text=f"{course['emoji']} {name} — {price_str}", callback_data=f"course_{key}")
-    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_menu")
+        b.button(text=f"{course['emoji']} {name} â€” {price_str}", callback_data=f"course_{key}")
+    b.button(text="ðŸ”™ " + ("AtpakaÄ¼" if ui_lang == "lv" else "ÐÐ°Ð·Ð°Ð´"), callback_data="courses_menu")
     b.adjust(1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
@@ -2192,22 +2193,22 @@ async def course_receive_email(message: Message, state: FSMContext):
     await message.answer(
         ui_text(
             lang,
-            "Kursu pirkumi tagad notiek tikai caur mājaslapas checkout. E-pastu vari mainīt iestatījumos.",
-            "Покупки курсов теперь работают только через checkout на сайте. E-mail можно менять в настройках.",
+            "Kursu pirkumi tagad notiek tikai caur mÄjaslapas checkout. E-pastu vari mainÄ«t iestatÄ«jumos.",
+            "ÐŸÐ¾ÐºÑƒÐ¿ÐºÐ¸ ÐºÑƒÑ€ÑÐ¾Ð² Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÑŽÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ‡ÐµÑ€ÐµÐ· checkout Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ. E-mail Ð¼Ð¾Ð¶Ð½Ð¾ Ð¼ÐµÐ½ÑÑ‚ÑŒ Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°Ñ….",
             "Course purchases now work only through website checkout. You can still change your e-mail in settings.",
         )
     )
     return
     if message.text == "/cancel":
         await state.clear()
-        await message.answer("❌")
+        await message.answer("âŒ")
         return
     
     email = message.text.strip()
     if "@" not in email or "." not in email or len(email) < 5:
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("❌ " + ("Nepareizs e-pasts. Pamēģini vēlreiz:" if lang == "lv" else ("Неверный e-mail. Попробуй:" if lang == "ru" else "Invalid e-mail. Try:")))
+        await message.answer("âŒ " + ("Nepareizs e-pasts. PamÄ“Ä£ini vÄ“lreiz:" if lang == "lv" else ("ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹:" if lang == "ru" else "Invalid e-mail. Try:")))
         return
     
     data = await state.get_data()
@@ -2220,15 +2221,15 @@ async def course_receive_email(message: Message, state: FSMContext):
     lang = user.get("lang", "ru") if user else "ru"
     
     if lang == "lv":
-        confirm_text = f"✅ E-pasts saglabāts: *{email}*"
+        confirm_text = f"âœ… E-pasts saglabÄts: *{email}*"
     elif lang == "ru":
-        confirm_text = f"✅ E-mail сохранён: *{email}*"
+        confirm_text = f"âœ… E-mail ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½: *{email}*"
     else:
-        confirm_text = f"✅ E-mail saved: *{email}*"
+        confirm_text = f"âœ… E-mail saved: *{email}*"
     
     await message.answer(confirm_text, parse_mode="Markdown")
     
-    # Ja ir izvēlēts kurss, rādām payment
+    # Ja ir izvÄ“lÄ“ts kurss, rÄdÄm payment
     if selected_course:
         # Create a callback mock to reuse _show_course_payment
         class CallbackMock:
@@ -2248,8 +2249,8 @@ async def course_selected(callback: CallbackQuery):
     await callback.answer(
         ui_text(
             lang,
-            "Šī vecā kursa apmaksas poga vairs netiek izmantota. Atver kursu no jaunās izvēlnes un izmanto checkout.",
-            "Эта старая кнопка оплаты курса больше не используется. Открой курс из нового меню и используй checkout.",
+            "Å Ä« vecÄ kursa apmaksas poga vairs netiek izmantota. Atver kursu no jaunÄs izvÄ“lnes un izmanto checkout.",
+            "Ð­Ñ‚Ð° ÑÑ‚Ð°Ñ€Ð°Ñ ÐºÐ½Ð¾Ð¿ÐºÐ° Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ ÐºÑƒÑ€ÑÐ° Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ. ÐžÑ‚ÐºÑ€Ð¾Ð¹ ÐºÑƒÑ€Ñ Ð¸Ð· Ð½Ð¾Ð²Ð¾Ð³Ð¾ Ð¼ÐµÐ½ÑŽ Ð¸ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ checkout.",
             "This old course payment button is no longer used. Open the course from the new menu and use checkout.",
         ),
         show_alert=True,
@@ -2257,7 +2258,7 @@ async def course_selected(callback: CallbackQuery):
     return
     course_key = callback.data.replace("course_", "")
     course = config.COURSES.get(course_key)
-    if not course: await callback.answer("❌"); return
+    if not course: await callback.answer("âŒ"); return
 
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
@@ -2266,14 +2267,14 @@ async def course_selected(callback: CallbackQuery):
     email = user.get("email", "") if user else ""
 
     if not email:
-        await callback.answer("⚠️ Nepieciešams e-pasts!" if ui_lang == "lv" else "⚠️ Нужен e-mail!", show_alert=True)
+        await callback.answer("âš ï¸ NepiecieÅ¡ams e-pasts!" if ui_lang == "lv" else "âš ï¸ ÐÑƒÐ¶ÐµÐ½ e-mail!", show_alert=True)
         return
 
     # Cena no DB
     saved_price = await db.get_setting(f"course_price_{course_key}")
     base_price = float(saved_price) if saved_price else course['price_usdt']
 
-    # Unikāla summa (slot sistēma)
+    # UnikÄla summa (slot sistÄ“ma)
     unique_amount = await _get_unique_amount(f"course_{course_key}", user_id, base_price)
     await db.set_pending_payment(user_id, f"course_{course_key}", unique_amount)
 
@@ -2281,42 +2282,42 @@ async def course_selected(callback: CallbackQuery):
     if ui_lang == "lv":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Cena: *{unique_amount} USDT*\n"
-            f"📧 E-pasts: *{email}*\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Nosūti *{unique_amount} USDT (BEP-20)* uz:\n\n"
+            f"ðŸ’° Cena: *{unique_amount} USDT*\n"
+            f"ðŸ“§ E-pasts: *{email}*\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ NosÅ«ti *{unique_amount} USDT (BEP-20)* uz:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"⚠️ Tikai *USDT BEP-20* (BSC tīkls)\n"
-            f"Pēc apmaksas nospied pogu zemāk"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"âš ï¸ Tikai *USDT BEP-20* (BSC tÄ«kls)\n"
+            f"PÄ“c apmaksas nospied pogu zemÄk"
         )
     elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Цена: *{unique_amount} USDT*\n"
-            f"📧 Логин: *{email}*\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Отправь *{unique_amount} USDT (BEP-20)* на:\n\n"
+            f"ðŸ’° Ð¦ÐµÐ½Ð°: *{unique_amount} USDT*\n"
+            f"ðŸ“§ Ð›Ð¾Ð³Ð¸Ð½: *{email}*\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ *{unique_amount} USDT (BEP-20)* Ð½Ð°:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"⚠️ Только *USDT BEP-20* (сеть BSC)\n"
-            f"После оплаты нажми кнопку ниже"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"âš ï¸ Ð¢Ð¾Ð»ÑŒÐºÐ¾ *USDT BEP-20* (ÑÐµÑ‚ÑŒ BSC)\n"
+            f"ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð½Ð°Ð¶Ð¼Ð¸ ÐºÐ½Ð¾Ð¿ÐºÑƒ Ð½Ð¸Ð¶Ðµ"
         )
     else:
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"💰 Price: *{unique_amount} USDT*\n"
-            f"📧 Login: *{email}*\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"📤 Send *{unique_amount} USDT (BEP-20)* to:\n\n"
+            f"ðŸ’° Price: *{unique_amount} USDT*\n"
+            f"ðŸ“§ Login: *{email}*\n\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"ðŸ“¤ Send *{unique_amount} USDT (BEP-20)* to:\n\n"
             f"`{config.CRYPTO_WALLET}`\n\n"
-            f"━━━━━━━━━━━━━━━━\n"
-            f"⚠️ Only *USDT BEP-20* (BSC network)\n"
+            f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+            f"âš ï¸ Only *USDT BEP-20* (BSC network)\n"
             f"After payment press the button below"
         )
     b = InlineKeyboardBuilder()
-    b.button(text="✅ " + ("Esmu apmaksājis" if ui_lang == "lv" else "Я оплатил"), callback_data=f"check_course_{course_key}")
-    b.button(text="🔙 " + ("Atpakaļ" if ui_lang == "lv" else "Назад"), callback_data="courses_crypto")
+    b.button(text="âœ… " + ("Esmu apmaksÄjis" if ui_lang == "lv" else "Ð¯ Ð¾Ð¿Ð»Ð°Ñ‚Ð¸Ð»"), callback_data=f"check_course_{course_key}")
+    b.button(text="ðŸ”™ " + ("AtpakaÄ¼" if ui_lang == "lv" else "ÐÐ°Ð·Ð°Ð´"), callback_data="courses_crypto")
     b.adjust(1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
     await callback.answer()
@@ -2329,8 +2330,8 @@ async def check_course_payment(callback: CallbackQuery):
     await callback.answer(
         ui_text(
             lang,
-            "Vecā kursa maksājuma pārbaude ir izņemta. Kursu pirkumi tagad nāk tikai no mājaslapas webhook.",
-            "Старая проверка оплаты курса удалена. Покупки курсов теперь приходят только через webhook сайта.",
+            "VecÄ kursa maksÄjuma pÄrbaude ir izÅ†emta. Kursu pirkumi tagad nÄk tikai no mÄjaslapas webhook.",
+            "Ð¡Ñ‚Ð°Ñ€Ð°Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ ÐºÑƒÑ€ÑÐ° ÑƒÐ´Ð°Ð»ÐµÐ½Ð°. ÐŸÐ¾ÐºÑƒÐ¿ÐºÐ¸ ÐºÑƒÑ€ÑÐ¾Ð² Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¿Ñ€Ð¸Ñ…Ð¾Ð´ÑÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ‡ÐµÑ€ÐµÐ· webhook ÑÐ°Ð¹Ñ‚Ð°.",
             "The old course payment check has been removed. Course purchases now arrive only through the website webhook.",
         ),
         show_alert=True,
@@ -2338,7 +2339,7 @@ async def check_course_payment(callback: CallbackQuery):
     return
     course_key = callback.data.replace("check_course_", "")
     course = config.COURSES.get(course_key)
-    if not course: await callback.answer("❌"); return
+    if not course: await callback.answer("âŒ"); return
 
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
@@ -2349,11 +2350,11 @@ async def check_course_payment(callback: CallbackQuery):
 
     pending = await db.get_pending_payment(user_id)
     if not pending or not pending.get("amount_usdt"):
-        await callback.answer(ui_text(lang, "⚠️ Nav gaidoša maksājuma", "⚠️ Нет ожидающего платежа", "⚠️ No pending payment"), show_alert=True); return
+        await callback.answer(ui_text(lang, "âš ï¸ Nav gaidoÅ¡a maksÄjuma", "âš ï¸ ÐÐµÑ‚ Ð¾Ð¶Ð¸Ð´Ð°ÑŽÑ‰ÐµÐ³Ð¾ Ð¿Ð»Ð°Ñ‚ÐµÐ¶Ð°", "âš ï¸ No pending payment"), show_alert=True); return
     expected = float(pending["amount_usdt"])
 
-    await callback.answer("⏳...")
-    msg = await callback.message.edit_text("⏳ *" + ui_text(lang, "Pārbaudu...", "Проверяю...", "Checking...") + "*", parse_mode="Markdown")
+    await callback.answer("â³...")
+    msg = await callback.message.edit_text("â³ *" + ui_text(lang, "PÄrbaudu...", "ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÑŽ...", "Checking...") + "*", parse_mode="Markdown")
 
     tx = await check_payment(config.CRYPTO_WALLET, expected, user_id)
     if tx:
@@ -2361,7 +2362,7 @@ async def check_course_payment(callback: CallbackQuery):
         name_ru = course['name']['ru'] if isinstance(course['name'], dict) else course['name']
         await db.delete_pending_payment(user_id)
 
-        # Saglabāt pirkumu UN iegūt purchase_id
+        # SaglabÄt pirkumu UN iegÅ«t purchase_id
         purchase_id = await db.add_course_purchase(user_id, username, course_key, name_ru, expected, tx, email)
         active_promo_code = await db.get_user_active_promo(user_id)
         if active_promo_code:
@@ -2371,51 +2372,51 @@ async def check_course_payment(callback: CallbackQuery):
         ref = await db.get_referral_by_referred(user_id)
         if ref and False:
             pass
-        # ═══════════════════════════════════════════════════════════════
+        # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
         if lang == "ru":
             text = (
-                f"✅ *Оплата подтверждена!*\n\n"
-                f"📚 Курс: *{name}*\n"
-                f"🔖 TX: `{tx}`\n\n"
-                f"🙏 Спасибо за покупку!\n"
-                f"Ваши данные доступа к обучающей платформе будут "
-                f"отправлены после проверки и подтверждения оплаты."
+                f"âœ… *ÐžÐ¿Ð»Ð°Ñ‚Ð° Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð°!*\n\n"
+                f"ðŸ“š ÐšÑƒÑ€Ñ: *{name}*\n"
+                f"ðŸ”– TX: `{tx}`\n\n"
+                f"ðŸ™ Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ!\n"
+                f"Ð’Ð°ÑˆÐ¸ Ð´Ð°Ð½Ð½Ñ‹Ðµ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð° Ðº Ð¾Ð±ÑƒÑ‡Ð°ÑŽÑ‰ÐµÐ¹ Ð¿Ð»Ð°Ñ‚Ñ„Ð¾Ñ€Ð¼Ðµ Ð±ÑƒÐ´ÑƒÑ‚ "
+                f"Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð¿Ð¾ÑÐ»Ðµ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸ Ð¸ Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð¸Ñ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹."
             )
         elif lang == "lv":
             text = (
-                f"✅ *Maksājums apstiprināts!*\n\n"
-                f"📚 Kurss: *{name}*\n"
-                f"🔖 TX: `{tx}`\n\n"
-                f"🙏 Paldies par pirkumu!\n"
-                f"Piekļuves dati mācību platformai tiks nosūtīti "
-                f"pēc maksājuma pārbaudes un apstiprināšanas."
+                f"âœ… *MaksÄjums apstiprinÄts!*\n\n"
+                f"ðŸ“š Kurss: *{name}*\n"
+                f"ðŸ”– TX: `{tx}`\n\n"
+                f"ðŸ™ Paldies par pirkumu!\n"
+                f"PiekÄ¼uves dati mÄcÄ«bu platformai tiks nosÅ«tÄ«ti "
+                f"pÄ“c maksÄjuma pÄrbaudes un apstiprinÄÅ¡anas."
             )
         else:
             text = (
-                f"✅ *Payment confirmed!*\n\n"
-                f"📚 Course: *{name}*\n"
-                f"🔖 TX: `{tx}`\n\n"
-                f"🙏 Thank you for your purchase!\n"
+                f"âœ… *Payment confirmed!*\n\n"
+                f"ðŸ“š Course: *{name}*\n"
+                f"ðŸ”– TX: `{tx}`\n\n"
+                f"ðŸ™ Thank you for your purchase!\n"
                 f"Your access credentials for the learning platform "
                 f"will be sent after payment verification and confirmation."
             )
         await msg.edit_text(text, parse_mode="Markdown")
 
-        # Admin paziņojums
+        # Admin paziÅ†ojums
         admin_text = (
-            f"📚 *Jauns kursa pirkums!*\n\n"
-            f"👤 @{username} (`{user_id}`)\n"
-            f"📧 E-mail: `{email}`\n"
-            f"📚 Kurss: *{name_ru}*\n"
-            f"💰 Summa: *{expected} USDT*\n"
-            f"🔖 TX: `{tx}`"
+            f"ðŸ“š *Jauns kursa pirkums!*\n\n"
+            f"ðŸ‘¤ @{username} (`{user_id}`)\n"
+            f"ðŸ“§ E-mail: `{email}`\n"
+            f"ðŸ“š Kurss: *{name_ru}*\n"
+            f"ðŸ’° Summa: *{expected} USDT*\n"
+            f"ðŸ”– TX: `{tx}`"
         )
         for aid in config.ADMIN_IDS:
             try: await bot.send_message(aid, admin_text, parse_mode="Markdown")
             except: pass
 
-        # Referral bonus wallet arī par kursa pirkumu
+        # Referral bonus wallet arÄ« par kursa pirkumu
         ref = await db.get_referral_by_referred(user_id)
         if ref and not ref.get("bonus_given"):
             referrer = await db.get_user(ref["referrer_id"])
@@ -2433,19 +2434,19 @@ async def check_course_payment(callback: CallbackQuery):
                         ui_text(
                             rlang,
                             (
-                                "🎉 *Referral bonuss saņemts!*\n\n"
-                                f"Tavs draugs veica pirkumu, un tev piešķirtas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
-                                f"Tagad tavā balansā ir *{new_balance_days}* bonusu dienas.\n\n"
-                                "Atver referral sadaļu un izvēlies, kuram aktīvajam čatam tās pielikt."
+                                "ðŸŽ‰ *Referral bonuss saÅ†emts!*\n\n"
+                                f"Tavs draugs veica pirkumu, un tev pieÅ¡Ä·irtas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
+                                f"Tagad tavÄ balansÄ ir *{new_balance_days}* bonusu dienas.\n\n"
+                                "Atver referral sadaÄ¼u un izvÄ“lies, kuram aktÄ«vajam Äatam tÄs pielikt."
                             ),
                             (
-                                "🎉 *Реферальный бонус получен!*\n\n"
-                                f"Твой друг совершил покупку, и тебе начислено *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
-                                f"Теперь на твоем балансе *{new_balance_days}* бонусных дней.\n\n"
-                                "Открой раздел referral и выбери, к какому активному чату их применить."
+                                "ðŸŽ‰ *Ð ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ñ‹Ð¹ Ð±Ð¾Ð½ÑƒÑ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½!*\n\n"
+                                f"Ð¢Ð²Ð¾Ð¹ Ð´Ñ€ÑƒÐ³ ÑÐ¾Ð²ÐµÑ€ÑˆÐ¸Ð» Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ, Ð¸ Ñ‚ÐµÐ±Ðµ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¾ *+{REFERRAL_BONUS_DAYS} Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n"
+                                f"Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð½Ð° Ñ‚Ð²Ð¾ÐµÐ¼ Ð±Ð°Ð»Ð°Ð½ÑÐµ *{new_balance_days}* Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹.\n\n"
+                                "ÐžÑ‚ÐºÑ€Ð¾Ð¹ Ñ€Ð°Ð·Ð´ÐµÐ» referral Ð¸ Ð²Ñ‹Ð±ÐµÑ€Ð¸, Ðº ÐºÐ°ÐºÐ¾Ð¼Ñƒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñƒ Ð¸Ñ… Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ."
                             ),
                             (
-                                "🎉 *Referral bonus received!*\n\n"
+                                "ðŸŽ‰ *Referral bonus received!*\n\n"
                                 f"Your friend made a purchase and you received *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
                                 f"You now have *{new_balance_days}* bonus days in your balance.\n\n"
                                 "Open the referral section and choose which active chat to apply them to."
@@ -2455,17 +2456,17 @@ async def check_course_payment(callback: CallbackQuery):
                 except: pass
     else:
         if lang == "ru":
-            text = f"❌ *Платёж не найден*\n\nУбедись что отправил *{expected} USDT (BEP-20)*"
+            text = f"âŒ *ÐŸÐ»Ð°Ñ‚Ñ‘Ð¶ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½*\n\nÐ£Ð±ÐµÐ´Ð¸ÑÑŒ Ñ‡Ñ‚Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ð» *{expected} USDT (BEP-20)*"
         else:
-            text = f"❌ *Payment not found*\n\nMake sure you sent *{expected} USDT (BEP-20)*"
+            text = f"âŒ *Payment not found*\n\nMake sure you sent *{expected} USDT (BEP-20)*"
         b = InlineKeyboardBuilder()
-        b.button(text="🔄 " + ui_text(lang, "Pārbaudīt vēlreiz", "Проверить снова", "Check again"), callback_data=f"check_course_{course_key}")
+        b.button(text="ðŸ”„ " + ui_text(lang, "PÄrbaudÄ«t vÄ“lreiz", "ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ ÑÐ½Ð¾Ð²Ð°", "Check again"), callback_data=f"check_course_{course_key}")
         b.button(text=back_button_text(lang), callback_data="courses_crypto")
         b.adjust(1)
         await msg.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
 
-# ─── DEBUG / ERROR NOTIFICATIONS ───
+# â”€â”€â”€ DEBUG / ERROR NOTIFICATIONS â”€â”€â”€
 async def notify_admins(text: str, parse_mode: str = "Markdown"):
     for aid in config.ADMIN_IDS:
         try:
@@ -2475,12 +2476,12 @@ async def notify_admins(text: str, parse_mode: str = "Markdown"):
 
 
 async def notify_admins_error(context: str, error: str):
-    """Sūta admin paziņojumu par kļūdu"""
-    text = f"⚠️ *Bota kļūda*\n\n📍 `{context}`\n❌ `{str(error)[:500]}`"
+    """SÅ«ta admin paziÅ†ojumu par kÄ¼Å«du"""
+    text = f"âš ï¸ *Bota kÄ¼Å«da*\n\nðŸ“ `{context}`\nâŒ `{str(error)[:500]}`"
     await notify_admins(text, parse_mode="Markdown")
 
 
-# ─── FIX #3: SLOT NO DB ───
+# â”€â”€â”€ FIX #3: SLOT NO DB â”€â”€â”€
 async def _get_unique_amount(plan_key, user_id, base_price):
     mem_slots = [amt for uid, amt in _active_payment_sessions.items() if isinstance(amt, float) and uid != user_id]
     db_slots = await db.get_active_pending_amounts(plan_key)
@@ -2491,28 +2492,28 @@ async def _get_unique_amount(plan_key, user_id, base_price):
         if c not in taken: return c
         slot += 1
 
-# ─── PLAN/PAYMENT ───
+# â”€â”€â”€ PLAN/PAYMENT â”€â”€â”€
 @dp.callback_query(F.data.startswith("plan_"))
 async def plan_selected(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "lv") if user else "lv"
     text = ui_text(
         lang,
-        "Šī apmaksas metode vairs netiek izmantota. Izmanto mājaslapas checkout pogas.",
-        "Этот способ оплаты больше не используется. Используй checkout-кнопки сайта.",
+        "Å Ä« apmaksas metode vairs netiek izmantota. Izmanto mÄjaslapas checkout pogas.",
+        "Ð­Ñ‚Ð¾Ñ‚ ÑÐ¿Ð¾ÑÐ¾Ð± Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ. Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ checkout-ÐºÐ½Ð¾Ð¿ÐºÐ¸ ÑÐ°Ð¹Ñ‚Ð°.",
         "This payment method is no longer used. Please use the website checkout buttons.",
     )
     await callback.answer(text, show_alert=True)
     return
     plan_key = callback.data.split("_", 1)[1]
-    if plan_key not in config.PLANS: await callback.answer("❌", show_alert=True); return
+    if plan_key not in config.PLANS: await callback.answer("âŒ", show_alert=True); return
     plan = config.PLANS[plan_key]
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
     if not (user and user.get("email")):
         await callback.message.edit_text(
-            "📧 " + ("Vispirms iestati e-pastu. Tas ir vajadzīgs, lai piesaistītu piekļuvi." if lang == "lv" else ("Сначала укажи e-mail в настройках. Он нужен для привязки доступа." if lang == "ru" else "Please set your e-mail in Settings first. It is needed to link your access.")),
+            "ðŸ“§ " + ("Vispirms iestati e-pastu. Tas ir vajadzÄ«gs, lai piesaistÄ«tu piekÄ¼uvi." if lang == "lv" else ("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑƒÐºÐ°Ð¶Ð¸ e-mail Ð² Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ°Ñ…. ÐžÐ½ Ð½ÑƒÐ¶ÐµÐ½ Ð´Ð»Ñ Ð¿Ñ€Ð¸Ð²ÑÐ·ÐºÐ¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°." if lang == "ru" else "Please set your e-mail in Settings first. It is needed to link your access.")),
             reply_markup=main_menu_keyboard(lang),
             parse_mode="Markdown"
         )
@@ -2521,7 +2522,7 @@ async def plan_selected(callback: CallbackQuery):
     saved = await db.get_setting(f"price_{plan_key}")
     base = float(saved) if saved else plan['price_usdt']
     
-    # FIX: Ja lietotājam jau ir pending ar šo pašu plānu — NEĢENERĒT jaunu summu
+    # FIX: Ja lietotÄjam jau ir pending ar Å¡o paÅ¡u plÄnu â€” NEÄ¢ENERÄ’T jaunu summu
     existing_pending = await db.get_pending_payment(user_id)
     if existing_pending and existing_pending.get("plan_key") == plan_key and existing_pending.get("amount_usdt"):
         unique_amount = float(existing_pending["amount_usdt"])
@@ -2533,19 +2534,19 @@ async def plan_selected(callback: CallbackQuery):
     plan_name = plan['name'][lang] if isinstance(plan['name'], dict) else plan['name']
     await callback.message.edit_text(
         t(lang, "payment_title", emoji=plan['emoji'], name=plan_name, price=plan['price_usd'],
-          usdt=unique_amount, days=plan['days'] if plan['days'] < 36500 else "∞", wallet=config.CRYPTO_WALLET),
+          usdt=unique_amount, days=plan['days'] if plan['days'] < 36500 else "âˆž", wallet=config.CRYPTO_WALLET),
         reply_markup=payment_keyboard(plan_key, lang), parse_mode="Markdown")
     
-    # Admin paziņojums par jaunu pending payment
+    # Admin paziÅ†ojums par jaunu pending payment
     uname = f"@{callback.from_user.username}" if callback.from_user.username else f"ID {user_id}"
     for aid in config.ADMIN_IDS:
         try:
             await bot.send_message(aid,
-                f"🔔 *Jauns maksājums gaida!*\n\n"
-                f"👤 {uname} (`{user_id}`)\n"
-                f"📦 {plan['emoji']} {plan_name}\n"
-                f"💰 *{unique_amount} USDT*\n"
-                f"⏱ Taimeris: 15 min",
+                f"ðŸ”” *Jauns maksÄjums gaida!*\n\n"
+                f"ðŸ‘¤ {uname} (`{user_id}`)\n"
+                f"ðŸ“¦ {plan['emoji']} {plan_name}\n"
+                f"ðŸ’° *{unique_amount} USDT*\n"
+                f"â± Taimeris: 15 min",
                 parse_mode="Markdown")
         except: pass
     
@@ -2557,17 +2558,17 @@ async def check_payment_cb(callback: CallbackQuery):
     lang = user.get("lang", "lv") if user else "lv"
     text = ui_text(
         lang,
-        "Automātiskā crypto pārbaude ir izņemta. Pirkums tagad notiek tikai caur mājaslapu un webhook.",
-        "Автопроверка crypto удалена. Теперь покупка работает только через сайт и webhook.",
+        "AutomÄtiskÄ crypto pÄrbaude ir izÅ†emta. Pirkums tagad notiek tikai caur mÄjaslapu un webhook.",
+        "ÐÐ²Ñ‚Ð¾Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° crypto ÑƒÐ´Ð°Ð»ÐµÐ½Ð°. Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ° Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ñ‡ÐµÑ€ÐµÐ· ÑÐ°Ð¹Ñ‚ Ð¸ webhook.",
         "Automatic crypto checking has been removed. Purchases now work only via website checkout and webhook.",
     )
     await callback.answer(text, show_alert=True)
     return
     plan_key = callback.data.split("_", 1)[1]
-    if plan_key not in config.PLANS: await callback.answer("❌", show_alert=True); return
+    if plan_key not in config.PLANS: await callback.answer("âŒ", show_alert=True); return
     user_id = callback.from_user.id
     if user_id in _active_payment_sessions:
-        await callback.answer("⏳ Pārbaude jau notiek!", show_alert=True); return
+        await callback.answer("â³ PÄrbaude jau notiek!", show_alert=True); return
     plan = dict(config.PLANS[plan_key])
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
@@ -2582,9 +2583,9 @@ async def check_payment_cb(callback: CallbackQuery):
     plan['price_usdt'] = expected
     await callback.answer()
     start_text = (
-        f"⏳ *{ui_text(lang, 'Pārbaudu maksājumu', 'Проверяю платёж', 'Checking payment')}...*\n\n"
-        f"⏱ {ui_text(lang, 'Atlicis', 'Осталось', 'Time left')}: *15:00*\n\n"
-        f"{ui_text(lang, 'Bots automātiski pārbauda ik pēc 10 sekundēm', 'Бот автоматически проверяет каждые 10 секунд', 'Auto-checking every 10 sec')}"
+        f"â³ *{ui_text(lang, 'PÄrbaudu maksÄjumu', 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÑŽ Ð¿Ð»Ð°Ñ‚Ñ‘Ð¶', 'Checking payment')}...*\n\n"
+        f"â± {ui_text(lang, 'Atlicis', 'ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ', 'Time left')}: *15:00*\n\n"
+        f"{ui_text(lang, 'Bots automÄtiski pÄrbauda ik pÄ“c 10 sekundÄ“m', 'Ð‘Ð¾Ñ‚ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÑÐµÑ‚ ÐºÐ°Ð¶Ð´Ñ‹Ðµ 10 ÑÐµÐºÑƒÐ½Ð´', 'Auto-checking every 10 sec')}"
     )
     try:
         await callback.message.edit_text(start_text, parse_mode="Markdown"); msg = callback.message
@@ -2593,7 +2594,7 @@ async def check_payment_cb(callback: CallbackQuery):
     _active_payment_sessions[user_id] = expected
     asyncio.create_task(_confirm_payment(user_id, plan_key, plan, lang, msg, callback.from_user.username or ""))
 
-# ─── UNIVERSĀLA AKTIVIZĀCIJA ───
+# â”€â”€â”€ UNIVERSÄ€LA AKTIVIZÄ€CIJA â”€â”€â”€
 async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount):
     now = datetime.utcnow()
     product_meta = resolve_subscription_product(plan_key, lang)
@@ -2638,9 +2639,9 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
             await db.redeem_winback_offer(user_id, tx_hash)
             bonus_text = ui_text(
                 lang,
-                f"🎁 *Atgriešanās bonuss aktivizēts!*\n\nTev pievienotas *+{bonus_days} bezmaksas dienas*.\n📅 Aktīvs līdz: *{new_exp.strftime('%d.%m.%Y')}*",
-                f"🎁 *Win-back бонус активирован!*\n\nТебе добавлено *+{bonus_days} бесплатных дней*.\n📅 Активно до: *{new_exp.strftime('%d.%m.%Y')}*",
-                f"🎁 *Win-back bonus activated!*\n\nYou received *+{bonus_days} free days*.\n📅 Active until: *{new_exp.strftime('%d.%m.%Y')}*",
+                f"ðŸŽ *AtgrieÅ¡anÄs bonuss aktivizÄ“ts!*\n\nTev pievienotas *+{bonus_days} bezmaksas dienas*.\nðŸ“… AktÄ«vs lÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*",
+                f"ðŸŽ *Win-back Ð±Ð¾Ð½ÑƒÑ Ð°ÐºÑ‚Ð¸Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½!*\n\nÐ¢ÐµÐ±Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¾ *+{bonus_days} Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\nðŸ“… ÐÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð´Ð¾: *{new_exp.strftime('%d.%m.%Y')}*",
+                f"ðŸŽ *Win-back bonus activated!*\n\nYou received *+{bonus_days} free days*.\nðŸ“… Active until: *{new_exp.strftime('%d.%m.%Y')}*",
             )
             try:
                 await bot.send_message(user_id, bonus_text, parse_mode="Markdown")
@@ -2660,23 +2661,23 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
             ref_lang = referrer.get("lang", "ru")
             if ref_lang == "ru":
                 ref_text = (
-                    f"🎁 *Бонус за друга!*\n\n"
-                    f"Твой реферал оформил подписку.\n"
-                    f"Тебе начислено *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
-                    f"Теперь доступно: *{new_balance_days}* дней.\n\n"
-                    "Используй их сам и выбери, к какому активному чату применить бонус."
+                    f"ðŸŽ *Ð‘Ð¾Ð½ÑƒÑ Ð·Ð° Ð´Ñ€ÑƒÐ³Ð°!*\n\n"
+                    f"Ð¢Ð²Ð¾Ð¹ Ñ€ÐµÑ„ÐµÑ€Ð°Ð» Ð¾Ñ„Ð¾Ñ€Ð¼Ð¸Ð» Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ.\n"
+                    f"Ð¢ÐµÐ±Ðµ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¾ *+{REFERRAL_BONUS_DAYS} Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n"
+                    f"Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾: *{new_balance_days}* Ð´Ð½ÐµÐ¹.\n\n"
+                    "Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ Ð¸Ñ… ÑÐ°Ð¼ Ð¸ Ð²Ñ‹Ð±ÐµÑ€Ð¸, Ðº ÐºÐ°ÐºÐ¾Ð¼Ñƒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñƒ Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð±Ð¾Ð½ÑƒÑ."
                 )
             elif ref_lang == "lv":
                 ref_text = (
-                    f"🎁 *Bonuss par draugu!*\n\n"
-                    f"Tavs referral noformēja abonementu.\n"
-                    f"Tev ieskaitītas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
+                    f"ðŸŽ *Bonuss par draugu!*\n\n"
+                    f"Tavs referral noformÄ“ja abonementu.\n"
+                    f"Tev ieskaitÄ«tas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
                     f"Tagad pieejams: *{new_balance_days}* dienas.\n\n"
-                    "Izmanto tās pats un izvēlies, kuram aktīvajam čatam pielikt bonusu."
+                    "Izmanto tÄs pats un izvÄ“lies, kuram aktÄ«vajam Äatam pielikt bonusu."
                 )
             else:
                 ref_text = (
-                    f"🎁 *Referral bonus!*\n\n"
+                    f"ðŸŽ *Referral bonus!*\n\n"
                     f"Your referral purchased a subscription.\n"
                     f"You received *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
                     f"You now have: *{new_balance_days}* days available.\n\n"
@@ -2699,32 +2700,32 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
             await db.mark_referral_bonus_given(user_id)
             ref_lang = referrer.get("lang", "ru")
             if ref_lang == "ru":
-                ref_text = f"🎁 *Бонус за друга!*\n\nТвой реферал оформил подписку.\nТебе добавлено *+{REFERRAL_BONUS_DAYS} дней* бесплатного доступа."
+                ref_text = f"ðŸŽ *Ð‘Ð¾Ð½ÑƒÑ Ð·Ð° Ð´Ñ€ÑƒÐ³Ð°!*\n\nÐ¢Ð²Ð¾Ð¹ Ñ€ÐµÑ„ÐµÑ€Ð°Ð» Ð¾Ñ„Ð¾Ñ€Ð¼Ð¸Ð» Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ.\nÐ¢ÐµÐ±Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¾ *+{REFERRAL_BONUS_DAYS} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°."
             elif ref_lang == "lv":
-                ref_text = f"🎁 *Bonuss par draugu!*\n\nTavs referral noformēja abonementu.\nTev pievienotas *+{REFERRAL_BONUS_DAYS} bezmaksas dienas*."
+                ref_text = f"ðŸŽ *Bonuss par draugu!*\n\nTavs referral noformÄ“ja abonementu.\nTev pievienotas *+{REFERRAL_BONUS_DAYS} bezmaksas dienas*."
             else:
-                ref_text = f"🎁 *Referral bonus!*\n\nYour referral purchased a subscription.\nYou received *+{REFERRAL_BONUS_DAYS} free days*."
+                ref_text = f"ðŸŽ *Referral bonus!*\n\nYour referral purchased a subscription.\nYou received *+{REFERRAL_BONUS_DAYS} free days*."
             try:
                 await bot.send_message(ref["referrer_id"], ref_text, parse_mode="Markdown")
             except Exception as e:
                 logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
             uname = f"@{username}" if username else f"ID {user_id}"
             for aid in config.ADMIN_IDS:
-                try: await bot.send_message(aid, f"ðŸ’° *Jauns maksÄjums!*\n\nðŸ‘¤ {uname} (`{user_id}`)\nðŸ“¦ *{plan_name_loc}*\nðŸ’µ *{amount} USDT*\nðŸ“… LÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*\nðŸ”– TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
+                try: await bot.send_message(aid, f"Ã°Å¸â€™Â° *Jauns maksÃ„Âjums!*\n\nÃ°Å¸â€˜Â¤ {uname} (`{user_id}`)\nÃ°Å¸â€œÂ¦ *{plan_name_loc}*\nÃ°Å¸â€™Âµ *{amount} USDT*\nÃ°Å¸â€œâ€¦ LÃ„Â«dz: *{new_exp.strftime('%d.%m.%Y')}*\nÃ°Å¸â€â€“ TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
                 except: pass
             return new_exp, plan_name_loc, product_meta
     # Admin notify
     uname = f"@{username}" if username else f"ID {user_id}"
     for aid in config.ADMIN_IDS:
         try:
-            extra = f"\n🎁 Win-back bonuss: *+{winback_bonus_days} d.*" if winback_bonus_days else ""
-            await bot.send_message(aid, f"💰 *Jauns maksājums!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Līdz: *{new_exp.strftime('%d.%m.%Y')}*{extra}\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
+            extra = f"\nðŸŽ Win-back bonuss: *+{winback_bonus_days} d.*" if winback_bonus_days else ""
+            await bot.send_message(aid, f"ðŸ’° *Jauns maksÄjums!*\n\nðŸ‘¤ {uname} (`{user_id}`)\nðŸ“¦ *{plan_name_loc}*\nðŸ’µ *{amount} USDT*\nðŸ“… LÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*{extra}\nðŸ”– TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
         except: pass
     return new_exp, plan_name_loc, product_meta
 
-# Pēc veiksmīga payment — nosūtīt referral reminder pēc 5 min
+# PÄ“c veiksmÄ«ga payment â€” nosÅ«tÄ«t referral reminder pÄ“c 5 min
 async def _post_payment_actions(user_id, lang):
-    """Darbības pēc veiksmīga maksājuma — referral reminder"""
+    """DarbÄ«bas pÄ“c veiksmÄ«ga maksÄjuma â€” referral reminder"""
     asyncio.create_task(_send_referral_reminder(user_id, lang))
 
 async def _confirm_payment(user_id, plan_key, plan, lang, msg, username):
@@ -2747,13 +2748,13 @@ async def _confirm_payment(user_id, plan_key, plan, lang, msg, username):
                 return
             if elapsed % 30 == 0 and remaining > 0:
                 m, s = remaining // 60, remaining % 60
-                try: await msg.edit_text(f"⏳ *{ui_text(lang, 'Pārbaudu maksājumu', 'Проверяю платёж', 'Checking')}...*\n\n⏱ {ui_text(lang, 'Atlicis', 'Осталось', 'Left')}: *{m}:{s:02d}*\n\n{ui_text(lang, 'Automātiska pārbaude ik pēc 10 sekundēm', 'Автоматическая проверка каждые 10 секунд', 'Auto-check every 10 sec')}", parse_mode="Markdown")
+                try: await msg.edit_text(f"â³ *{ui_text(lang, 'PÄrbaudu maksÄjumu', 'ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÑŽ Ð¿Ð»Ð°Ñ‚Ñ‘Ð¶', 'Checking')}...*\n\nâ± {ui_text(lang, 'Atlicis', 'ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ', 'Left')}: *{m}:{s:02d}*\n\n{ui_text(lang, 'AutomÄtiska pÄrbaude ik pÄ“c 10 sekundÄ“m', 'ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ°Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ° ÐºÐ°Ð¶Ð´Ñ‹Ðµ 10 ÑÐµÐºÑƒÐ½Ð´', 'Auto-check every 10 sec')}", parse_mode="Markdown")
                 except: pass
         timeout_txt = ui_text(
             lang,
-            "❌ *Laiks beidzās (15 min)*\n\nJa nosūtīji maksājumu, pagaidi - bots to pārbauda fonā ik pēc 3 min.",
-            "❌ *Время вышло (15 мин)*\n\nЕсли отправил — подожди, бот проверяет фоном каждые 3 мин.",
-            "❌ *Timeout (15 min)*\n\nIf sent — wait, bot checks background every 3 min."
+            "âŒ *Laiks beidzÄs (15 min)*\n\nJa nosÅ«tÄ«ji maksÄjumu, pagaidi - bots to pÄrbauda fonÄ ik pÄ“c 3 min.",
+            "âŒ *Ð’Ñ€ÐµÐ¼Ñ Ð²Ñ‹ÑˆÐ»Ð¾ (15 Ð¼Ð¸Ð½)*\n\nÐ•ÑÐ»Ð¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ð» â€” Ð¿Ð¾Ð´Ð¾Ð¶Ð´Ð¸, Ð±Ð¾Ñ‚ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÑÐµÑ‚ Ñ„Ð¾Ð½Ð¾Ð¼ ÐºÐ°Ð¶Ð´Ñ‹Ðµ 3 Ð¼Ð¸Ð½.",
+            "âŒ *Timeout (15 min)*\n\nIf sent â€” wait, bot checks background every 3 min."
         )
         try: await msg.edit_text(timeout_txt, reply_markup=payment_keyboard(plan_key, lang), parse_mode="Markdown")
         except: await bot.send_message(user_id, timeout_txt, reply_markup=payment_keyboard(plan_key, lang), parse_mode="Markdown")
@@ -2763,26 +2764,26 @@ async def _confirm_payment(user_id, plan_key, plan, lang, msg, username):
 
 @dp.callback_query(F.data == "vip_chat_plans")
 async def show_vip_chat_plans(callback: CallbackQuery):
-    """Parāda pieejamos VIP čatus. Pirkums notiek mājaslapā."""
+    """ParÄda pieejamos VIP Äatus. Pirkums notiek mÄjaslapÄ."""
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     if not (user and user.get("email")):
         text = (
-            "📧 Vispirms iestati e-pastu. Pēc pirkuma mājaslapa sūtīs webhook, un bots piekļuvi atradīs tieši pēc šī e-pasta."
+            "ðŸ“§ Vispirms iestati e-pastu. PÄ“c pirkuma mÄjaslapa sÅ«tÄ«s webhook, un bots piekÄ¼uvi atradÄ«s tieÅ¡i pÄ“c Å¡Ä« e-pasta."
             if lang == "lv" else
-            ("📧 Сначала укажи e-mail. После покупки сайт отправит webhook, и бот найдёт доступ именно по этому e-mail."
+            ("ðŸ“§ Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑƒÐºÐ°Ð¶Ð¸ e-mail. ÐŸÐ¾ÑÐ»Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ ÑÐ°Ð¹Ñ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ webhook, Ð¸ Ð±Ð¾Ñ‚ Ð½Ð°Ð¹Ð´Ñ‘Ñ‚ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð¸Ð¼ÐµÐ½Ð½Ð¾ Ð¿Ð¾ ÑÑ‚Ð¾Ð¼Ñƒ e-mail."
              if lang == "ru" else
-             "📧 Please set your e-mail first. After purchase the website will send a webhook, and the bot will match access by this e-mail.")
+             "ðŸ“§ Please set your e-mail first. After purchase the website will send a webhook, and the bot will match access by this e-mail.")
         )
         await callback.message.edit_text(text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
         await callback.answer()
         return
     text = (
-        "💎 *Izvēlies VIP čatu:*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski piesaistīs piekļuvi pēc tava e-pasta."
+        "ðŸ’Ž *IzvÄ“lies VIP Äatu:*\n\nPirkums notiek mÄjaslapÄ. PÄ“c apmaksas bots automÄtiski piesaistÄ«s piekÄ¼uvi pÄ“c tava e-pasta."
         if lang == "lv" else
-        ("💎 *Выбери VIP чат:*\n\nПокупка происходит на сайте. После оплаты бот автоматически привяжет доступ по твоему e-mail."
+        ("ðŸ’Ž *Ð’Ñ‹Ð±ÐµÑ€Ð¸ VIP Ñ‡Ð°Ñ‚:*\n\nÐŸÐ¾ÐºÑƒÐ¿ÐºÐ° Ð¿Ñ€Ð¾Ð¸ÑÑ…Ð¾Ð´Ð¸Ñ‚ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ. ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ñ‚ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¿Ñ€Ð¸Ð²ÑÐ¶ÐµÑ‚ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð¿Ð¾ Ñ‚Ð²Ð¾ÐµÐ¼Ñƒ e-mail."
          if lang == "ru" else
-         "💎 *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
+         "ðŸ’Ž *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
     )
     await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
@@ -2793,37 +2794,37 @@ async def vip_checkout_missing_or_open(callback: CallbackQuery):
     code = callback.data.replace("vip_checkout_", "")
     user = await db.get_user(callback.from_user.id)
     if not (user and user.get("email")):
-        await callback.answer("Vispirms iestati e-pastu botā.", show_alert=True)
+        await callback.answer("Vispirms iestati e-pastu botÄ.", show_alert=True)
         return
     url = await checkout_url_for_lang(code)
     if url:
         b = InlineKeyboardBuilder()
-        b.button(text="Atvērt checkout" if code == "lv" else "Открыть checkout", url=url)
+        b.button(text="AtvÄ“rt checkout" if code == "lv" else "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ checkout", url=url)
         b.adjust(1)
         await callback.message.answer("Checkout links:", reply_markup=b.as_markup())
         await callback.answer()
         return
-    await callback.answer("Checkout links šai pogai vēl nav iestatīts admin panelī.", show_alert=True)
+    await callback.answer("Checkout links Å¡ai pogai vÄ“l nav iestatÄ«ts admin panelÄ«.", show_alert=True)
 
 
 @dp.callback_query(F.data == "back_to_main")
 async def back_to_main_menu(callback: CallbackQuery):
-    """Atpakaļ uz galveno izvēlni"""
+    """AtpakaÄ¼ uz galveno izvÄ“lni"""
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     name = md_escape(callback.from_user.first_name)
     
-    # Pārbauda vai ir aktīva subscription
+    # PÄrbauda vai ir aktÄ«va subscription
     active_subs = await db.get_active_user_subscriptions(callback.from_user.id)
     if active_subs:
         text, kb = await build_active_home_view(callback.from_user.id, lang, name)
         await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
     elif user and user.get('expires_at') and datetime.fromisoformat(user['expires_at']) > datetime.utcnow():
         expires_dt = datetime.fromisoformat(user['expires_at'])
-        text = t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=max(0, (expires_dt - datetime.utcnow()).days))
+        text = t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "â€”"), days=max(0, (expires_dt - datetime.utcnow()).days))
         await callback.message.edit_text(text, reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
-        # Neaktīviem - main_menu
+        # NeaktÄ«viem - main_menu
         welcome_text = await inactive_welcome_text(lang, name)
         await callback.message.edit_text(welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
     
@@ -2834,7 +2835,7 @@ async def back_to_main_menu(callback: CallbackQuery):
 async def back_to_plans(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    text = "💎 *Izvēlies VIP čatu:*" if lang == "lv" else ("💎 *Выбери VIP чат:*" if lang == "ru" else "💎 *Choose VIP chat:*")
+    text = "ðŸ’Ž *IzvÄ“lies VIP Äatu:*" if lang == "lv" else ("ðŸ’Ž *Ð’Ñ‹Ð±ÐµÑ€Ð¸ VIP Ñ‡Ð°Ñ‚:*" if lang == "ru" else "ðŸ’Ž *Choose VIP chat:*")
     await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
@@ -2844,14 +2845,14 @@ async def show_qr_code(callback: CallbackQuery):
     lang = user.get("lang", "lv") if user else "lv"
     text = ui_text(
         lang,
-        "QR crypto apmaksa vairs nav aktīva. Izmanto checkout pogas botā.",
-        "QR crypto оплата больше не активна. Используй checkout-кнопки в боте.",
+        "QR crypto apmaksa vairs nav aktÄ«va. Izmanto checkout pogas botÄ.",
+        "QR crypto Ð¾Ð¿Ð»Ð°Ñ‚Ð° Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½Ðµ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð°. Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ checkout-ÐºÐ½Ð¾Ð¿ÐºÐ¸ Ð² Ð±Ð¾Ñ‚Ðµ.",
         "QR crypto payment is no longer active. Use the checkout buttons in the bot.",
     )
     await callback.answer(text, show_alert=True)
     return
     plan_key = callback.data.split("_", 1)[1]
-    if plan_key not in config.PLANS: await callback.answer("❌", show_alert=True); return
+    if plan_key not in config.PLANS: await callback.answer("âŒ", show_alert=True); return
     plan = config.PLANS[plan_key]
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
@@ -2869,9 +2870,9 @@ async def show_qr_code(callback: CallbackQuery):
         b.button(text=t(lang, "btn_paid"), callback_data=f"check_{plan_key}"); b.adjust(1)
         await callback.message.answer_photo(BufferedInputFile(buf.getvalue(), filename="qr.png"), caption=t(lang, "qr_caption", usdt=usdt, wallet=config.CRYPTO_WALLET), reply_markup=b.as_markup(), parse_mode="Markdown")
     except ImportError:
-        await callback.answer(f"📋 {config.CRYPTO_WALLET}", show_alert=True)
+        await callback.answer(f"ðŸ“‹ {config.CRYPTO_WALLET}", show_alert=True)
 
-# ─── FIX #2: AUTO-CHECK FONS ───
+# â”€â”€â”€ FIX #2: AUTO-CHECK FONS â”€â”€â”€
 async def auto_check_pending_payments():
     return
     pending = await db.get_all_pending_payments()
@@ -2901,17 +2902,17 @@ async def auto_check_pending_payments():
                     await db.add_course_purchase(uid, username, ckey, cname, amount, tx, email)
                     await db.delete_pending_payment(uid)
                     if lang == "ru":
-                        msg = f"✅ *Оплата курса подтверждена!*\n\n📚 {cname}\n🔖 TX: `{tx[:20]}`\n\n🙏 Данные доступа будут отправлены после проверки."
+                        msg = f"âœ… *ÐžÐ¿Ð»Ð°Ñ‚Ð° ÐºÑƒÑ€ÑÐ° Ð¿Ð¾Ð´Ñ‚Ð²ÐµÑ€Ð¶Ð´ÐµÐ½Ð°!*\n\nðŸ“š {cname}\nðŸ”– TX: `{tx[:20]}`\n\nðŸ™ Ð”Ð°Ð½Ð½Ñ‹Ðµ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð° Ð±ÑƒÐ´ÑƒÑ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹ Ð¿Ð¾ÑÐ»Ðµ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ¸."
                     else:
-                        msg = f"✅ *Course payment confirmed!*\n\n📚 {cname}\n🔖 TX: `{tx[:20]}`\n\n🙏 Access credentials will be sent after verification."
+                        msg = f"âœ… *Course payment confirmed!*\n\nðŸ“š {cname}\nðŸ”– TX: `{tx[:20]}`\n\nðŸ™ Access credentials will be sent after verification."
                     try: await bot.send_message(uid, msg, parse_mode="Markdown")
                     except: pass
                     # Admin
                     for aid in config.ADMIN_IDS:
-                        try: await bot.send_message(aid, f"📚 *Kursa pirkums (auto):*\n👤 @{username} (`{uid}`)\n📧 `{email}`\n📚 {cname}\n💰 {amount} USDT\n🔖 `{tx[:20]}`", parse_mode="Markdown")
+                        try: await bot.send_message(aid, f"ðŸ“š *Kursa pirkums (auto):*\nðŸ‘¤ @{username} (`{uid}`)\nðŸ“§ `{email}`\nðŸ“š {cname}\nðŸ’° {amount} USDT\nðŸ”– `{tx[:20]}`", parse_mode="Markdown")
                         except: pass
                 else:
-                    # Čata abonements
+                    # ÄŒata abonements
                     plan = config.PLANS[pk]
                     new_exp, pname, product_meta = await _do_activate(uid, pk, plan, lang, username, tx, amount)
                     inv = await invite_text_for_product(uid, lang, product_meta, new_exp)
@@ -2922,7 +2923,7 @@ async def auto_check_pending_payments():
             logger.error(f"[AUTO-CHECK] {uid}: {e}")
             await notify_admins_error(f"auto_check user={uid}", e)
 
-# ─── SCHEDULER JOBS ───
+# â”€â”€â”€ SCHEDULER JOBS â”€â”€â”€
 async def check_expiring_subscriptions():
     now = datetime.utcnow()
     for db_ in [3, 1, 0]:
@@ -2940,17 +2941,17 @@ async def check_expiring_subscriptions():
                 elif db_ == 1:
                     text = t(lang, "remind_1", expires=exp_str)
                 else:
-                    text = f"⏰ *Subscription expires TODAY!*\n\n📅 {exp_str}\n\nRenew now:" if lang == "en" else f"⏰ *Подписка истекает СЕГОДНЯ!*\n\n📅 Дата: {exp_str}\n\nПродли сейчас:"
+                    text = f"â° *Subscription expires TODAY!*\n\nðŸ“… {exp_str}\n\nRenew now:" if lang == "en" else f"â° *ÐŸÐ¾Ð´Ð¿Ð¸ÑÐºÐ° Ð¸ÑÑ‚ÐµÐºÐ°ÐµÑ‚ Ð¡Ð•Ð“ÐžÐ”ÐÐ¯!*\n\nðŸ“… Ð”Ð°Ñ‚Ð°: {exp_str}\n\nÐŸÑ€Ð¾Ð´Ð»Ð¸ ÑÐµÐ¹Ñ‡Ð°Ñ:"
                 await bot.send_message(user['user_id'], text, reply_markup=plans_keyboard(lang), parse_mode="Markdown")
                 await db.mark_reminder_sent(user['user_id'], db_)
                 await db.log_bot_event("reminder_sent", user['user_id'], meta=f"days_before={db_}")
                 if db_ == 0:
                     username = f"@{user['username']}" if user.get("username") else f"ID {user['user_id']}"
                     admin_text = (
-                        "⏰ *Abonements beidzas šodien*\n\n"
-                        f"👤 {username} (`{user['user_id']}`)\n"
-                        f"📦 {user.get('plan_name', '—')}\n"
-                        f"📅 {exp_str}"
+                        "â° *Abonements beidzas Å¡odien*\n\n"
+                        f"ðŸ‘¤ {username} (`{user['user_id']}`)\n"
+                        f"ðŸ“¦ {user.get('plan_name', 'â€”')}\n"
+                        f"ðŸ“… {exp_str}"
                     )
                     for admin_id in config.ADMIN_IDS:
                         try:
@@ -2974,7 +2975,7 @@ async def send_upsell_offers():
             pn = m['name'][lang] if isinstance(m['name'], dict) else m['name']
             b = InlineKeyboardBuilder()
             yn = y['name'][lang] if isinstance(y['name'], dict) else y['name']
-            b.button(text=f"🔥 {yn}", callback_data="plan_yearly"); b.adjust(1)
+            b.button(text=f"ðŸ”¥ {yn}", callback_data="plan_yearly"); b.adjust(1)
             await bot.send_message(
                 user['user_id'],
                 t(
@@ -2994,9 +2995,9 @@ async def send_upsell_offers():
 async def kick_expired_users():
     for user in await db.get_expired_chat_subscriptions():
         if user.get("is_friend"): continue
-        # ADMIN AIZSARDZĪBA — nekad nebanoj adminus
+        # ADMIN AIZSARDZÄªBA â€” nekad nebanoj adminus
         if user['user_id'] in config.ADMIN_IDS:
-            logger.info(f"Skip admin {user['user_id']} — cannot kick admin")
+            logger.info(f"Skip admin {user['user_id']} â€” cannot kick admin")
             continue
         try:
             chat_id = int(user.get("chat_id") or 0)
@@ -3012,11 +3013,11 @@ async def kick_expired_users():
             username = f"@{user['username']}" if user.get("username") else f"ID {user['user_id']}"
             expires_at = user.get("expires_at", "")
             admin_text = (
-                "🚫 *Lietotājs izmests no čata*\n\n"
-                f"👤 {username} (`{user['user_id']}`)\n"
-                f"📦 {user.get('product_name', user.get('plan_name', '—'))}\n"
-                f"📅 Abonements beidzās: `{expires_at}`\n\n"
-                "ℹ️ Marketing ziņas šim lietotājam joprojām var tikt sūtītas no DB segmentiem."
+                "ðŸš« *LietotÄjs izmests no Äata*\n\n"
+                f"ðŸ‘¤ {username} (`{user['user_id']}`)\n"
+                f"ðŸ“¦ {user.get('product_name', user.get('plan_name', 'â€”'))}\n"
+                f"ðŸ“… Abonements beidzÄs: `{expires_at}`\n\n"
+                "â„¹ï¸ Marketing ziÅ†as Å¡im lietotÄjam joprojÄm var tikt sÅ«tÄ«tas no DB segmentiem."
             )
             for admin_id in config.ADMIN_IDS:
                 try:
@@ -3027,7 +3028,7 @@ async def kick_expired_users():
         except Exception as e: logger.error(f"Kick {user['user_id']}: {e}")
 
 async def run_monthly_giveaway():
-    """Automātiska izloze — 1. datumā, iepriekšējā mēneša dalībnieki"""
+    """AutomÄtiska izloze â€” 1. datumÄ, iepriekÅ¡Ä“jÄ mÄ“neÅ¡a dalÄ«bnieki"""
     import random
     now = datetime.utcnow()
     if now.month == 1:
@@ -3037,7 +3038,7 @@ async def run_monthly_giveaway():
 
     participants = await db.get_giveaway_participants(prev_month)
     if not participants:
-        logger.info(f"[GIVEAWAY] Nav dalībnieku par {prev_month}")
+        logger.info(f"[GIVEAWAY] Nav dalÄ«bnieku par {prev_month}")
         return
 
     winners_count, prize_days = await _giveaway_settings()
@@ -3045,7 +3046,7 @@ async def run_monthly_giveaway():
 
     winners = random.sample(participants, winners_count)
 
-    month_names_ru = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"]
+    month_names_ru = ["Ð¯Ð½Ð²Ð°Ñ€ÑŒ","Ð¤ÐµÐ²Ñ€Ð°Ð»ÑŒ","ÐœÐ°Ñ€Ñ‚","ÐÐ¿Ñ€ÐµÐ»ÑŒ","ÐœÐ°Ð¹","Ð˜ÑŽÐ½ÑŒ","Ð˜ÑŽÐ»ÑŒ","ÐÐ²Ð³ÑƒÑÑ‚","Ð¡ÐµÐ½Ñ‚ÑÐ±Ñ€ÑŒ","ÐžÐºÑ‚ÑÐ±Ñ€ÑŒ","ÐÐ¾ÑÐ±Ñ€ÑŒ","Ð”ÐµÐºÐ°Ð±Ñ€ÑŒ"]
     month_idx = int(prev_month.split("-")[1]) - 1
 
     winner_names = []
@@ -3056,7 +3057,7 @@ async def run_monthly_giveaway():
         wlang = wuser.get("lang", "ru") if wuser else "ru"
         winner_names.append(wname)
 
-        # Piešķirt dienas — pat ja abonements beidzies
+        # PieÅ¡Ä·irt dienas â€” pat ja abonements beidzies
         if wuser and wuser.get('expires_at'):
             exp = datetime.fromisoformat(wuser['expires_at'])
         else:
@@ -3074,37 +3075,37 @@ async def run_monthly_giveaway():
         if not (wuser and wuser.get('expires_at') and datetime.fromisoformat(wuser['expires_at']) > now):
             try:
                 link = await bot.create_chat_invite_link(chat_id_for_lang(wlang), member_limit=1, expire_date=int((new_exp + timedelta(days=7)).timestamp()))
-                invite_text = f"\n\n🔗 [{ui_text(wlang, 'Pievienoties čatam', 'Вступить в чат', 'Join chat')}]({link.invite_link})"
+                invite_text = f"\n\nðŸ”— [{ui_text(wlang, 'Pievienoties Äatam', 'Ð’ÑÑ‚ÑƒÐ¿Ð¸Ñ‚ÑŒ Ð² Ñ‡Ð°Ñ‚', 'Join chat')}]({link.invite_link})"
             except Exception:
-                invite_text = f"\n\n📢 {chat_link_for_lang(wlang)}"
+                invite_text = f"\n\nðŸ“¢ {chat_link_for_lang(wlang)}"
 
-        # Privātā ziņa uzvarētājam — custom vai default
+        # PrivÄtÄ ziÅ†a uzvarÄ“tÄjam â€” custom vai default
         custom_winner_text = await db.get_setting(f"giveaway_winner_text_{wlang}")
         if custom_winner_text:
             private_text = custom_winner_text.replace("{days}", str(prize_days)).replace("{expires}", new_exp.strftime('%d.%m.%Y'))
         elif wlang == "ru":
             private_text = (
-                "🎉🎉🎉 *ПОЗДРАВЛЯЕМ!*\n\n"
-                "🏆 Ты выиграл в ежемесячном розыгрыше!\n"
-                f"🎁 Приз: *+{prize_days} дней* бесплатного доступа к чату!\n\n"
-                f"📅 Подписка активна до: *{new_exp.strftime('%d.%m.%Y')}*\n\n"
-                "🎟 Участвуй в розыгрыше следующего месяца!"
+                "ðŸŽ‰ðŸŽ‰ðŸŽ‰ *ÐŸÐžÐ—Ð”Ð ÐÐ’Ð›Ð¯Ð•Ðœ!*\n\n"
+                "ðŸ† Ð¢Ñ‹ Ð²Ñ‹Ð¸Ð³Ñ€Ð°Ð» Ð² ÐµÐ¶ÐµÐ¼ÐµÑÑÑ‡Ð½Ð¾Ð¼ Ñ€Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹ÑˆÐµ!\n"
+                f"ðŸŽ ÐŸÑ€Ð¸Ð·: *+{prize_days} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð° Ðº Ñ‡Ð°Ñ‚Ñƒ!\n\n"
+                f"ðŸ“… ÐŸÐ¾Ð´Ð¿Ð¸ÑÐºÐ° Ð°ÐºÑ‚Ð¸Ð²Ð½Ð° Ð´Ð¾: *{new_exp.strftime('%d.%m.%Y')}*\n\n"
+                "ðŸŽŸ Ð£Ñ‡Ð°ÑÑ‚Ð²ÑƒÐ¹ Ð² Ñ€Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹ÑˆÐµ ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ³Ð¾ Ð¼ÐµÑÑÑ†Ð°!"
             )
         elif wlang == "lv":
             private_text = (
-                "🎉🎉🎉 *APSVEICAM!*\n\n"
-                "🏆 Tu uzvarēji ikmēneša izlozē!\n"
-                f"🎁 Balva: *+{prize_days} dienas* bezmaksas piekļuvei čatam!\n\n"
-                f"📅 Abonements aktīvs līdz: *{new_exp.strftime('%d.%m.%Y')}*\n\n"
-                "🎟 Piedalies arī nākamā mēneša izlozē!"
+                "ðŸŽ‰ðŸŽ‰ðŸŽ‰ *APSVEICAM!*\n\n"
+                "ðŸ† Tu uzvarÄ“ji ikmÄ“neÅ¡a izlozÄ“!\n"
+                f"ðŸŽ Balva: *+{prize_days} dienas* bezmaksas piekÄ¼uvei Äatam!\n\n"
+                f"ðŸ“… Abonements aktÄ«vs lÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*\n\n"
+                "ðŸŽŸ Piedalies arÄ« nÄkamÄ mÄ“neÅ¡a izlozÄ“!"
             )
         else:
             private_text = (
-                "🎉🎉🎉 *CONGRATULATIONS!*\n\n"
-                "🏆 You won the monthly giveaway!\n"
-                f"🎁 Prize: *+{prize_days} days* of free chat access!\n\n"
-                f"📅 Subscription active until: *{new_exp.strftime('%d.%m.%Y')}*\n\n"
-                "🎟 Join next month's giveaway!"
+                "ðŸŽ‰ðŸŽ‰ðŸŽ‰ *CONGRATULATIONS!*\n\n"
+                "ðŸ† You won the monthly giveaway!\n"
+                f"ðŸŽ Prize: *+{prize_days} days* of free chat access!\n\n"
+                f"ðŸ“… Subscription active until: *{new_exp.strftime('%d.%m.%Y')}*\n\n"
+                "ðŸŽŸ Join next month's giveaway!"
             )
         try:
             await bot.send_message(wid, private_text + invite_text, parse_mode="Markdown")
@@ -3113,7 +3114,7 @@ async def run_monthly_giveaway():
 
     await db.set_setting(f"giveaway_winner_{prev_month}", ",".join(str(w['user_id']) for w in winners))
 
-    # Kanāla paziņojums — valoda no settings
+    # KanÄla paziÅ†ojums â€” valoda no settings
     winners_str = ", ".join(winner_names)
     chat_lang = await db.get_setting("giveaway_chat_lang") or "ru"
 
@@ -3121,25 +3122,25 @@ async def run_monthly_giveaway():
 
     if chat_lang == "en":
         channel_text = (
-            f"🎟 *{month_names_en[month_idx]} Giveaway Results!*\n\n"
-            f"👥 Participants: *{len(participants)}*\n"
-            f"🏆 {'Winners' if winners_count > 1 else 'Winner'}: *{winners_str}*\n"
-            f"🎁 Prize: *+{prize_days} days* of free access!\n\n"
-            "━━━━━━━━━━━━━━━━\n\n"
-            "🎟 *Want to join next month's giveaway?*\n"
-            "Press «Monthly Giveaway» button in the bot!\n\n"
-            "🍀 Good luck everyone!"
+            f"ðŸŽŸ *{month_names_en[month_idx]} Giveaway Results!*\n\n"
+            f"ðŸ‘¥ Participants: *{len(participants)}*\n"
+            f"ðŸ† {'Winners' if winners_count > 1 else 'Winner'}: *{winners_str}*\n"
+            f"ðŸŽ Prize: *+{prize_days} days* of free access!\n\n"
+            "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+            "ðŸŽŸ *Want to join next month's giveaway?*\n"
+            "Press Â«Monthly GiveawayÂ» button in the bot!\n\n"
+            "ðŸ€ Good luck everyone!"
         )
     else:
         channel_text = (
-            f"🎟 *Результаты розыгрыша {month_names_ru[month_idx]}!*\n\n"
-            f"👥 Участников: *{len(participants)}*\n"
-            f"🏆 {'Победители' if winners_count > 1 else 'Победитель'}: *{winners_str}*\n"
-            f"🎁 Приз: *+{prize_days} дней* бесплатного доступа!\n\n"
-            "━━━━━━━━━━━━━━━━\n\n"
-            "🎟 *Хочешь участвовать в следующем розыгрыше?*\n"
-            "Нажми кнопку «Розыгрыш месяца» в боте!\n\n"
-            "🍀 Удачи всем!"
+            f"ðŸŽŸ *Ð ÐµÐ·ÑƒÐ»ÑŒÑ‚Ð°Ñ‚Ñ‹ Ñ€Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹ÑˆÐ° {month_names_ru[month_idx]}!*\n\n"
+            f"ðŸ‘¥ Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ¾Ð²: *{len(participants)}*\n"
+            f"ðŸ† {'ÐŸÐ¾Ð±ÐµÐ´Ð¸Ñ‚ÐµÐ»Ð¸' if winners_count > 1 else 'ÐŸÐ¾Ð±ÐµÐ´Ð¸Ñ‚ÐµÐ»ÑŒ'}: *{winners_str}*\n"
+            f"ðŸŽ ÐŸÑ€Ð¸Ð·: *+{prize_days} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°!\n\n"
+            "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+            "ðŸŽŸ *Ð¥Ð¾Ñ‡ÐµÑˆÑŒ ÑƒÑ‡Ð°ÑÑ‚Ð²Ð¾Ð²Ð°Ñ‚ÑŒ Ð² ÑÐ»ÐµÐ´ÑƒÑŽÑ‰ÐµÐ¼ Ñ€Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹ÑˆÐµ?*\n"
+            "ÐÐ°Ð¶Ð¼Ð¸ ÐºÐ½Ð¾Ð¿ÐºÑƒ Â«Ð Ð¾Ð·Ñ‹Ð³Ñ€Ñ‹Ñˆ Ð¼ÐµÑÑÑ†Ð°Â» Ð² Ð±Ð¾Ñ‚Ðµ!\n\n"
+            "ðŸ€ Ð£Ð´Ð°Ñ‡Ð¸ Ð²ÑÐµÐ¼!"
         )
     try:
         await bot.send_message(config.CHAT_ID, channel_text, parse_mode="Markdown")
@@ -3149,10 +3150,10 @@ async def run_monthly_giveaway():
     for aid in config.ADMIN_IDS:
         try:
             await bot.send_message(aid,
-                f"🎟 *Giveaway {prev_month}:*\n\n"
-                f"👥 Dalībnieki: *{len(participants)}*\n"
-                f"🏆 Uzvarētāji: *{winners_str}*\n"
-                f"🎁 +{prize_days} dienas",
+                f"ðŸŽŸ *Giveaway {prev_month}:*\n\n"
+                f"ðŸ‘¥ DalÄ«bnieki: *{len(participants)}*\n"
+                f"ðŸ† UzvarÄ“tÄji: *{winners_str}*\n"
+                f"ðŸŽ +{prize_days} dienas",
                 parse_mode="Markdown")
         except Exception:
             pass
@@ -3160,7 +3161,7 @@ async def run_monthly_giveaway():
     logger.info(f"[GIVEAWAY] {prev_month}: {len(winners)} winners from {len(participants)}")
 
 
-# Legacy naudas referral sadaļas aizvietotas ar bonusu dienu maku
+# Legacy naudas referral sadaÄ¼as aizvietotas ar bonusu dienu maku
 @dp.callback_query(F.data == "ref_earnings_page")
 async def show_earnings_page(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
@@ -3168,9 +3169,9 @@ async def show_earnings_page(callback: CallbackQuery):
     text = await build_referral_overview_text(callback.from_user.id, lang)
     text += ui_text(
         lang,
-        "\n\nℹ️ Šobrīd referral programma izmanto tikai bonusu dienas. Naudas izmaksas vairs nav pieejamas.",
-        "\n\nℹ️ Сейчас referral программа использует только бонусные дни. Денежные выплаты больше недоступны.",
-        "\n\nℹ️ The referral program now uses bonus days only. Cash payouts are no longer available.",
+        "\n\nâ„¹ï¸ Å obrÄ«d referral programma izmanto tikai bonusu dienas. Naudas izmaksas vairs nav pieejamas.",
+        "\n\nâ„¹ï¸ Ð¡ÐµÐ¹Ñ‡Ð°Ñ referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸. Ð”ÐµÐ½ÐµÐ¶Ð½Ñ‹Ðµ Ð²Ñ‹Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹.",
+        "\n\nâ„¹ï¸ The referral program now uses bonus days only. Cash payouts are no longer available.",
     )
     await callback.message.edit_text(text, reply_markup=referral_keyboard_with_earnings(lang), parse_mode="Markdown")
     await callback.answer()
@@ -3185,7 +3186,7 @@ async def show_earnings_list(callback: CallbackQuery):
         ui_text(
             lang,
             "Referral programma tagad izmanto tikai bonusu dienas.",
-            "Referral программа теперь использует только бонусные дни.",
+            "Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸.",
             "The referral program now uses bonus days only.",
         ),
         show_alert=True,
@@ -3206,8 +3207,8 @@ async def start_withdrawal(callback: CallbackQuery, state: FSMContext):
     await callback.answer(
         ui_text(
             lang,
-            "Naudas izmaksas vairs nav pieejamas. Referral programma tagad dod tikai bonusu dienas čatiem.",
-            "Денежные выплаты больше недоступны. Referral программа теперь дает только бонусные дни для чатов.",
+            "Naudas izmaksas vairs nav pieejamas. Referral programma tagad dod tikai bonusu dienas Äatiem.",
+            "Ð”ÐµÐ½ÐµÐ¶Ð½Ñ‹Ðµ Ð²Ñ‹Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹. Referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð´Ð°ÐµÑ‚ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
             "Cash payouts are no longer available. The referral program now gives only bonus days for chats.",
         ),
         show_alert=True,
@@ -3223,8 +3224,8 @@ async def withdrawal_receive_email(message: Message, state: FSMContext):
     await message.answer(
         ui_text(
             lang,
-            "Referral izmaksas ir izslēgtas. Tagad pieejamas tikai bonusu dienas čatiem.",
-            "Referral выплаты отключены. Теперь доступны только бонусные дни для чатов.",
+            "Referral izmaksas ir izslÄ“gtas. Tagad pieejamas tikai bonusu dienas Äatiem.",
+            "Referral Ð²Ñ‹Ð¿Ð»Ð°Ñ‚Ñ‹ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ñ‹. Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
             "Referral payouts are disabled. Only bonus days for chats are available now.",
         )
     )
@@ -3239,8 +3240,8 @@ async def withdrawal_receive_address(message: Message, state: FSMContext):
     await message.answer(
         ui_text(
             lang,
-            "Referral izmaksas ir izslēgtas. Tagad pieejamas tikai bonusu dienas čatiem.",
-            "Referral выплаты отключены. Теперь доступны только бонусные дни для чатов.",
+            "Referral izmaksas ir izslÄ“gtas. Tagad pieejamas tikai bonusu dienas Äatiem.",
+            "Referral Ð²Ñ‹Ð¿Ð»Ð°Ñ‚Ñ‹ Ð¾Ñ‚ÐºÐ»ÑŽÑ‡ÐµÐ½Ñ‹. Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
             "Referral payouts are disabled. Only bonus days for chats are available now.",
         )
     )
@@ -3255,9 +3256,9 @@ async def withdrawal_confirm(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         ui_text(
             lang,
-            "ℹ️ Referral izmaksas vairs nav pieejamas. Tagad tiek izmantotas tikai bonusu dienas čatiem.",
-            "ℹ️ Referral выплаты больше недоступны. Теперь используются только бонусные дни для чатов.",
-            "ℹ️ Referral payouts are no longer available. Only bonus days for chats are used now.",
+            "â„¹ï¸ Referral izmaksas vairs nav pieejamas. Tagad tiek izmantotas tikai bonusu dienas Äatiem.",
+            "â„¹ï¸ Referral Ð²Ñ‹Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½ÐµÐ´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ñ‹. Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÑŽÑ‚ÑÑ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ð´Ð»Ñ Ñ‡Ð°Ñ‚Ð¾Ð².",
+            "â„¹ï¸ Referral payouts are no longer available. Only bonus days for chats are used now.",
         )
     )
     await callback.answer()
@@ -3272,8 +3273,8 @@ async def withdrawal_cancel(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         ui_text(
             lang,
-            "Atcelts. Referral sadaļā tagad tiek izmantotas tikai bonusu dienas.",
-            "Отменено. В referral разделе теперь используются только бонусные дни.",
+            "Atcelts. Referral sadaÄ¼Ä tagad tiek izmantotas tikai bonusu dienas.",
+            "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾. Ð’ referral Ñ€Ð°Ð·Ð´ÐµÐ»Ðµ Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÑŽÑ‚ÑÑ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸.",
             "Cancelled. The referral section now uses bonus days only.",
         )
     )
@@ -3293,8 +3294,8 @@ async def show_withdrawal_history(callback: CallbackQuery):
     await callback.answer(
         ui_text(
             lang,
-            "Izmaksu vēsture vairs netiek izmantota, jo referral programma tagad strādā ar bonusu dienām.",
-            "История выплат больше не используется, потому что referral программа теперь работает с бонусными днями.",
+            "Izmaksu vÄ“sture vairs netiek izmantota, jo referral programma tagad strÄdÄ ar bonusu dienÄm.",
+            "Ð˜ÑÑ‚Ð¾Ñ€Ð¸Ñ Ð²Ñ‹Ð¿Ð»Ð°Ñ‚ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð½Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ, Ð¿Ð¾Ñ‚Ð¾Ð¼Ñƒ Ñ‡Ñ‚Ð¾ referral Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ñ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ð¼Ð¸ Ð´Ð½ÑÐ¼Ð¸.",
             "Withdrawal history is no longer used because the referral program now works with bonus days.",
         ),
         show_alert=True,
@@ -3303,9 +3304,9 @@ async def show_withdrawal_history(callback: CallbackQuery):
 
 
 
-# ═══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # LOYALTY HANDLERS (embedded from bot_loyalty_addon.py)
-# ═══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @dp.message(Command("loyalty"))
 async def show_loyalty_status(message: Message):
@@ -3314,7 +3315,7 @@ async def show_loyalty_status(message: Message):
     user = await db.get_user(user_id)
     
     if not user:
-        await message.answer("❌ User not found")
+        await message.answer("âŒ User not found")
         return
     
     lang = user.get('lang', 'ru')
@@ -3350,19 +3351,19 @@ async def show_loyalty_status(message: Message):
         progress = consecutive_months / target_months
         bar_length = 20
         filled = int(progress * bar_length)
-        bar = "█" * filled + "░" * (bar_length - filled)
+        bar = "â–ˆ" * filled + "â–‘" * (bar_length - filled)
         
         months_left = target_months - consecutive_months
     else:
         # Already Legend
-        bar = "█" * 20
+        bar = "â–ˆ" * 20
         months_left = 0
     
     if lang == 'ru':
-        text = f"""📊 Твой Прогресс Лояльности
+        text = f"""ðŸ“Š Ð¢Ð²Ð¾Ð¹ ÐŸÑ€Ð¾Ð³Ñ€ÐµÑÑ Ð›Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸
 
 {emoji} *{tag.upper()}* ({discount}%)
-{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} месяцев
+{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} Ð¼ÐµÑÑÑ†ÐµÐ²
 """
         
         if next_tier:
@@ -3372,28 +3373,28 @@ async def show_loyalty_status(message: Message):
             next_bonus = config.LOYALTY_TIERS[next_tier]['bonus_days']
             
             text += f"""
-➡️ Следующий: {next_emoji} *{next_tag.upper()}*
-📅 До цели: {months_left} {'месяц' if months_left == 1 else 'месяца' if months_left < 5 else 'месяцев'}! 🔥
+âž¡ï¸ Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¹: {next_emoji} *{next_tag.upper()}*
+ðŸ“… Ð”Ð¾ Ñ†ÐµÐ»Ð¸: {months_left} {'Ð¼ÐµÑÑÑ†' if months_left == 1 else 'Ð¼ÐµÑÑÑ†Ð°' if months_left < 5 else 'Ð¼ÐµÑÑÑ†ÐµÐ²'}! ðŸ”¥
 
-🎁 Получишь:
-   • +{next_bonus} дней бесплатно
-   • {next_discount}% скидка (против {discount}%)
-   • {next_emoji} {next_tag} badge"""
+ðŸŽ ÐŸÐ¾Ð»ÑƒÑ‡Ð¸ÑˆÑŒ:
+   â€¢ +{next_bonus} Ð´Ð½ÐµÐ¹ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾
+   â€¢ {next_discount}% ÑÐºÐ¸Ð´ÐºÐ° (Ð¿Ñ€Ð¾Ñ‚Ð¸Ð² {discount}%)
+   â€¢ {next_emoji} {next_tag} badge"""
             
             if next_tier == 'elite':
-                text += "\n   • 🎓 Power Up курс (100$ стоимость)"
+                text += "\n   â€¢ ðŸŽ“ Power Up ÐºÑƒÑ€Ñ (100$ ÑÑ‚Ð¾Ð¸Ð¼Ð¾ÑÑ‚ÑŒ)"
         
         else:
             text += f"""
-🔱 *ТЫ ДОСТИГ МАКСИМУМА!*
-👑 Legend статус - высшее достижение!
+ðŸ”± *Ð¢Ð« Ð”ÐžÐ¡Ð¢Ð˜Ð“ ÐœÐÐšÐ¡Ð˜ÐœÐ£ÐœÐ!*
+ðŸ‘‘ Legend ÑÑ‚Ð°Ñ‚ÑƒÑ - Ð²Ñ‹ÑÑˆÐµÐµ Ð´Ð¾ÑÑ‚Ð¸Ð¶ÐµÐ½Ð¸Ðµ!
 
-Спасибо за {consecutive_months} месяцев лояльности! 🏆"""
+Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° {consecutive_months} Ð¼ÐµÑÑÑ†ÐµÐ² Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸! ðŸ†"""
         
-        text += "\n\n💡 *Продолжай продлять - сохраняй статус!*"
+        text += "\n\nðŸ’¡ *ÐŸÑ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ð¹ Ð¿Ñ€Ð¾Ð´Ð»ÑÑ‚ÑŒ - ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐ¹ ÑÑ‚Ð°Ñ‚ÑƒÑ!*"
     
     else:  # EN
-        text = f"""📊 Your Loyalty Progress
+        text = f"""ðŸ“Š Your Loyalty Progress
 
 {emoji} *{tag.upper()}* ({discount}%)
 {bar} {consecutive_months}/{target_months if next_tier else consecutive_months} months
@@ -3406,50 +3407,50 @@ async def show_loyalty_status(message: Message):
             next_bonus = config.LOYALTY_TIERS[next_tier]['bonus_days']
             
             text += f"""
-➡️ Next: {next_emoji} *{next_tag.upper()}*
-📅 Time left: {months_left} {'month' if months_left == 1 else 'months'}! 🔥
+âž¡ï¸ Next: {next_emoji} *{next_tag.upper()}*
+ðŸ“… Time left: {months_left} {'month' if months_left == 1 else 'months'}! ðŸ”¥
 
-🎁 You'll get:
-   • +{next_bonus} days free
-   • {next_discount}% discount (vs {discount}%)
-   • {next_emoji} {next_tag} badge"""
+ðŸŽ You'll get:
+   â€¢ +{next_bonus} days free
+   â€¢ {next_discount}% discount (vs {discount}%)
+   â€¢ {next_emoji} {next_tag} badge"""
             
             if next_tier == 'elite':
-                text += "\n   • 🎓 Power Up course (100$ value)"
+                text += "\n   â€¢ ðŸŽ“ Power Up course (100$ value)"
         
         else:
             text += f"""
-🔱 *YOU REACHED THE TOP!*
-👑 Legend status - ultimate achievement!
+ðŸ”± *YOU REACHED THE TOP!*
+ðŸ‘‘ Legend status - ultimate achievement!
 
-Thank you for {consecutive_months} months of loyalty! 🏆"""
+Thank you for {consecutive_months} months of loyalty! ðŸ†"""
         
-        text += "\n\n💡 *Keep renewing - maintain your status!*"
+        text += "\n\nðŸ’¡ *Keep renewing - maintain your status!*"
     
     if lang == 'ru':
         text = (
-            f"📊 *Твой прогресс лояльности*\n\n"
+            f"ðŸ“Š *Ð¢Ð²Ð¾Ð¹ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
             f"{emoji} *{tag.upper()}*\n"
-            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} месяцев\n\n"
-            "🎁 Чем дольше активна подписка, тем больше бесплатных дней ты получаешь."
+            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} Ð¼ÐµÑÑÑ†ÐµÐ²\n\n"
+            "ðŸŽ Ð§ÐµÐ¼ Ð´Ð¾Ð»ÑŒÑˆÐµ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð° Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ°, Ñ‚ÐµÐ¼ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ñ… Ð´Ð½ÐµÐ¹ Ñ‚Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑˆÑŒ."
         )
     elif lang == 'lv':
         text = (
-            f"📊 *Tavs lojalitātes progress*\n\n"
+            f"ðŸ“Š *Tavs lojalitÄtes progress*\n\n"
             f"{emoji} *{tag.upper()}*\n"
-            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} mēneši\n\n"
-            "🎁 Jo ilgāk abonements ir aktīvs, jo vairāk bezmaksas bonusa dienu tu atbloķē."
+            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} mÄ“neÅ¡i\n\n"
+            "ðŸŽ Jo ilgÄk abonements ir aktÄ«vs, jo vairÄk bezmaksas bonusa dienu tu atbloÄ·Ä“."
         )
     else:
         text = (
-            f"📊 *Your Loyalty Progress*\n\n"
+            f"ðŸ“Š *Your Loyalty Progress*\n\n"
             f"{emoji} *{tag.upper()}*\n"
             f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} months\n\n"
-            "🎁 The longer your subscription stays active, the more free bonus days you unlock."
+            "ðŸŽ The longer your subscription stays active, the more free bonus days you unlock."
         )
 
     b = InlineKeyboardBuilder()
-    b.button(text="💎 " + ui_text(lang, "Pagarināt", "Продлить", "Renew"),
+    b.button(text="ðŸ’Ž " + ui_text(lang, "PagarinÄt", "ÐŸÑ€Ð¾Ð´Ð»Ð¸Ñ‚ÑŒ", "Renew"),
              callback_data="vip_chat_plans")
     b.adjust(1)
     
@@ -3463,7 +3464,7 @@ async def loyalty_status_callback(callback: CallbackQuery):
     user = await db.get_user(user_id)
     
     if not user:
-        await callback.answer("❌ User not found")
+        await callback.answer("âŒ User not found")
         return
     
     lang = user.get('lang', 'ru')
@@ -3479,7 +3480,7 @@ async def loyalty_status_callback(callback: CallbackQuery):
     consecutive_months = loyalty_data.get('consecutive_months', 0)
     
     tier_data = config.LOYALTY_TIERS[current_tier]
-    emoji = tier_data.get('emoji', '🌱')
+    emoji = tier_data.get('emoji', 'ðŸŒ±')
     tag = tier_data.get('tag', 'Rookie')
     discount = tier_data.get('chat_discount', 0)
     
@@ -3499,17 +3500,17 @@ async def loyalty_status_callback(callback: CallbackQuery):
         progress_pct = int(progress * 100)
         bar_length = 15
         filled = int(progress * bar_length)
-        bar = "▓" * filled + "░" * (bar_length - filled)
+        bar = "â–“" * filled + "â–‘" * (bar_length - filled)
         months_left = target_months - consecutive_months
     else:
-        bar = "▓" * 15
+        bar = "â–“" * 15
         months_left = 0
         progress_pct = 100
     
     if lang == 'ru':
-        discount_text = f" — скидка *{discount}%*" if discount > 0 else ""
+        discount_text = f" â€” ÑÐºÐ¸Ð´ÐºÐ° *{discount}%*" if discount > 0 else ""
         text = (
-            f"🏆 *Твой уровень лояльности*\n\n"
+            f"ðŸ† *Ð¢Ð²Ð¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
             f"{emoji} *{tag.upper()}*{discount_text}\n"
             f"{bar} *{progress_pct}%*\n"
         )
@@ -3522,40 +3523,40 @@ async def loyalty_status_callback(callback: CallbackQuery):
             next_bonus = next_data['bonus_days']
             
             text += (
-                f"\n━━━━━━━━━━━━━━━━\n\n"
-                f"🎯 *Следующий уровень:* {next_emoji} {next_tag}\n"
-                f"📅 Осталось: *{months_left}* {_months_ru(months_left)}\n\n"
-                f"🎁 *Что ты получишь:*\n"
-                f"   • +{next_bonus} дней бесплатного доступа\n"
-                f"   • Постоянная скидка {next_discount}%\n"
-                f"   • Статус {next_emoji} {next_tag}"
+                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+                f"ðŸŽ¯ *Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ:* {next_emoji} {next_tag}\n"
+                f"ðŸ“… ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ: *{months_left}* {_months_ru(months_left)}\n\n"
+                f"ðŸŽ *Ð§Ñ‚Ð¾ Ñ‚Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸ÑˆÑŒ:*\n"
+                f"   â€¢ +{next_bonus} Ð´Ð½ÐµÐ¹ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°\n"
+                f"   â€¢ ÐŸÐ¾ÑÑ‚Ð¾ÑÐ½Ð½Ð°Ñ ÑÐºÐ¸Ð´ÐºÐ° {next_discount}%\n"
+                f"   â€¢ Ð¡Ñ‚Ð°Ñ‚ÑƒÑ {next_emoji} {next_tag}"
             )
             if next_tier == 'elite':
-                text += "\n   • 🎓 Бесплатный Power Up курс ($100)"
+                text += "\n   â€¢ ðŸŽ“ Ð‘ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ð¹ Power Up ÐºÑƒÑ€Ñ ($100)"
             
             text += (
-                f"\n\n━━━━━━━━━━━━━━━━\n"
-                f"💡 *Продолжай подписку — прогресс копится!*"
+                f"\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+                f"ðŸ’¡ *ÐŸÑ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ð¹ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ â€” Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑ ÐºÐ¾Ð¿Ð¸Ñ‚ÑÑ!*"
             )
             
-            # Course upsell priekš Rookie un Active
+            # Course upsell priekÅ¡ Rookie un Active
             if current_tier in ('rookie', 'active'):
                 text += (
-                    f"\n\n🔥 *Хочешь быстрее расти?*\n"
-                    f"Пройди курс и прокачай свой трейдинг!"
+                    f"\n\nðŸ”¥ *Ð¥Ð¾Ñ‡ÐµÑˆÑŒ Ð±Ñ‹ÑÑ‚Ñ€ÐµÐµ Ñ€Ð°ÑÑ‚Ð¸?*\n"
+                    f"ÐŸÑ€Ð¾Ð¹Ð´Ð¸ ÐºÑƒÑ€Ñ Ð¸ Ð¿Ñ€Ð¾ÐºÐ°Ñ‡Ð°Ð¹ ÑÐ²Ð¾Ð¹ Ñ‚Ñ€ÐµÐ¹Ð´Ð¸Ð½Ð³!"
                 )
         else:
             text += (
-                f"\n━━━━━━━━━━━━━━━━\n\n"
-                f"🔱 *ТЫ НА ВЕРШИНЕ!*\n"
-                f"Максимальная скидка *{discount}%* на всё!\n\n"
-                f"🙏 Спасибо за *{consecutive_months}* месяцев с нами! 🏆"
+                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+                f"ðŸ”± *Ð¢Ð« ÐÐ Ð’Ð•Ð Ð¨Ð˜ÐÐ•!*\n"
+                f"ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð°Ñ ÑÐºÐ¸Ð´ÐºÐ° *{discount}%* Ð½Ð° Ð²ÑÑ‘!\n\n"
+                f"ðŸ™ Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° *{consecutive_months}* Ð¼ÐµÑÑÑ†ÐµÐ² Ñ Ð½Ð°Ð¼Ð¸! ðŸ†"
             )
     
     else:  # EN
-        discount_text = f" — *{discount}%* discount" if discount > 0 else ""
+        discount_text = f" â€” *{discount}%* discount" if discount > 0 else ""
         text = (
-            f"🏆 *Your Loyalty Level*\n\n"
+            f"ðŸ† *Your Loyalty Level*\n\n"
             f"{emoji} *{tag.upper()}*{discount_text}\n"
             f"{bar} *{progress_pct}%*\n"
         )
@@ -3568,64 +3569,64 @@ async def loyalty_status_callback(callback: CallbackQuery):
             next_bonus = next_data['bonus_days']
             
             text += (
-                f"\n━━━━━━━━━━━━━━━━\n\n"
-                f"🎯 *Next level:* {next_emoji} {next_tag}\n"
-                f"📅 *{months_left}* month{'s' if months_left != 1 else ''} to go\n\n"
-                f"🎁 *You'll unlock:*\n"
-                f"   • +{next_bonus} days free access\n"
-                f"   • Permanent {next_discount}% discount\n"
-                f"   • {next_emoji} {next_tag} status"
+                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+                f"ðŸŽ¯ *Next level:* {next_emoji} {next_tag}\n"
+                f"ðŸ“… *{months_left}* month{'s' if months_left != 1 else ''} to go\n\n"
+                f"ðŸŽ *You'll unlock:*\n"
+                f"   â€¢ +{next_bonus} days free access\n"
+                f"   â€¢ Permanent {next_discount}% discount\n"
+                f"   â€¢ {next_emoji} {next_tag} status"
             )
             if next_tier == 'elite':
-                text += "\n   • 🎓 Free Power Up course ($100)"
+                text += "\n   â€¢ ðŸŽ“ Free Power Up course ($100)"
             
             text += (
-                f"\n\n━━━━━━━━━━━━━━━━\n"
-                f"💡 *Keep your subscription active to progress!*"
+                f"\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+                f"ðŸ’¡ *Keep your subscription active to progress!*"
             )
             
             if current_tier in ('rookie', 'active'):
                 text += (
-                    f"\n\n🔥 *Want to grow faster?*\n"
+                    f"\n\nðŸ”¥ *Want to grow faster?*\n"
                     f"Take a course and level up your trading!"
                 )
         else:
             text += (
-                f"\n━━━━━━━━━━━━━━━━\n\n"
-                f"🔱 *YOU'RE AT THE TOP!*\n"
+                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+                f"ðŸ”± *YOU'RE AT THE TOP!*\n"
                 f"Maximum *{discount}%* discount on everything!\n\n"
-                f"🙏 Thank you for *{consecutive_months}* months with us! 🏆"
+                f"ðŸ™ Thank you for *{consecutive_months}* months with us! ðŸ†"
             )
     
     if lang == 'ru':
         text = (
-            f"🏆 *Твой уровень лояльности*\n\n"
+            f"ðŸ† *Ð¢Ð²Ð¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
             f"{emoji} *{tag.upper()}*\n"
             f"{bar} *{progress_pct}%*\n\n"
-            "🎁 Лояльность теперь даёт бонусные бесплатные дни за длительную активную подписку."
+            "ðŸŽ Ð›Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚ÑŒ Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð´Ð°Ñ‘Ñ‚ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ðµ Ð´Ð½Ð¸ Ð·Ð° Ð´Ð»Ð¸Ñ‚ÐµÐ»ÑŒÐ½ÑƒÑŽ Ð°ÐºÑ‚Ð¸Ð²Ð½ÑƒÑŽ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ."
         )
     elif lang == 'lv':
         text = (
-            f"🏆 *Tavs lojalitātes līmenis*\n\n"
+            f"ðŸ† *Tavs lojalitÄtes lÄ«menis*\n\n"
             f"{emoji} *{tag.upper()}*\n"
             f"{bar} *{progress_pct}%*\n\n"
-            "🎁 Lojalitāte tagad dod bezmaksas bonusa dienas par ilgstoši aktīvu abonementu."
+            "ðŸŽ LojalitÄte tagad dod bezmaksas bonusa dienas par ilgstoÅ¡i aktÄ«vu abonementu."
         )
     else:
         text = (
-            f"🏆 *Your Loyalty Level*\n\n"
+            f"ðŸ† *Your Loyalty Level*\n\n"
             f"{emoji} *{tag.upper()}*\n"
             f"{bar} *{progress_pct}%*\n\n"
-            "🎁 Loyalty now rewards long active subscriptions with free bonus days."
+            "ðŸŽ Loyalty now rewards long active subscriptions with free bonus days."
         )
 
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     b = InlineKeyboardBuilder()
-    b.button(text="📋  " + ui_text(lang, "Visi līmeņi un bonusi", "Все уровни и бонусы", "All levels & rewards"),
+    b.button(text="ðŸ“‹  " + ui_text(lang, "Visi lÄ«meÅ†i un bonusi", "Ð’ÑÐµ ÑƒÑ€Ð¾Ð²Ð½Ð¸ Ð¸ Ð±Ð¾Ð½ÑƒÑÑ‹", "All levels & rewards"),
              callback_data="loyalty_tiers_info")
-    # Course upsell poga priekš Rookie/Active
+    # Course upsell poga priekÅ¡ Rookie/Active
     if current_tier in ('rookie', 'active'):
-        b.button(text="🔥  " + ui_text(lang, "Kursi — uzlabo tradingu!", "Курсы — прокачай трейдинг!", "Courses — level up!"),
+        b.button(text="ðŸ”¥  " + ui_text(lang, "Kursi â€” uzlabo tradingu!", "ÐšÑƒÑ€ÑÑ‹ â€” Ð¿Ñ€Ð¾ÐºÐ°Ñ‡Ð°Ð¹ Ñ‚Ñ€ÐµÐ¹Ð´Ð¸Ð½Ð³!", "Courses â€” level up!"),
                  callback_data="courses_menu")
     b.button(text=back_button_text(lang),
              callback_data="settings_back")
@@ -3637,17 +3638,17 @@ async def loyalty_status_callback(callback: CallbackQuery):
 
 
 def _months_ru(n):
-    """Mēnešu locījums krievu valodā"""
+    """MÄ“neÅ¡u locÄ«jums krievu valodÄ"""
     if n % 10 == 1 and n % 100 != 11:
-        return "месяц"
+        return "Ð¼ÐµÑÑÑ†"
     elif 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14):
-        return "месяца"
-    return "месяцев"
+        return "Ð¼ÐµÑÑÑ†Ð°"
+    return "Ð¼ÐµÑÑÑ†ÐµÐ²"
 
 
 @dp.callback_query(F.data == "loyalty_tiers_info")
 async def loyalty_tiers_info(callback: CallbackQuery):
-    """Parādīt visu līmeņu aprakstu ar bonusiem"""
+    """ParÄdÄ«t visu lÄ«meÅ†u aprakstu ar bonusiem"""
     user = await db.get_user(callback.from_user.id)
     lang = user.get('lang', 'ru') if user else 'ru'
     
@@ -3657,11 +3658,11 @@ async def loyalty_tiers_info(callback: CallbackQuery):
     tier_order = ['rookie', 'active', 'pro', 'elite', 'master', 'legend']
     
     if lang == 'ru':
-        text = "📋 *Все уровни лояльности*\n\nЧем дольше подписка — тем больше привилегий!\n"
+        text = "ðŸ“‹ *Ð’ÑÐµ ÑƒÑ€Ð¾Ð²Ð½Ð¸ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\nÐ§ÐµÐ¼ Ð´Ð¾Ð»ÑŒÑˆÐµ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° â€” Ñ‚ÐµÐ¼ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð¿Ñ€Ð¸Ð²Ð¸Ð»ÐµÐ³Ð¸Ð¹!\n"
     elif lang == 'lv':
-        text = "📋 *Visi lojalitātes līmeņi*\n\nJo ilgāk abonē, jo vairāk bonusu!\n"
+        text = "ðŸ“‹ *Visi lojalitÄtes lÄ«meÅ†i*\n\nJo ilgÄk abonÄ“, jo vairÄk bonusu!\n"
     else:
-        text = "📋 *All Loyalty Levels*\n\nThe longer you subscribe — the more rewards!\n"
+        text = "ðŸ“‹ *All Loyalty Levels*\n\nThe longer you subscribe â€” the more rewards!\n"
     
     for tier_name in tier_order:
         td = config.LOYALTY_TIERS[tier_name]
@@ -3672,52 +3673,52 @@ async def loyalty_tiers_info(callback: CallbackQuery):
         min_m = td['min_months']
         
         is_current = (tier_name == current_tier)
-        marker = ui_text(lang, " ◀ TU ESI ŠEIT", " ◀ ТЫ ЗДЕСЬ", " ◀ YOU") if is_current else ""
+        marker = ui_text(lang, " â—€ TU ESI Å EIT", " â—€ Ð¢Ð« Ð—Ð”Ð•Ð¡Ð¬", " â—€ YOU") if is_current else ""
         
-        text += f"\n━━━━━━━━━━━━━━━━\n"
+        text += f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
         text += f"{em} *{tg.upper()}*{marker}\n"
         
         if lang == 'ru':
             if min_m == 0:
-                text += "📅 Старт\n"
+                text += "ðŸ“… Ð¡Ñ‚Ð°Ñ€Ñ‚\n"
             else:
-                text += f"📅 После {min_m} {_months_ru(min_m)} подписки\n"
+                text += f"ðŸ“… ÐŸÐ¾ÑÐ»Ðµ {min_m} {_months_ru(min_m)} Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸\n"
             if disc > 0:
-                text += f"💰 Скидка: *{disc}%* на всё\n"
+                text += f"ðŸ’° Ð¡ÐºÐ¸Ð´ÐºÐ°: *{disc}%* Ð½Ð° Ð²ÑÑ‘\n"
             if bonus > 0:
-                text += f"🎁 Бонус: *+{bonus} дней* бесплатно\n"
+                text += f"ðŸŽ Ð‘Ð¾Ð½ÑƒÑ: *+{bonus} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾\n"
             if td.get('free_course'):
-                text += f"🎓 Бесплатный Power Up курс ($100)\n"
+                text += f"ðŸŽ“ Ð‘ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ð¹ Power Up ÐºÑƒÑ€Ñ ($100)\n"
         elif lang == 'lv':
             if min_m == 0:
-                text += "📅 Sākuma līmenis\n"
+                text += "ðŸ“… SÄkuma lÄ«menis\n"
             else:
-                text += f"📅 Pēc {min_m} mēnešu abonementa\n"
+                text += f"ðŸ“… PÄ“c {min_m} mÄ“neÅ¡u abonementa\n"
             if disc > 0:
-                text += f"💰 Atlaide: *{disc}%* visam\n"
+                text += f"ðŸ’° Atlaide: *{disc}%* visam\n"
             if bonus > 0:
-                text += f"🎁 Bonuss: *+{bonus} dienas* bezmaksas\n"
+                text += f"ðŸŽ Bonuss: *+{bonus} dienas* bezmaksas\n"
             if td.get('free_course'):
-                text += f"🎓 Bezmaksas Power Up kurss ($100)\n"
+                text += f"ðŸŽ“ Bezmaksas Power Up kurss ($100)\n"
         else:
             if min_m == 0:
-                text += "📅 Starting level\n"
+                text += "ðŸ“… Starting level\n"
             else:
-                text += f"📅 After {min_m} months\n"
+                text += f"ðŸ“… After {min_m} months\n"
             if disc > 0:
-                text += f"💰 Discount: *{disc}%* on everything\n"
+                text += f"ðŸ’° Discount: *{disc}%* on everything\n"
             if bonus > 0:
-                text += f"🎁 Bonus: *+{bonus} days* free\n"
+                text += f"ðŸŽ Bonus: *+{bonus} days* free\n"
             if td.get('free_course'):
-                text += f"🎓 Free Power Up course ($100)\n"
+                text += f"ðŸŽ“ Free Power Up course ($100)\n"
     
-    text += "\n━━━━━━━━━━━━━━━━\n"
+    text += "\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
     if lang == 'ru':
-        text += "\n💡 *Твой прогресс сохраняется пока подписка активна!*"
+        text += "\nðŸ’¡ *Ð¢Ð²Ð¾Ð¹ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ Ð¿Ð¾ÐºÐ° Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° Ð°ÐºÑ‚Ð¸Ð²Ð½Ð°!*"
     elif lang == 'lv':
-        text += "\n💡 *Tavs progress saglabājas, kamēr abonements ir aktīvs!*"
+        text += "\nðŸ’¡ *Tavs progress saglabÄjas, kamÄ“r abonements ir aktÄ«vs!*"
     else:
-        text += "\n💡 *Your progress is saved while subscription is active!*"
+        text += "\nðŸ’¡ *Your progress is saved while subscription is active!*"
     
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     b = InlineKeyboardBuilder()
@@ -3738,7 +3739,7 @@ async def show_promo_codes(callback: CallbackQuery):
     coupons = await db.get_active_coupons(user_id)
     
     if not coupons:
-        text = "❌ " + ui_text(lang, "Tev nav aktīvu promokodu", "У тебя нет активных промокодов", "You have no active promo codes")
+        text = "âŒ " + ui_text(lang, "Tev nav aktÄ«vu promokodu", "Ð£ Ñ‚ÐµÐ±Ñ Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ… Ð¿Ñ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´Ð¾Ð²", "You have no active promo codes")
         b = InlineKeyboardBuilder()
         b.button(text=back_button_text(lang), callback_data="loyalty_main")
         b.adjust(1)
@@ -3747,11 +3748,11 @@ async def show_promo_codes(callback: CallbackQuery):
         return
     
     if lang == 'ru':
-        text = "💳 *ТВОИ ПРОМОКОДЫ*\n\n"
+        text = "ðŸ’³ *Ð¢Ð’ÐžÐ˜ ÐŸÐ ÐžÐœÐžÐšÐžÐ”Ð«*\n\n"
     elif lang == 'lv':
-        text = "💳 *TAVI PROMOKODI*\n\n"
+        text = "ðŸ’³ *TAVI PROMOKODI*\n\n"
     else:
-        text = "💳 *YOUR PROMO CODES*\n\n"
+        text = "ðŸ’³ *YOUR PROMO CODES*\n\n"
     
     keyboard = InlineKeyboardBuilder()
     
@@ -3764,25 +3765,25 @@ async def show_promo_codes(callback: CallbackQuery):
         max_uses = coupon.get('max_uses')
         times_used = coupon.get('times_used', 0)
         
-        text += "━━━━━━━━━━━━━━━━\n\n"
+        text += "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
         
         # Type-specific header
         if coupon_type == 'loyalty_tier':
-            text += f"🎯 *{ui_text(lang, 'Lojalitātes atlaide', 'Скидка лояльности', 'Loyalty Discount')}*\n\n"
+            text += f"ðŸŽ¯ *{ui_text(lang, 'LojalitÄtes atlaide', 'Ð¡ÐºÐ¸Ð´ÐºÐ° Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸', 'Loyalty Discount')}*\n\n"
         
         elif coupon_type == 'reminder_bonus':
-            text += f"🎁 *{ui_text(lang, 'Atgādinājuma bonuss', 'Бонус-напоминание', 'Reminder Bonus')}*\n\n"
+            text += f"ðŸŽ *{ui_text(lang, 'AtgÄdinÄjuma bonuss', 'Ð‘Ð¾Ð½ÑƒÑ-Ð½Ð°Ð¿Ð¾Ð¼Ð¸Ð½Ð°Ð½Ð¸Ðµ', 'Reminder Bonus')}*\n\n"
         
         elif coupon_type == 'winback':
-            text += f"🔙 *{ui_text(lang, 'Laipni atpakaļ', 'С возвращением', 'Welcome Back')}*\n\n"
+            text += f"ðŸ”™ *{ui_text(lang, 'Laipni atpakaÄ¼', 'Ð¡ Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰ÐµÐ½Ð¸ÐµÐ¼', 'Welcome Back')}*\n\n"
         
         elif coupon_type == 'survey':
-            text += f"📊 *{ui_text(lang, 'Aptaujas balva', 'Награда за опрос', 'Survey Reward')}*\n\n"
+            text += f"ðŸ“Š *{ui_text(lang, 'Aptaujas balva', 'ÐÐ°Ð³Ñ€Ð°Ð´Ð° Ð·Ð° Ð¾Ð¿Ñ€Ð¾Ñ', 'Survey Reward')}*\n\n"
         
         # Code
         if lang == 'ru':
-            text += f"Код: `{code}`\n"
-            text += f"Скидка: *{discount}%*\n"
+            text += f"ÐšÐ¾Ð´: `{code}`\n"
+            text += f"Ð¡ÐºÐ¸Ð´ÐºÐ°: *{discount}%*\n"
         elif lang == 'lv':
             text += f"Kods: `{code}`\n"
             text += f"Atlaide: *{discount}%*\n"
@@ -3792,11 +3793,11 @@ async def show_promo_codes(callback: CallbackQuery):
         
         # Applies to
         if applies_to == 'all':
-            text += ui_text(lang, "Der: visiem plāniem + kursiem\n", "Применяется: Все планы + курсы\n", "Applies to: All plans + courses\n")
+            text += ui_text(lang, "Der: visiem plÄniem + kursiem\n", "ÐŸÑ€Ð¸Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ: Ð’ÑÐµ Ð¿Ð»Ð°Ð½Ñ‹ + ÐºÑƒÑ€ÑÑ‹\n", "Applies to: All plans + courses\n")
         elif applies_to == 'chat':
-            text += ui_text(lang, "Der: tikai plāniem\n", "Применяется: Только планы\n", "Applies to: Plans only\n")
+            text += ui_text(lang, "Der: tikai plÄniem\n", "ÐŸÑ€Ð¸Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ: Ð¢Ð¾Ð»ÑŒÐºÐ¾ Ð¿Ð»Ð°Ð½Ñ‹\n", "Applies to: Plans only\n")
         elif applies_to == 'courses':
-            text += ui_text(lang, "Der: tikai kursiem\n", "Применяется: Только курсы\n", "Applies to: Courses only\n")
+            text += ui_text(lang, "Der: tikai kursiem\n", "ÐŸÑ€Ð¸Ð¼ÐµÐ½ÑÐµÑ‚ÑÑ: Ð¢Ð¾Ð»ÑŒÐºÐ¾ ÐºÑƒÑ€ÑÑ‹\n", "Applies to: Courses only\n")
         
         # Expiry
         if expires_at:
@@ -3806,17 +3807,17 @@ async def show_promo_codes(callback: CallbackQuery):
             if time_left.total_seconds() > 0:
                 hours_left = int(time_left.total_seconds() / 3600)
                 if lang == 'ru':
-                    text += f"Истекает: ⏰ через {hours_left} часов\n"
+                    text += f"Ð˜ÑÑ‚ÐµÐºÐ°ÐµÑ‚: â° Ñ‡ÐµÑ€ÐµÐ· {hours_left} Ñ‡Ð°ÑÐ¾Ð²\n"
                 elif lang == 'lv':
-                    text += f"Beidzas: ⏰ pēc {hours_left} stundām\n"
+                    text += f"Beidzas: â° pÄ“c {hours_left} stundÄm\n"
                 else:
-                    text += f"Expires: ⏰ in {hours_left} hours\n"
+                    text += f"Expires: â° in {hours_left} hours\n"
         else:
             # Tier-based
             if lang == 'ru':
-                text += f"Действует: Пока статус активен\n"
+                text += f"Ð”ÐµÐ¹ÑÑ‚Ð²ÑƒÐµÑ‚: ÐŸÐ¾ÐºÐ° ÑÑ‚Ð°Ñ‚ÑƒÑ Ð°ÐºÑ‚Ð¸Ð²ÐµÐ½\n"
             elif lang == 'lv':
-                text += f"Derīgs: kamēr statuss ir aktīvs\n"
+                text += f"DerÄ«gs: kamÄ“r statuss ir aktÄ«vs\n"
             else:
                 text += f"Valid: While status active\n"
         
@@ -3824,35 +3825,35 @@ async def show_promo_codes(callback: CallbackQuery):
         if max_uses:
             remaining = max_uses - times_used
             if lang == 'ru':
-                text += f"Осталось: {remaining} использование\n"
+                text += f"ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ: {remaining} Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ð½Ð¸Ðµ\n"
             elif lang == 'lv':
                 text += f"Atlicis: {remaining} lietojums\n"
             else:
                 text += f"Remaining: {remaining} use(s)\n"
         else:
             if lang == 'ru':
-                text += f"Использований: Безлимит ♾\n"
+                text += f"Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ð½Ð¸Ð¹: Ð‘ÐµÐ·Ð»Ð¸Ð¼Ð¸Ñ‚ â™¾\n"
             elif lang == 'lv':
-                text += f"Lietojumi: bez limita ♾\n"
+                text += f"Lietojumi: bez limita â™¾\n"
             else:
-                text += f"Uses: Unlimited ♾\n"
+                text += f"Uses: Unlimited â™¾\n"
         
         text += "\n"
         
         # Copy button
         keyboard.button(
-            text=f"📋 {code[:20]}{'...' if len(code) > 20 else ''}",
+            text=f"ðŸ“‹ {code[:20]}{'...' if len(code) > 20 else ''}",
             callback_data=f"copy_{code}"
         )
     
-    text += "━━━━━━━━━━━━━━━━\n\n"
+    text += "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
     
     if lang == 'ru':
-        text += "ℹ️ Используй промокод при оплате\n   для получения скидки"
+        text += "â„¹ï¸ Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ Ð¿Ñ€Ð¾Ð¼Ð¾ÐºÐ¾Ð´ Ð¿Ñ€Ð¸ Ð¾Ð¿Ð»Ð°Ñ‚Ðµ\n   Ð´Ð»Ñ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½Ð¸Ñ ÑÐºÐ¸Ð´ÐºÐ¸"
     elif lang == 'lv':
-        text += "ℹ️ Izmanto promokodu apmaksas laikā,\n   lai saņemtu atlaidi"
+        text += "â„¹ï¸ Izmanto promokodu apmaksas laikÄ,\n   lai saÅ†emtu atlaidi"
     else:
-        text += "ℹ️ Use promo code at checkout\n   to get your discount"
+        text += "â„¹ï¸ Use promo code at checkout\n   to get your discount"
     
     keyboard.button(text=back_button_text(lang), callback_data="loyalty_main")
     keyboard.adjust(1)
@@ -3864,13 +3865,13 @@ async def show_promo_codes(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "loyalty_main")
 async def loyalty_main_back(callback: CallbackQuery):
-    """Назад no promo kodiem uz loyalty status — reuse loyalty_status_callback"""
+    """ÐÐ°Ð·Ð°Ð´ no promo kodiem uz loyalty status â€” reuse loyalty_status_callback"""
     await loyalty_status_callback(callback)
 
 
 @dp.callback_query(F.data == "start_back")
 async def start_back_callback(callback: CallbackQuery):
-    """Назад uz galveno menu"""
+    """ÐÐ°Ð·Ð°Ð´ uz galveno menu"""
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     name = md_escape(callback.from_user.first_name)
@@ -3888,16 +3889,16 @@ async def start_back_callback(callback: CallbackQuery):
             loyalty_data = {'current_tier': 'rookie', 'consecutive_months': 0}
         current_tier = loyalty_data.get('current_tier', 'rookie')
         tier_data = config.LOYALTY_TIERS.get(current_tier, {})
-        tier_emoji = tier_data.get('emoji', '🌱')
+        tier_emoji = tier_data.get('emoji', 'ðŸŒ±')
         tier_tag = tier_data.get('tag', 'Rookie')
         tier_discount = tier_data.get('chat_discount', 0)
         if lang == "ru":
-            loyalty_line = f"\n\n{tier_emoji} Уровень: *{tier_tag}*" + (f" ({tier_discount}% скидка)" if tier_discount > 0 else "")
+            loyalty_line = f"\n\n{tier_emoji} Ð£Ñ€Ð¾Ð²ÐµÐ½ÑŒ: *{tier_tag}*" + (f" ({tier_discount}% ÑÐºÐ¸Ð´ÐºÐ°)" if tier_discount > 0 else "")
         elif lang == "lv":
-            loyalty_line = f"\n\n{tier_emoji} Līmenis: *{tier_tag}*" + (f" ({tier_discount}% atlaide)" if tier_discount > 0 else "")
+            loyalty_line = f"\n\n{tier_emoji} LÄ«menis: *{tier_tag}*" + (f" ({tier_discount}% atlaide)" if tier_discount > 0 else "")
         else:
             loyalty_line = f"\n\n{tier_emoji} Level: *{tier_tag}*" + (f" ({tier_discount}% discount)" if tier_discount > 0 else "")
-        welcome_text = t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "—"), days=days_left) + loyalty_line
+        welcome_text = t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "â€”"), days=days_left) + loyalty_line
         await callback.message.edit_text(welcome_text, reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
         welcome_text = await inactive_welcome_text(lang, name)
@@ -3911,7 +3912,7 @@ async def copy_coupon_code(callback: CallbackQuery):
     code = callback.data[5:]  # Remove "copy_"
     
     # Just show in answer popup
-    await callback.answer(f"✅ {code}", show_alert=True, cache_time=1)
+    await callback.answer(f"âœ… {code}", show_alert=True, cache_time=1)
 
 
 @dp.callback_query(F.data == "winback_survey")
@@ -3922,38 +3923,38 @@ async def show_winback_survey(callback: CallbackQuery):
     lang = user.get('lang', 'ru')
     
     if lang == 'ru':
-        text = """📊 Почему ушёл? Помоги нам стать лучше!
+        text = """ðŸ“Š ÐŸÐ¾Ñ‡ÐµÐ¼Ñƒ ÑƒÑˆÑ‘Ð»? ÐŸÐ¾Ð¼Ð¾Ð³Ð¸ Ð½Ð°Ð¼ ÑÑ‚Ð°Ñ‚ÑŒ Ð»ÑƒÑ‡ÑˆÐµ!
 
-Выбери причину (или напиши свою):"""
+Ð’Ñ‹Ð±ÐµÑ€Ð¸ Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ñƒ (Ð¸Ð»Ð¸ Ð½Ð°Ð¿Ð¸ÑˆÐ¸ ÑÐ²Ð¾ÑŽ):"""
     elif lang == 'lv':
-        text = """📊 Kāpēc aizgāji? Palīdzi mums kļūt labākiem!
+        text = """ðŸ“Š KÄpÄ“c aizgÄji? PalÄ«dzi mums kÄ¼Å«t labÄkiem!
 
-Izvēlies iemeslu vai uzraksti savu:"""
+IzvÄ“lies iemeslu vai uzraksti savu:"""
     else:
-        text = """📊 Why did you leave? Help us improve!
+        text = """ðŸ“Š Why did you leave? Help us improve!
 
 Choose a reason (or write your own):"""
     
     b = InlineKeyboardBuilder()
     
     if lang == 'ru':
-        b.button(text="💸 Слишком дорого", callback_data="survey_expensive")
-        b.button(text="📉 Мало контента", callback_data="survey_content")
-        b.button(text="⏰ Нет времени", callback_data="survey_time")
-        b.button(text="❓ Не понял как пользоваться", callback_data="survey_confused")
-        b.button(text="📝 Другое (напиши)", callback_data="survey_custom")
+        b.button(text="ðŸ’¸ Ð¡Ð»Ð¸ÑˆÐºÐ¾Ð¼ Ð´Ð¾Ñ€Ð¾Ð³Ð¾", callback_data="survey_expensive")
+        b.button(text="ðŸ“‰ ÐœÐ°Ð»Ð¾ ÐºÐ¾Ð½Ñ‚ÐµÐ½Ñ‚Ð°", callback_data="survey_content")
+        b.button(text="â° ÐÐµÑ‚ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð¸", callback_data="survey_time")
+        b.button(text="â“ ÐÐµ Ð¿Ð¾Ð½ÑÐ» ÐºÐ°Ðº Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÑŒÑÑ", callback_data="survey_confused")
+        b.button(text="ðŸ“ Ð”Ñ€ÑƒÐ³Ð¾Ðµ (Ð½Ð°Ð¿Ð¸ÑˆÐ¸)", callback_data="survey_custom")
     elif lang == 'lv':
-        b.button(text="💸 Pārāk dārgi", callback_data="survey_expensive")
-        b.button(text="📉 Par maz vērtības", callback_data="survey_content")
-        b.button(text="⏰ Nav laika", callback_data="survey_time")
-        b.button(text="❓ Nesapratu, kā lietot", callback_data="survey_confused")
-        b.button(text="📝 Cits iemesls", callback_data="survey_custom")
+        b.button(text="ðŸ’¸ PÄrÄk dÄrgi", callback_data="survey_expensive")
+        b.button(text="ðŸ“‰ Par maz vÄ“rtÄ«bas", callback_data="survey_content")
+        b.button(text="â° Nav laika", callback_data="survey_time")
+        b.button(text="â“ Nesapratu, kÄ lietot", callback_data="survey_confused")
+        b.button(text="ðŸ“ Cits iemesls", callback_data="survey_custom")
     else:
-        b.button(text="💸 Too expensive", callback_data="survey_expensive")
-        b.button(text="📉 Not enough value", callback_data="survey_content")
-        b.button(text="⏰ No time", callback_data="survey_time")
-        b.button(text="❓ Didn't understand", callback_data="survey_confused")
-        b.button(text="📝 Other (write)", callback_data="survey_custom")
+        b.button(text="ðŸ’¸ Too expensive", callback_data="survey_expensive")
+        b.button(text="ðŸ“‰ Not enough value", callback_data="survey_content")
+        b.button(text="â° No time", callback_data="survey_time")
+        b.button(text="â“ Didn't understand", callback_data="survey_confused")
+        b.button(text="ðŸ“ Other (write)", callback_data="survey_custom")
     
     b.adjust(1)
     
@@ -3977,11 +3978,11 @@ async def handle_survey_response(callback: CallbackQuery, state: FSMContext):
     
     if response_type == 'custom':
         if lang == 'ru':
-            text = "📝 *Напиши свою причину:*\n\n/cancel для отмены"
+            text = "ðŸ“ *ÐÐ°Ð¿Ð¸ÑˆÐ¸ ÑÐ²Ð¾ÑŽ Ð¿Ñ€Ð¸Ñ‡Ð¸Ð½Ñƒ:*\n\n/cancel Ð´Ð»Ñ Ð¾Ñ‚Ð¼ÐµÐ½Ñ‹"
         elif lang == 'lv':
-            text = "📝 *Uzraksti savu iemeslu:*\n\n/cancel lai atceltu"
+            text = "ðŸ“ *Uzraksti savu iemeslu:*\n\n/cancel lai atceltu"
         else:
-            text = "📝 *Write your reason:*\n\n/cancel to cancel"
+            text = "ðŸ“ *Write your reason:*\n\n/cancel to cancel"
         await state.set_state(SurveyCustomState.waiting_text)
         await callback.message.edit_text(text, parse_mode="Markdown")
         await callback.answer()
@@ -3994,60 +3995,60 @@ async def handle_survey_response(callback: CallbackQuery, state: FSMContext):
     await db.save_survey_response(user_id, response_type, coupon_code)
     
     if lang == 'ru':
-        text = f"""🎁 *Спасибо за ответ!*
+        text = f"""ðŸŽ *Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾Ñ‚Ð²ÐµÑ‚!*
 
-Твоя награда:
-💳 Код: `{coupon_code}`
-💰 Скидка: *20%* на всё
-⏰ Действует: 24 часа
+Ð¢Ð²Ð¾Ñ Ð½Ð°Ð³Ñ€Ð°Ð´Ð°:
+ðŸ’³ ÐšÐ¾Ð´: `{coupon_code}`
+ðŸ’° Ð¡ÐºÐ¸Ð´ÐºÐ°: *20%* Ð½Ð° Ð²ÑÑ‘
+â° Ð”ÐµÐ¹ÑÑ‚Ð²ÑƒÐµÑ‚: 24 Ñ‡Ð°ÑÐ°
 
-Используй при оплате!
+Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ Ð¿Ñ€Ð¸ Ð¾Ð¿Ð»Ð°Ñ‚Ðµ!
 
-[💎 Перейти к тарифам]"""
+[ðŸ’Ž ÐŸÐµÑ€ÐµÐ¹Ñ‚Ð¸ Ðº Ñ‚Ð°Ñ€Ð¸Ñ„Ð°Ð¼]"""
     elif lang == 'lv':
-        text = f"""🎁 *Paldies par atbildi!*
+        text = f"""ðŸŽ *Paldies par atbildi!*
 
 Tava balva:
-💳 Kods: `{coupon_code}`
-💰 Atlaide: *20%* visam
-⏰ Derīgs: 24 stundas
+ðŸ’³ Kods: `{coupon_code}`
+ðŸ’° Atlaide: *20%* visam
+â° DerÄ«gs: 24 stundas
 
-Izmanto apmaksas laikā!
+Izmanto apmaksas laikÄ!
 
-[💎 Pāriet uz tarifiem]"""
+[ðŸ’Ž PÄriet uz tarifiem]"""
     else:
-        text = f"""🎁 *Thanks for your feedback!*
+        text = f"""ðŸŽ *Thanks for your feedback!*
 
 Your reward:
-💳 Code: `{coupon_code}`
-💰 Discount: *20%* on everything
-⏰ Valid: 24 hours
+ðŸ’³ Code: `{coupon_code}`
+ðŸ’° Discount: *20%* on everything
+â° Valid: 24 hours
 
 Use at checkout!
 
-[💎 Go to plans]"""
+[ðŸ’Ž Go to plans]"""
     
     b = InlineKeyboardBuilder()
-    b.button(text=ui_text(lang, "💎 Tarifi", "💎 Тарифы", "💎 Plans"),
+    b.button(text=ui_text(lang, "ðŸ’Ž Tarifi", "ðŸ’Ž Ð¢Ð°Ñ€Ð¸Ñ„Ñ‹", "ðŸ’Ž Plans"),
              callback_data="vip_chat_plans")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
-    await callback.answer("✅")
+    await callback.answer("âœ…")
 
 
 @dp.message(SurveyCustomState.waiting_text)
 async def survey_custom_text(message: Message, state: FSMContext):
-    """Saņem custom survey atbildi"""
+    """SaÅ†em custom survey atbildi"""
     user = await db.get_user(message.from_user.id)
     lang = user.get('lang', 'ru') if user else 'ru'
     if message.text == "/cancel":
         await state.clear()
-        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
+        await message.answer("âŒ " + ui_text(lang, "Atcelts", "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", "Cancelled"))
         return
     
     user_id = message.from_user.id
-    custom_text = message.text[:500]  # Limitēt garumu
+    custom_text = message.text[:500]  # LimitÄ“t garumu
     await state.clear()
     
     coupon_code = await loyalty_system.generate_winback_coupon(user_id, survey_response=True)
@@ -4055,31 +4056,31 @@ async def survey_custom_text(message: Message, state: FSMContext):
     
     if lang == 'ru':
         text = (
-            f"🎁 *Спасибо за ответ!*\n\n"
-            f"Твоя награда:\n"
-            f"💳 Код: `{coupon_code}`\n"
-            f"💰 Скидка: *20%* на всё\n"
-            f"⏰ Действует: 24 часа"
+            f"ðŸŽ *Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° Ð¾Ñ‚Ð²ÐµÑ‚!*\n\n"
+            f"Ð¢Ð²Ð¾Ñ Ð½Ð°Ð³Ñ€Ð°Ð´Ð°:\n"
+            f"ðŸ’³ ÐšÐ¾Ð´: `{coupon_code}`\n"
+            f"ðŸ’° Ð¡ÐºÐ¸Ð´ÐºÐ°: *20%* Ð½Ð° Ð²ÑÑ‘\n"
+            f"â° Ð”ÐµÐ¹ÑÑ‚Ð²ÑƒÐµÑ‚: 24 Ñ‡Ð°ÑÐ°"
         )
     elif lang == 'lv':
         text = (
-            f"🎁 *Paldies par atbildi!*\n\n"
+            f"ðŸŽ *Paldies par atbildi!*\n\n"
             f"Tava balva:\n"
-            f"💳 Kods: `{coupon_code}`\n"
-            f"💰 Atlaide: *20%* visam\n"
-            f"⏰ Derīgs: 24 stundas"
+            f"ðŸ’³ Kods: `{coupon_code}`\n"
+            f"ðŸ’° Atlaide: *20%* visam\n"
+            f"â° DerÄ«gs: 24 stundas"
         )
     else:
         text = (
-            f"🎁 *Thank you for your feedback!*\n\n"
+            f"ðŸŽ *Thank you for your feedback!*\n\n"
             f"Your reward:\n"
-            f"💳 Code: `{coupon_code}`\n"
-            f"💰 Discount: *20%* on everything\n"
-            f"⏰ Valid: 24 hours"
+            f"ðŸ’³ Code: `{coupon_code}`\n"
+            f"ðŸ’° Discount: *20%* on everything\n"
+            f"â° Valid: 24 hours"
         )
     
     b = InlineKeyboardBuilder()
-    b.button(text=ui_text(lang, "💎 Tarifi", "💎 Тарифы", "💎 Plans"), callback_data="vip_chat_plans")
+    b.button(text=ui_text(lang, "ðŸ’Ž Tarifi", "ðŸ’Ž Ð¢Ð°Ñ€Ð¸Ñ„Ñ‹", "ðŸ’Ž Plans"), callback_data="vip_chat_plans")
     b.adjust(1)
     await message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
@@ -4110,7 +4111,7 @@ def _webhook_plan_from_payload(payload: dict):
             "name": {"ru": product_key or "Website subscription", "en": product_key or "Website subscription"},
             "days": int(days_raw),
             "price_usdt": float(payload.get("amount") or 0),
-            "emoji": "🌐",
+            "emoji": "ðŸŒ",
         }
     if days_raw:
         plan["days"] = int(days_raw)
@@ -4210,7 +4211,7 @@ async def website_purchase_webhook(request: web.Request):
             raise
         for aid in config.ADMIN_IDS:
             try:
-                await bot.send_message(aid, f"⚠️ *Webhook purchase without bot user*\n\n📧 `{email}`\n📦 `{product_key}`\n💳 `{payment_system}`", parse_mode="Markdown")
+                await bot.send_message(aid, f"âš ï¸ *Webhook purchase without bot user*\n\nðŸ“§ `{email}`\nðŸ“¦ `{product_key}`\nðŸ’³ `{payment_system}`", parse_mode="Markdown")
             except Exception:
                 pass
         return web.json_response({
@@ -4274,9 +4275,9 @@ async def main():
     await db.init()
     webhook_runner = await start_webhook_server()
     
-    # ═══════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     # LOYALTY SYSTEM INITIALIZATION
-    # ═══════════════════════════════════════════════════════════════
+    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     loyalty_system = LoyaltySystem(config, db)
     
     # Include loyalty routers
@@ -4295,14 +4296,14 @@ async def main():
         data['loyalty_system'] = loyalty_system
         return await handler(event, data)
     
-    # Setup loyalty cron jobs uz globālo scheduler
+    # Setup loyalty cron jobs uz globÄlo scheduler
     try:
         setup_loyalty_cron(scheduler, bot, db, config, loyalty_system)
-        logger.info("✅ Loyalty cron jobs pievienoti")
+        logger.info("âœ… Loyalty cron jobs pievienoti")
     except Exception as e:
-        logger.error(f"❌ Loyalty cron kļūda: {e}")
+        logger.error(f"âŒ Loyalty cron kÄ¼Å«da: {e}")
 
-    # Admini automātiski ir friend listā
+    # Admini automÄtiski ir friend listÄ
     for admin_id in config.ADMIN_IDS:
         await db.register_user_as_friend(admin_id)
     for pk, plan in config.PLANS.items():
@@ -4310,7 +4311,7 @@ async def main():
         if sp:
             try:
                 p = float(sp); plan['price_usdt'] = p
-                plan['price_usd'] = f"{p:.0f}€" if p == int(p) else f"{p}€"
+                plan['price_usd'] = f"{p:.0f}â‚¬" if p == int(p) else f"{p}â‚¬"
             except: pass
     old_course_defaults = {
         "mini": 25.0,
@@ -4333,7 +4334,7 @@ async def main():
     scheduler.add_job(check_expiring_subscriptions, 'cron', hour=10, minute=0)
     scheduler.add_job(send_upsell_offers, 'cron', hour=11, minute=0)
     scheduler.add_job(kick_expired_users, 'interval', hours=1)
-    # Giveaway — katra mēneša 1. datumā plkst 12:00 UTC
+    # Giveaway â€” katra mÄ“neÅ¡a 1. datumÄ plkst 12:00 UTC
     scheduler.add_job(run_monthly_giveaway, 'cron', day=1, hour=12, minute=0)
     scheduler.start()
     logger.info("Bot started!")
