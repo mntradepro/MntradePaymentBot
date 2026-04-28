@@ -372,10 +372,10 @@ def ui_text(lang, lv, ru, en):
     return en
 
 def back_button_text(lang):
-    return "ðŸ”™ " + ui_text(lang, "AtpakaÄ¼", "ÐÐ°Ð·Ð°Ð´", "Back")
+    return "🔙 " + ui_text(lang, "Atpakaļ", "Назад", "Back")
 
 def paid_button_text(lang):
-    return "âœ… " + ui_text(lang, "Es samaksÄju", "Ð¯ Ð¾Ð¿Ð»Ð°Ñ‚Ð¸Ð»", "I paid")
+    return "✅ " + ui_text(lang, "Es samaksāju", "Я оплатил", "I paid")
 
 def menu_button(emoji, label):
     return f"{emoji}  {label}"
@@ -386,8 +386,8 @@ def market_scanner_label(lang):
 def email_binding_notice(lang):
     return ui_text(
         lang,
-        "E-pasts piesaista tavu piekÄ¼uvi un pirkumus no mÄjaslapas - tÄpÄ“c norÄdi derÄ«gu epastu.",
-        "E-mail Ð¿Ñ€Ð¸Ð²ÑÐ·Ñ‹Ð²Ð°ÐµÑ‚ Ñ‚Ð²Ð¾Ð¹ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð¸ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ñ ÑÐ°Ð¹Ñ‚Ð° - Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ ÑƒÐºÐ°Ð¶Ð¸ Ð´ÐµÐ¹ÑÑ‚Ð²Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ð¹ e-mail.",
+        "E-pasts piesaista tavu piekļuvi un pirkumus no mājaslapas, tāpēc norādi derīgu e-pastu.",
+        "E-mail привязывает твой доступ и покупки с сайта, поэтому укажи действительный e-mail.",
         "E-mail links your access and website purchases - so enter a valid e-mail.",
     )
 
@@ -620,9 +620,9 @@ class RegistrationEmailState(StatesGroup):
 def _first_time_lang_keyboard(ref_param=None):
     """Valodas izvÄ“le jaunajiem lietotÄjiem"""
     b = InlineKeyboardBuilder()
-    b.button(text="ðŸ‡·ðŸ‡º  Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="first_lang_ru")
-    b.button(text="ðŸ‡¬ðŸ‡§  English", callback_data="first_lang_en")
-    b.button(text="ðŸ‡±ðŸ‡»  LatvieÅ¡u", callback_data="first_lang_lv")
+    b.button(text="🇷🇺 Русский", callback_data="first_lang_ru")
+    b.button(text="🇬🇧 English", callback_data="first_lang_en")
+    b.button(text="🇱🇻 Latviešu", callback_data="first_lang_lv")
     b.adjust(2, 1)
     return b.as_markup()
 
@@ -649,9 +649,9 @@ async def first_lang_selected(callback: CallbackQuery, state: FSMContext):
     
     if lang == "lv":
         text = (
-            "ðŸ“§ *Ievadi savu e-pastu*\n\n"
-            "Pie Å¡Ä« e-pasta tiks piesaistÄ«ts abonements un piekÄ¼uve. PÄ“c maksÄjuma mÄjaslapÄ bots pirkumu pÄrbaudÄ«s pÄ“c Å¡Ä« e-pasta.\n\n"
-            "_AtsÅ«ti e-pastu vienÄ ziÅ†Ä:_"
+            "📧 *Ievadi savu e-pastu*\n\n"
+            "Pie šī e-pasta tiks piesaistīts abonements un piekļuve. Pēc maksājuma mājaslapā bots pirkumu pārbaudīs pēc šī e-pasta.\n\n"
+            "_Atsūti e-pastu vienā ziņā:_"
         )
     elif lang == "ru":
         text = (
@@ -1017,9 +1017,9 @@ async def cmd_start(message: Message, state: FSMContext):
         if existing_user:
             if lang == "lv":
                 text = (
-                    "ðŸ“§ *Ievadi savu e-pastu*\n\n"
+                    "📧 *Ievadi savu e-pastu*\n\n"
                     f"{email_binding_notice(lang)}\n\n"
-                    "_AtsÅ«ti e-pastu vienÄ ziÅ†Ä:_"
+                    "_Atsūti e-pastu vienā ziņā:_"
                 )
             elif lang == "ru":
                 text = (
@@ -1038,7 +1038,7 @@ async def cmd_start(message: Message, state: FSMContext):
             await message.answer(text, parse_mode="Markdown")
             return
         await message.answer(
-            "ðŸŒ IzvÄ“lies valodu / Choose language / Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ·Ñ‹Ðº:",
+            "🌐 Izvēlies valodu / Choose language / Выбери язык:",
             reply_markup=_first_time_lang_keyboard(ref_param)
         )
         return
@@ -1172,7 +1172,7 @@ async def cmd_help(message: Message):
 
 @dp.message(Command("language"))
 async def cmd_language(message: Message):
-    await message.answer("ðŸŒ IzvÄ“lies valodu / Choose language / Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ·Ñ‹Ðº:", reply_markup=lang_keyboard())
+    await message.answer("🌐 Izvēlies valodu / Choose language / Выбери язык:", reply_markup=lang_keyboard())
 
 @dp.message(Command("support"))
 async def cmd_support(message: Message):
@@ -1196,24 +1196,24 @@ async def cb_market_scanner(callback: CallbackQuery):
         await callback.message.answer(
             ui_text(
                 lang,
-                "ðŸ“§ Vispirms iestati e-pastu botÄ. PÄ“c pirkuma piekÄ¼uve tiks piesaistÄ«ta pÄ“c Å¡Ä« e-pasta.",
-                "ðŸ“§ Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑƒÐºÐ°Ð¶Ð¸ e-mail Ð² Ð±Ð¾Ñ‚Ðµ. ÐŸÐ¾ÑÐ»Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð±ÑƒÐ´ÐµÑ‚ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½ Ð¿Ð¾ ÑÑ‚Ð¾Ð¼Ñƒ e-mail.",
-                "ðŸ“§ Please set your e-mail first. After purchase access will be linked by this e-mail.",
+                "📧 Vispirms iestati e-pastu botā. Pēc pirkuma piekļuve tiks piesaistīta pēc šī e-pasta.",
+                "📧 Сначала укажи e-mail в боте. После покупки доступ будет привязан по этому e-mail.",
+                "📧 Please set your e-mail first. After purchase access will be linked by this e-mail.",
             )
         )
         return
     checkout_url = await checkout_url_for_subscription_product("scanner_chat", lang)
     text = ui_text(
         lang,
-        "ðŸ“¡ *Tirgus Skaneris/AI signÄli*\n\nPirkums notiek mÄjaslapÄ. PÄ“c apmaksas bots automÄtiski iedos jaunu piekÄ¼uvi.",
-        "ðŸ“¡ *Ð¡ÐºÐ°Ð½ÐµÑ€ Ñ€Ñ‹Ð½ÐºÐ°/AI ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹*\n\nÐŸÐ¾ÐºÑƒÐ¿ÐºÐ° Ð¿Ñ€Ð¾Ð¸ÑÑ…Ð¾Ð´Ð¸Ñ‚ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ. ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ñ‚ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð²Ñ‹Ð´Ð°ÑÑ‚ Ð´Ð¾ÑÑ‚ÑƒÐ¿.",
-        "ðŸ“¡ *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
+        "📡 *Tirgus Skaneris/AI signāli*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski iedos jaunu piekļuvi.",
+        "📡 *Сканер рынка/AI сигналы*\n\nПокупка происходит на сайте. После оплаты бот автоматически выдаст доступ.",
+        "📡 *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
     )
     b = InlineKeyboardBuilder()
     if checkout_url:
-        b.button(text=ui_text(lang, "ðŸ’³ MaksÄt ar karti / banku / crypto", "ðŸ’³ ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto", "ðŸ’³ Pay with card / bank / crypto"), url=checkout_url)
+        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), url=checkout_url)
     else:
-        b.button(text=ui_text(lang, "ðŸ’³ MaksÄt ar karti / banku / crypto", "ðŸ’³ ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto", "ðŸ’³ Pay with card / bank / crypto"), callback_data="scanner_checkout_missing")
+        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), callback_data="scanner_checkout_missing")
     b.button(text=back_button_text(lang), callback_data="back_to_main")
     b.adjust(1)
     await callback.message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1221,7 +1221,7 @@ async def cb_market_scanner(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "scanner_checkout_missing")
 async def scanner_checkout_missing(callback: CallbackQuery):
-    await callback.answer("Scanner checkout links vÄ“l nav iestatÄ«ts admin panelÄ«.", show_alert=True)
+    await callback.answer("Scanner checkout links vel nav iestatits admin paneli.", show_alert=True)
 
 @dp.message(Command("status"))
 async def cmd_status(message: Message):
@@ -1249,7 +1249,7 @@ async def cmd_status(message: Message):
 async def cmd_renew(message: Message):
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    text = "ðŸ’Ž *IzvÄ“lies VIP Äatu:*" if lang == "lv" else ("ðŸ’Ž *Ð’Ñ‹Ð±ÐµÑ€Ð¸ VIP Ñ‡Ð°Ñ‚:*" if lang == "ru" else "ðŸ’Ž *Choose VIP chat:*")
+    text = "💎 *Izvēlies VIP čatu:*" if lang == "lv" else ("💎 *Выбери VIP чат:*" if lang == "ru" else "💎 *Choose VIP chat:*")
     await message.answer(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
 
 @dp.message(Command("referral"))
@@ -1444,28 +1444,28 @@ class UserSettingsState(StatesGroup):
     waiting_email = State()
 
 def settings_text(lang, email, selected=False):
-    email_display = email if email else ui_text(lang, "â€” nav norÄdÄ«ts", "â€” Ð½Ðµ ÑƒÐºÐ°Ð·Ð°Ð½", "â€” not set")
-    check = " âœ…" if selected else ""
+    email_display = email if email else ui_text(lang, "— nav norādīts", "— не указан", "— not set")
+    check = " ✅" if selected else ""
     if lang == "lv":
         return (
-            "âš™ï¸ *IestatÄ«jumi*\n\n"
-            f"ðŸŒ Valoda: *LatvieÅ¡u*{check}\n"
-            f"ðŸ“§ E-pasts: *{email_display}*\n\n"
+            "⚙️ *Iestatījumi*\n\n"
+            f"🌐 Valoda: *Latviešu*{check}\n"
+            f"📧 E-pasts: *{email_display}*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "IzvÄ“lies, ko mainÄ«t:"
+            "Izvēlies, ko mainīt:"
         )
     if lang == "ru":
         return (
-            "âš™ï¸ *ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸*\n\n"
-            f"ðŸŒ Ð¯Ð·Ñ‹Ðº: *Ð ÑƒÑÑÐºÐ¸Ð¹*{check}\n"
-            f"ðŸ“§ E-mail: *{email_display}*\n\n"
+            "⚙️ *Настройки*\n\n"
+            f"🌐 Язык: *Русский*{check}\n"
+            f"📧 E-mail: *{email_display}*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "Ð’Ñ‹Ð±ÐµÑ€Ð¸, Ñ‡Ñ‚Ð¾ Ð¸Ð·Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ:"
+            "Выбери, что изменить:"
         )
     return (
-        "âš™ï¸ *Settings*\n\n"
-        f"ðŸŒ Language: *English*{check}\n"
-        f"ðŸ“§ E-mail: *{email_display}*\n\n"
+        "⚙️ *Settings*\n\n"
+        f"🌐 Language: *English*{check}\n"
+        f"📧 E-mail: *{email_display}*\n\n"
         f"{email_binding_notice(lang)}\n\n"
         "Choose what to change:"
     )
@@ -1478,10 +1478,10 @@ async def user_settings(callback: CallbackQuery):
     text = settings_text(lang, email)
 
     b = InlineKeyboardBuilder()
-    b.button(text="ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="settings_lang_ru")
-    b.button(text="ðŸ‡¬ðŸ‡§ English", callback_data="settings_lang_en")
-    b.button(text="ðŸ‡±ðŸ‡» LatvieÅ¡u", callback_data="settings_lang_lv")
-    email_btn = "ðŸ“§ " + ui_text(lang, "IevadÄ«t e-pastu", "Ð£ÐºÐ°Ð·Ð°Ñ‚ÑŒ e-mail", "Set e-mail")
+    b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
+    b.button(text="🇬🇧 English", callback_data="settings_lang_en")
+    b.button(text="🇱🇻 Latviešu", callback_data="settings_lang_lv")
+    email_btn = "📧 " + ui_text(lang, "Ievadīt e-pastu", "Указать e-mail", "Set e-mail")
     b.button(text=email_btn, callback_data="settings_email")
     b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(2, 1, 1, 1)
@@ -1499,10 +1499,10 @@ async def settings_lang(callback: CallbackQuery):
     email = user.get("email", "") if user else ""
     text = settings_text(lang, email, selected=True)
     b = InlineKeyboardBuilder()
-    b.button(text="ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="settings_lang_ru")
-    b.button(text="ðŸ‡¬ðŸ‡§ English", callback_data="settings_lang_en")
-    b.button(text="ðŸ‡±ðŸ‡» LatvieÅ¡u", callback_data="settings_lang_lv")
-    b.button(text="ðŸ“§ " + ui_text(lang, "IevadÄ«t e-pastu", "Ð£ÐºÐ°Ð·Ð°Ñ‚ÑŒ e-mail", "Set e-mail"), callback_data="settings_email")
+    b.button(text="🇷🇺 Русский", callback_data="settings_lang_ru")
+    b.button(text="🇬🇧 English", callback_data="settings_lang_en")
+    b.button(text="🇱🇻 Latviešu", callback_data="settings_lang_lv")
+    b.button(text="📧 " + ui_text(lang, "Ievadīt e-pastu", "Указать e-mail", "Set e-mail"), callback_data="settings_email")
     b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(2, 1, 1, 1)
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -1515,9 +1515,9 @@ async def settings_email(callback: CallbackQuery, state: FSMContext):
     lang = user.get("lang", "ru") if user else "ru"
     if lang == "lv":
         text = (
-            "ðŸ“§ *Ievadi savu e-pastu:*\n\n"
+            "📧 *Ievadi savu e-pastu:*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "_AtsÅ«ti savu e-pastu ziÅ†Ä:_\n\n"
+            "_Atsūti savu e-pastu ziņā:_\n\n"
             "/cancel lai atceltu"
         )
     elif lang == "ru":
@@ -1990,8 +1990,8 @@ async def courses_menu(callback: CallbackQuery):
     
     if ui_lang == "lv":
         text = (
-            "ðŸ“š *MNtradepro kursi*\n\n"
-            "IzvÄ“lies kursu, lai apskatÄ«tu detaÄ¼as un apmaksas iespÄ“jas:"
+            "📚 *MNtradepro kursi*\n\n"
+            "Izvēlies kursu, lai apskatītu detaļas un apmaksas iespējas:"
         )
     elif ui_lang == "ru":
         text = (
@@ -2017,9 +2017,9 @@ async def courses_menu(callback: CallbackQuery):
         else:
             price_str = course['price_usd']
         name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
-        b.button(text=f"{course['emoji']} {name} â€” {price_str}", callback_data=f"course_info_{key}")
+        b.button(text=f"{course['emoji']} {name} — {price_str}", callback_data=f"course_info_{key}")
     
-    b.button(text="ðŸ”™ " + ("AtpakaÄ¼" if ui_lang == "lv" else "ÐÐ°Ð·Ð°Ð´"), callback_data="settings_back")
+    b.button(text=back_button_text(ui_lang), callback_data="settings_back")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -2048,9 +2048,9 @@ async def course_info_menu(callback: CallbackQuery):
     if ui_lang == "lv":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"ðŸ’° Cena: *{price_str}*\n\n"
-            "ðŸ“– DetalizÄ“ts kursa apraksts un programma ir pieejama MNtradepro mÄjaslapÄ.\n\n"
-            "IzvÄ“lies apmaksas veidu:"
+            f"💰 Cena: *{price_str}*\n\n"
+            "📖 Detalizēts kursa apraksts un programma ir pieejama MNtradepro mājaslapā.\n\n"
+            "Izvēlies apmaksas veidu:"
         )
     elif ui_lang == "ru":
         text = (
@@ -2073,10 +2073,10 @@ async def course_info_menu(callback: CallbackQuery):
     
     b = InlineKeyboardBuilder()
     if checkout_url:
-        b.button(text="ðŸ’³ " + ("MaksÄt ar karti / banku / crypto" if ui_lang == "lv" else "ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto"), url=checkout_url)
+        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), url=checkout_url)
     else:
-        b.button(text="ðŸ’³ " + ("MaksÄt ar karti / banku / crypto" if ui_lang == "lv" else "ÐžÐ¿Ð»Ð°Ñ‚Ð¸Ñ‚ÑŒ ÐºÐ°Ñ€Ñ‚Ð¾Ð¹ / Ð±Ð°Ð½ÐºÐ¾Ð¼ / crypto"), callback_data=f"course_checkout_missing_{course_key}")
-    b.button(text="ðŸ”™ " + ("AtpakaÄ¼" if ui_lang == "lv" else "ÐÐ°Ð·Ð°Ð´"), callback_data="courses_menu")
+        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), callback_data=f"course_checkout_missing_{course_key}")
+    b.button(text=back_button_text(ui_lang), callback_data="courses_menu")
     b.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -2085,7 +2085,7 @@ async def course_info_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("course_checkout_missing_"))
 async def course_checkout_missing(callback: CallbackQuery):
-    await callback.answer("Checkout links Å¡im kursam vÄ“l nav iestatÄ«ts admin panelÄ«.", show_alert=True)
+    await callback.answer("Checkout links sim kursam vel nav iestatits admin paneli.", show_alert=True)
 
 
 @dp.callback_query(F.data.startswith("course_crypto_"))
@@ -2873,21 +2873,21 @@ async def show_vip_chat_plans(callback: CallbackQuery):
     lang = user.get("lang", "ru") if user else "ru"
     if not (user and user.get("email")):
         text = (
-            "ðŸ“§ Vispirms iestati e-pastu. PÄ“c pirkuma mÄjaslapa sÅ«tÄ«s webhook, un bots piekÄ¼uvi atradÄ«s tieÅ¡i pÄ“c Å¡Ä« e-pasta."
+            "📧 Vispirms iestati e-pastu. Pēc pirkuma mājaslapa sūtīs webhook, un bots piekļuvi atradīs tieši pēc šī e-pasta."
             if lang == "lv" else
-            ("ðŸ“§ Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° ÑƒÐºÐ°Ð¶Ð¸ e-mail. ÐŸÐ¾ÑÐ»Ðµ Ð¿Ð¾ÐºÑƒÐ¿ÐºÐ¸ ÑÐ°Ð¹Ñ‚ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ webhook, Ð¸ Ð±Ð¾Ñ‚ Ð½Ð°Ð¹Ð´Ñ‘Ñ‚ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð¸Ð¼ÐµÐ½Ð½Ð¾ Ð¿Ð¾ ÑÑ‚Ð¾Ð¼Ñƒ e-mail."
+            ("📧 Сначала укажи e-mail. После покупки сайт отправит webhook, и бот найдет доступ именно по этому e-mail."
              if lang == "ru" else
-             "ðŸ“§ Please set your e-mail first. After purchase the website will send a webhook, and the bot will match access by this e-mail.")
+             "📧 Please set your e-mail first. After purchase the website will send a webhook, and the bot will match access by this e-mail.")
         )
         await callback.message.edit_text(text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
         await callback.answer()
         return
     text = (
-        "ðŸ’Ž *IzvÄ“lies VIP Äatu:*\n\nPirkums notiek mÄjaslapÄ. PÄ“c apmaksas bots automÄtiski piesaistÄ«s piekÄ¼uvi pÄ“c tava e-pasta."
+        "💎 *Izvēlies VIP čatu:*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski piesaistīs piekļuvi pēc tava e-pasta."
         if lang == "lv" else
-        ("ðŸ’Ž *Ð’Ñ‹Ð±ÐµÑ€Ð¸ VIP Ñ‡Ð°Ñ‚:*\n\nÐŸÐ¾ÐºÑƒÐ¿ÐºÐ° Ð¿Ñ€Ð¾Ð¸ÑÑ…Ð¾Ð´Ð¸Ñ‚ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ. ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð±Ð¾Ñ‚ Ð°Ð²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ñ‡ÐµÑÐºÐ¸ Ð¿Ñ€Ð¸Ð²ÑÐ¶ÐµÑ‚ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ð¿Ð¾ Ñ‚Ð²Ð¾ÐµÐ¼Ñƒ e-mail."
+        ("💎 *Выбери VIP чат:*\n\nПокупка происходит на сайте. После оплаты бот автоматически привяжет доступ по твоему e-mail."
          if lang == "ru" else
-         "ðŸ’Ž *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
+         "💎 *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
     )
     await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
@@ -2898,17 +2898,17 @@ async def vip_checkout_missing_or_open(callback: CallbackQuery):
     code = callback.data.replace("vip_checkout_", "")
     user = await db.get_user(callback.from_user.id)
     if not (user and user.get("email")):
-        await callback.answer("Vispirms iestati e-pastu botÄ.", show_alert=True)
+        await callback.answer("Vispirms iestati e-pastu botā.", show_alert=True)
         return
     url = await checkout_url_for_lang(code)
     if url:
         b = InlineKeyboardBuilder()
-        b.button(text="AtvÄ“rt checkout" if code == "lv" else "ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ checkout", url=url)
+        b.button(text="Atvērt checkout" if code == "lv" else "Открыть checkout", url=url)
         b.adjust(1)
         await callback.message.answer("Checkout links:", reply_markup=b.as_markup())
         await callback.answer()
         return
-    await callback.answer("Checkout links Å¡ai pogai vÄ“l nav iestatÄ«ts admin panelÄ«.", show_alert=True)
+    await callback.answer("Checkout links šai pogai vēl nav iestatīts admin panelī.", show_alert=True)
 
 
 @dp.callback_query(F.data == "back_to_main")
@@ -2939,7 +2939,7 @@ async def back_to_main_menu(callback: CallbackQuery):
 async def back_to_plans(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
-    text = "ðŸ’Ž *IzvÄ“lies VIP Äatu:*" if lang == "lv" else ("ðŸ’Ž *Ð’Ñ‹Ð±ÐµÑ€Ð¸ VIP Ñ‡Ð°Ñ‚:*" if lang == "ru" else "ðŸ’Ž *Choose VIP chat:*")
+    text = "💎 *Izvēlies VIP čatu:*" if lang == "lv" else ("💎 *Выбери VIP чат:*" if lang == "ru" else "💎 *Choose VIP chat:*")
     await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
