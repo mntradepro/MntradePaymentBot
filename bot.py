@@ -310,11 +310,11 @@ async def build_active_access_text(user_id: int, lang: str, name: str = None) ->
     tier_emoji = tier_data.get('emoji', 'ðŸŒ±')
     tier_tag = tier_data.get('tag', 'Rookie')
     if lang == "lv":
-        loyalty_line = f"\n\n{tier_emoji} LojalitÄtes lÄ«menis: *{tier_tag}*"
+        loyalty_line = f"\n\n{tier_emoji} Rangs: *{tier_tag}*"
     elif lang == "ru":
-        loyalty_line = f"\n\n{tier_emoji} Ð£Ñ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸: *{tier_tag}*"
+        loyalty_line = f"\n\n{tier_emoji} Ранг: *{tier_tag}*"
     else:
-        loyalty_line = f"\n\n{tier_emoji} Loyalty level: *{tier_tag}*"
+        loyalty_line = f"\n\n{tier_emoji} Rank: *{tier_tag}*"
 
     urgency = ""
     if nearest_days is not None and nearest_days <= 3:
@@ -710,10 +710,10 @@ async def registration_receive_email(message: Message, state: FSMContext):
     claimed = await attach_pending_email_purchases(message.from_user.id, email, lang, message.from_user.username or "")
     uname = f"@{message.from_user.username}" if message.from_user.username else f"ID {message.from_user.id}"
     await notify_admins(
-        "ðŸ“§ *LietotÄjs piesaistÄ«ja e-pastu*\n\n"
-        f"ðŸ‘¤ {uname} (`{message.from_user.id}`)\n"
-        f"ðŸ“§ `{email}`\n"
-        f"ðŸ“¦ AktivizÄ“ti gaidoÅ¡ie pirkumi: *{len(claimed)}*"
+        "📧 *User linked e-mail*\n\n"
+        f"👤 {uname} (`{message.from_user.id}`)\n"
+        f"📧 `{email}`\n"
+        f"📦 Activated pending purchases: *{len(claimed)}*"
     )
     await state.clear()
     await message.answer(("✅ E-pasts saglabāts." if lang == "lv" else ("✅ E-mail сохранён." if lang == "ru" else "✅ E-mail saved.")), parse_mode="Markdown")
@@ -739,7 +739,7 @@ async def _send_onboarding(message, lang, name):
             f"👋 *Sveiks, {name}!*\n\n"
             f"Laipni lūgts *MNtradepro*! 🚀\n\n"
             f"💎 *VIP Treideru čats*\n"
-            f"Slēgta community ar signāliem, analītiku un atbalstu.\n"
+            f"Slēgta community ar AI (Mākslīgā intelekta) signāliem, analītiku un atbalstu.\n"
             f"Izvēlies plānu un pievienojies!"
         )
         msg2 = (
@@ -748,11 +748,11 @@ async def _send_onboarding(message, lang, name):
             f"Audzē zināšanas un izmanto community pieredzi."
         )
         msg3 = (
-            f"🏆 *Lojalitātes programma*\n\n"
-            f"Jo ilgāk esi community biedrs, jo lielākus bonusus iegūsti:\n"
+            f"🏅 *Rank sistēma*\n\n"
+            f"Jo aktīvāks esi community, jo augstāku ranku sasniedz:\n"
             f"🔥 Audzē savu statusu ar aktivitāti\n"
-            f"🎁 Saņem bezmaksas bonusa dienas\n"
-            f"🎓 Atbloķē papildu privilēģijas aktīvākajiem biedriem\n\n"
+            f"🎯 Sasniedz jaunus līmeņus čatā\n"
+            f"👏 Par katru jaunu ranku saņemsi apsveikuma ziņu\n\n"
             f"Sāc tagad! 👇"
         )
     elif lang == "ru":
@@ -760,7 +760,7 @@ async def _send_onboarding(message, lang, name):
             f"👋 *Привет, {name}!*\n\n"
             f"Добро пожаловать в *MNtradepro*! 🚀\n\n"
             f"💎 *VIP чат трейдеров*\n"
-            f"Закрытое community с сигналами, аналитикой и поддержкой.\n"
+            f"Закрытое community с AI (искусственный интеллект) сигналами, аналитикой и поддержкой.\n"
             f"Выбирай тариф и присоединяйся!"
         )
         msg2 = (
@@ -769,11 +769,11 @@ async def _send_onboarding(message, lang, name):
             f"Прокачивай знания и используй опыт community."
         )
         msg3 = (
-            f"🏆 *Программа лояльности*\n\n"
-            f"Чем дольше ты в community, тем больше бонусов получаешь:\n"
-            f"🔥 Расти в статусе через активность\n"
-            f"🎁 Получай бесплатные бонусные дни\n"
-            f"🎓 Открывай дополнительные привилегии для активных участников\n\n"
+            f"🏅 *Система рангов*\n\n"
+            f"Чем активнее ты в community, тем выше твой ранг:\n"
+            f"🔥 Повышай статус через активность\n"
+            f"🎯 Открывай новые уровни в чате\n"
+            f"👏 За каждый новый ранг ты получишь поздравительное сообщение\n\n"
             f"Начни прямо сейчас! 👇"
         )
     else:
@@ -781,7 +781,7 @@ async def _send_onboarding(message, lang, name):
             f"👋 *Hi, {name}!*\n\n"
             f"Welcome to *MNtradepro*! 🚀\n\n"
             f"💎 *VIP Traders Chat*\n"
-            f"Private community with signals, analytics and support.\n"
+            f"Private community with AI signals, analytics and support.\n"
             f"Pick a plan and join!"
         )
         msg2 = (
@@ -790,11 +790,11 @@ async def _send_onboarding(message, lang, name):
             f"Build your knowledge and use the community experience."
         )
         msg3 = (
-            f"🏆 *Loyalty Program*\n\n"
-            f"The longer you stay in the community, the bigger bonuses you unlock:\n"
+            f"🏅 *Rank System*\n\n"
+            f"The more active you are in the community, the higher your rank:\n"
             f"🔥 Grow your status through activity\n"
-            f"🎁 Earn free bonus days\n"
-            f"🎓 Unlock extra perks for active members\n\n"
+            f"🎯 Reach new levels in the chat\n"
+            f"👏 Each new rank unlock sends you a congratulation message\n\n"
             f"Start now! 👇"
         )
     
@@ -954,7 +954,7 @@ def active_keyboard(lang):
     if lang == "lv":
         b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
         b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("🏅", "Mans ranks"), callback_data="loyalty_status")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
@@ -962,7 +962,7 @@ def active_keyboard(lang):
     elif lang == "ru":
         b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
         b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("🏅", "Мой ранг"), callback_data="loyalty_status")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
@@ -970,7 +970,7 @@ def active_keyboard(lang):
     else:
         b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
         b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("🏅", "My Rank"), callback_data="loyalty_status")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
@@ -984,7 +984,7 @@ def _urgency_keyboard(lang):
     if lang == "lv":
         b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
-        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("🏅", "Mans ranks"), callback_data="loyalty_status")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
@@ -992,7 +992,7 @@ def _urgency_keyboard(lang):
     elif lang == "ru":
         b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
-        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("🏅", "Мой ранг"), callback_data="loyalty_status")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
@@ -1000,7 +1000,7 @@ def _urgency_keyboard(lang):
     else:
         b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
-        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("🏅", "My Rank"), callback_data="loyalty_status")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
@@ -1023,9 +1023,9 @@ async def cmd_start(message: Message, state: FSMContext):
     if not existing_user:
         uname = f"@{message.from_user.username}" if message.from_user.username else f"ID {user_id}"
         await notify_admins(
-            "ðŸ†• *Jauns lietotÄjs botÄ*\n\n"
-            f"ðŸ‘¤ {uname} (`{user_id}`)\n"
-            f"ðŸŒ Valoda: `{auto_lang}`"
+            "🆕 *New bot user*\n\n"
+            f"👤 {uname} (`{user_id}`)\n"
+            f"🌐 Language: `{auto_lang}`"
         )
     if ref_param and ref_param.startswith("ref_"):
         try:
@@ -2614,7 +2614,7 @@ async def notify_admins(text: str, parse_mode: str = "Markdown"):
 
 async def notify_admins_error(context: str, error: str):
     """SÅ«ta admin paziÅ†ojumu par kÄ¼Å«du"""
-    text = f"âš ï¸ *Bota kÄ¼Å«da*\n\nðŸ“ `{context}`\nâŒ `{str(error)[:500]}`"
+    text = f"⚠️ *Bot error*\n\n📍 `{context}`\n❌ `{str(error)[:500]}`"
     await notify_admins(text, parse_mode="Markdown")
 
 
@@ -2853,15 +2853,15 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount,
                 logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
             uname = f"@{username}" if username else f"ID {user_id}"
             for aid in config.ADMIN_IDS:
-                try: await bot.send_message(aid, f"Ã°Å¸â€™Â° *Jauns maksÃ„Âjums!*\n\nÃ°Å¸â€˜Â¤ {uname} (`{user_id}`)\nÃ°Å¸â€œÂ¦ *{plan_name_loc}*\nÃ°Å¸â€™Âµ *{amount} USDT*\nÃ°Å¸â€œâ€¦ LÃ„Â«dz: *{new_exp.strftime('%d.%m.%Y')}*\nÃ°Å¸â€â€“ TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
+                try: await bot.send_message(aid, f"💰 *New payment!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Until: *{new_exp.strftime('%d.%m.%Y')}*\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
                 except: pass
             return new_exp, plan_name_loc, product_meta
     # Admin notify
     uname = f"@{username}" if username else f"ID {user_id}"
     for aid in config.ADMIN_IDS:
         try:
-            extra = f"\nðŸŽ Win-back bonuss: *+{winback_bonus_days} d.*" if winback_bonus_days else ""
-            await bot.send_message(aid, f"ðŸ’° *Jauns maksÄjums!*\n\nðŸ‘¤ {uname} (`{user_id}`)\nðŸ“¦ *{plan_name_loc}*\nðŸ’µ *{amount} USDT*\nðŸ“… LÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*{extra}\nðŸ”– TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
+            extra = f"\n🎁 Win-back bonus: *+{winback_bonus_days} d.*" if winback_bonus_days else ""
+            await bot.send_message(aid, f"💰 *New payment!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Until: *{new_exp.strftime('%d.%m.%Y')}*{extra}\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
         except: pass
     return new_exp, plan_name_loc, product_meta
 
@@ -3452,181 +3452,93 @@ async def show_withdrawal_history(callback: CallbackQuery):
 
 @dp.message(Command("loyalty"))
 async def show_loyalty_status(message: Message):
-    """Show user's loyalty progress"""
     user_id = message.from_user.id
     user = await db.get_user(user_id)
-    
     if not user:
-        await message.answer("âŒ User not found")
+        await message.answer("User not found.")
         return
-    
+
     lang = user.get('lang', 'ru')
-    
-    # Get loyalty data
     loyalty_data = await db.get_user_loyalty(user_id)
-    
     if not loyalty_data:
-        # Initialize
         await db.update_user_loyalty(user_id, 'rookie', 0)
         loyalty_data = {'current_tier': 'rookie', 'consecutive_months': 0}
-    
+
     current_tier = loyalty_data.get('current_tier', 'rookie')
     consecutive_months = loyalty_data.get('consecutive_months', 0)
-    
-    tier_data = config.LOYALTY_TIERS[current_tier]
-    emoji = tier_data.get('emoji', '')
-    tag = tier_data.get('tag', current_tier)
-    discount = tier_data.get('chat_discount', 0)
-    
-    # Find next tier
+    tier_data = config.LOYALTY_TIERS.get(current_tier, {})
+    emoji = tier_data.get('emoji', '🌱')
+    tag = tier_data.get('tag', 'Rookie')
+
     next_tier = None
+    target_months = consecutive_months
     for tier_name in ['active', 'pro', 'elite', 'master', 'legend']:
         tier_info = config.LOYALTY_TIERS[tier_name]
         if consecutive_months < tier_info['min_months']:
             next_tier = tier_name
+            target_months = tier_info['min_months']
             break
-    
-    # Build progress bar
-    if next_tier:
-        next_tier_data = config.LOYALTY_TIERS[next_tier]
-        target_months = next_tier_data['min_months']
-        progress = consecutive_months / target_months
-        bar_length = 20
-        filled = int(progress * bar_length)
-        bar = "â–ˆ" * filled + "â–‘" * (bar_length - filled)
-        
-        months_left = target_months - consecutive_months
-    else:
-        # Already Legend
-        bar = "â–ˆ" * 20
-        months_left = 0
-    
-    if lang == 'ru':
-        text = f"""ðŸ“Š Ð¢Ð²Ð¾Ð¹ ÐŸÑ€Ð¾Ð³Ñ€ÐµÑÑ Ð›Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸
 
-{emoji} *{tag.upper()}* ({discount}%)
-{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} Ð¼ÐµÑÑÑ†ÐµÐ²
-"""
-        
+    progress = 1 if not next_tier else (consecutive_months / target_months if target_months > 0 else 0)
+    bar_length = 12
+    filled = min(bar_length, int(progress * bar_length))
+    bar = "▓" * filled + "░" * (bar_length - filled)
+
+    if lang == "lv":
+        text = f"🏅 *Tavs ranks*\n\n{emoji} *{tag.upper()}*\n{bar} *{int(progress * 100)}%*\n\nAktīvie mēneši: *{consecutive_months}*"
         if next_tier:
-            next_emoji = config.LOYALTY_TIERS[next_tier]['emoji']
             next_tag = config.LOYALTY_TIERS[next_tier]['tag']
-            next_discount = config.LOYALTY_TIERS[next_tier]['chat_discount']
-            next_bonus = config.LOYALTY_TIERS[next_tier]['bonus_days']
-            
-            text += f"""
-âž¡ï¸ Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¹: {next_emoji} *{next_tag.upper()}*
-ðŸ“… Ð”Ð¾ Ñ†ÐµÐ»Ð¸: {months_left} {'Ð¼ÐµÑÑÑ†' if months_left == 1 else 'Ð¼ÐµÑÑÑ†Ð°' if months_left < 5 else 'Ð¼ÐµÑÑÑ†ÐµÐ²'}! ðŸ”¥
-
-ðŸŽ ÐŸÐ¾Ð»ÑƒÑ‡Ð¸ÑˆÑŒ:
-   â€¢ +{next_bonus} Ð´Ð½ÐµÐ¹ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾
-   â€¢ {next_discount}% ÑÐºÐ¸Ð´ÐºÐ° (Ð¿Ñ€Ð¾Ñ‚Ð¸Ð² {discount}%)
-   â€¢ {next_emoji} {next_tag} badge"""
-            
-            if next_tier == 'elite':
-                text += "\n   â€¢ ðŸŽ“ Power Up ÐºÑƒÑ€Ñ (100$ ÑÑ‚Ð¾Ð¸Ð¼Ð¾ÑÑ‚ÑŒ)"
-        
+            left = target_months - consecutive_months
+            text += f"\nNākamais ranks: *{next_tag}*\nAtlicis: *{left}* mēn."
         else:
-            text += f"""
-ðŸ”± *Ð¢Ð« Ð”ÐžÐ¡Ð¢Ð˜Ð“ ÐœÐÐšÐ¡Ð˜ÐœÐ£ÐœÐ!*
-ðŸ‘‘ Legend ÑÑ‚Ð°Ñ‚ÑƒÑ - Ð²Ñ‹ÑÑˆÐµÐµ Ð´Ð¾ÑÑ‚Ð¸Ð¶ÐµÐ½Ð¸Ðµ!
-
-Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° {consecutive_months} Ð¼ÐµÑÑÑ†ÐµÐ² Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸! ðŸ†"""
-        
-        text += "\n\nðŸ’¡ *ÐŸÑ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ð¹ Ð¿Ñ€Ð¾Ð´Ð»ÑÑ‚ÑŒ - ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐ¹ ÑÑ‚Ð°Ñ‚ÑƒÑ!*"
-    
-    else:  # EN
-        text = f"""ðŸ“Š Your Loyalty Progress
-
-{emoji} *{tag.upper()}* ({discount}%)
-{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} months
-"""
-        
+            text += "\nTu jau esi sasniedzis augstāko ranku."
+        text += "\n\nŠobrīd ranki ir bez bonusiem un bez atlaidēm."
+    elif lang == "ru":
+        text = f"🏅 *Твой ранг*\n\n{emoji} *{tag.upper()}*\n{bar} *{int(progress * 100)}%*\n\nАктивные месяцы: *{consecutive_months}*"
         if next_tier:
-            next_emoji = config.LOYALTY_TIERS[next_tier]['emoji']
             next_tag = config.LOYALTY_TIERS[next_tier]['tag']
-            next_discount = config.LOYALTY_TIERS[next_tier]['chat_discount']
-            next_bonus = config.LOYALTY_TIERS[next_tier]['bonus_days']
-            
-            text += f"""
-âž¡ï¸ Next: {next_emoji} *{next_tag.upper()}*
-ðŸ“… Time left: {months_left} {'month' if months_left == 1 else 'months'}! ðŸ”¥
-
-ðŸŽ You'll get:
-   â€¢ +{next_bonus} days free
-   â€¢ {next_discount}% discount (vs {discount}%)
-   â€¢ {next_emoji} {next_tag} badge"""
-            
-            if next_tier == 'elite':
-                text += "\n   â€¢ ðŸŽ“ Power Up course (100$ value)"
-        
+            left = target_months - consecutive_months
+            text += f"\nСледующий ранг: *{next_tag}*\nОсталось: *{left}* мес."
         else:
-            text += f"""
-ðŸ”± *YOU REACHED THE TOP!*
-ðŸ‘‘ Legend status - ultimate achievement!
-
-Thank you for {consecutive_months} months of loyalty! ðŸ†"""
-        
-        text += "\n\nðŸ’¡ *Keep renewing - maintain your status!*"
-    
-    if lang == 'ru':
-        text = (
-            f"ðŸ“Š *Ð¢Ð²Ð¾Ð¹ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
-            f"{emoji} *{tag.upper()}*\n"
-            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} Ð¼ÐµÑÑÑ†ÐµÐ²\n\n"
-            "ðŸŽ Ð§ÐµÐ¼ Ð´Ð¾Ð»ÑŒÑˆÐµ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð° Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ°, Ñ‚ÐµÐ¼ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ñ… Ð´Ð½ÐµÐ¹ Ñ‚Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑˆÑŒ."
-        )
-    elif lang == 'lv':
-        text = (
-            f"ðŸ“Š *Tavs lojalitÄtes progress*\n\n"
-            f"{emoji} *{tag.upper()}*\n"
-            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} mÄ“neÅ¡i\n\n"
-            "ðŸŽ Jo ilgÄk abonements ir aktÄ«vs, jo vairÄk bezmaksas bonusa dienu tu atbloÄ·Ä“."
-        )
+            text += "\nТы уже достиг максимального ранга."
+        text += "\n\nСейчас ранги без бонусов и без скидок."
     else:
-        text = (
-            f"ðŸ“Š *Your Loyalty Progress*\n\n"
-            f"{emoji} *{tag.upper()}*\n"
-            f"{bar} {consecutive_months}/{target_months if next_tier else consecutive_months} months\n\n"
-            "ðŸŽ The longer your subscription stays active, the more free bonus days you unlock."
-        )
+        text = f"🏅 *Your Rank*\n\n{emoji} *{tag.upper()}*\n{bar} *{int(progress * 100)}%*\n\nActive months: *{consecutive_months}*"
+        if next_tier:
+            next_tag = config.LOYALTY_TIERS[next_tier]['tag']
+            left = target_months - consecutive_months
+            text += f"\nNext rank: *{next_tag}*\nRemaining: *{left}* mo."
+        else:
+            text += "\nYou already reached the highest rank."
+        text += "\n\nRanks are currently visual only with no bonuses or discounts."
 
     b = InlineKeyboardBuilder()
-    b.button(text="ðŸ’Ž " + ui_text(lang, "PagarinÄt", "ÐŸÑ€Ð¾Ð´Ð»Ð¸Ñ‚ÑŒ", "Renew"),
-             callback_data="vip_chat_plans")
+    b.button(text="📋 " + ui_text(lang, "Visi ranki", "Все ранги", "All ranks"), callback_data="loyalty_tiers_info")
+    b.button(text="💎 " + ui_text(lang, "Pagarināt", "Продлить", "Renew"), callback_data="vip_chat_plans")
     b.adjust(1)
-    
     await message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
 
 
 @dp.callback_query(F.data == "loyalty_status")
 async def loyalty_status_callback(callback: CallbackQuery):
-    """Handle loyalty status button from main menu"""
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
-    
     if not user:
-        await callback.answer("âŒ User not found")
+        await callback.answer("User not found")
         return
-    
+
     lang = user.get('lang', 'ru')
-    
-    # Get loyalty data
     loyalty_data = await db.get_user_loyalty(user_id)
-    
     if not loyalty_data:
         await db.update_user_loyalty(user_id, 'rookie', 0)
         loyalty_data = {'current_tier': 'rookie', 'consecutive_months': 0}
-    
+
     current_tier = loyalty_data.get('current_tier', 'rookie')
     consecutive_months = loyalty_data.get('consecutive_months', 0)
-    
     tier_data = config.LOYALTY_TIERS[current_tier]
-    emoji = tier_data.get('emoji', 'ðŸŒ±')
+    emoji = tier_data.get('emoji', '🌱')
     tag = tier_data.get('tag', 'Rookie')
-    discount = tier_data.get('chat_discount', 0)
-    
-    # Find next tier
+
     next_tier = None
     target_months = 0
     for tier_name in ['active', 'pro', 'elite', 'master', 'legend']:
@@ -3636,144 +3548,44 @@ async def loyalty_status_callback(callback: CallbackQuery):
             target_months = tier_info['min_months']
             break
     
-    # Build progress bar ar %
     if next_tier:
         progress = consecutive_months / target_months if target_months > 0 else 0
         progress_pct = int(progress * 100)
         bar_length = 15
-        filled = int(progress * bar_length)
-        bar = "â–“" * filled + "â–‘" * (bar_length - filled)
-        months_left = target_months - consecutive_months
+        filled = min(bar_length, int(progress * bar_length))
+        bar = "▓" * filled + "░" * (bar_length - filled)
     else:
-        bar = "â–“" * 15
-        months_left = 0
+        bar = "▓" * 15
         progress_pct = 100
-    
     if lang == 'ru':
-        discount_text = f" â€” ÑÐºÐ¸Ð´ÐºÐ° *{discount}%*" if discount > 0 else ""
-        text = (
-            f"ðŸ† *Ð¢Ð²Ð¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
-            f"{emoji} *{tag.upper()}*{discount_text}\n"
-            f"{bar} *{progress_pct}%*\n"
-        )
-        
+        text = f"🏅 *Твой ранг*\n\n{emoji} *{tag.upper()}*\n{bar} *{progress_pct}%*\n\nАктивные месяцы: *{consecutive_months}*"
         if next_tier:
-            next_data = config.LOYALTY_TIERS[next_tier]
-            next_emoji = next_data['emoji']
-            next_tag = next_data['tag']
-            next_discount = next_data['chat_discount']
-            next_bonus = next_data['bonus_days']
-            
-            text += (
-                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
-                f"ðŸŽ¯ *Ð¡Ð»ÐµÐ´ÑƒÑŽÑ‰Ð¸Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ:* {next_emoji} {next_tag}\n"
-                f"ðŸ“… ÐžÑÑ‚Ð°Ð»Ð¾ÑÑŒ: *{months_left}* {_months_ru(months_left)}\n\n"
-                f"ðŸŽ *Ð§Ñ‚Ð¾ Ñ‚Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð¸ÑˆÑŒ:*\n"
-                f"   â€¢ +{next_bonus} Ð´Ð½ÐµÐ¹ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾Ð³Ð¾ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°\n"
-                f"   â€¢ ÐŸÐ¾ÑÑ‚Ð¾ÑÐ½Ð½Ð°Ñ ÑÐºÐ¸Ð´ÐºÐ° {next_discount}%\n"
-                f"   â€¢ Ð¡Ñ‚Ð°Ñ‚ÑƒÑ {next_emoji} {next_tag}"
-            )
-            if next_tier == 'elite':
-                text += "\n   â€¢ ðŸŽ“ Ð‘ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ð¹ Power Up ÐºÑƒÑ€Ñ ($100)"
-            
-            text += (
-                f"\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
-                f"ðŸ’¡ *ÐŸÑ€Ð¾Ð´Ð¾Ð»Ð¶Ð°Ð¹ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ â€” Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑ ÐºÐ¾Ð¿Ð¸Ñ‚ÑÑ!*"
-            )
-            
-            # Course upsell priekÅ¡ Rookie un Active
-            if current_tier in ('rookie', 'active'):
-                text += (
-                    f"\n\nðŸ”¥ *Ð¥Ð¾Ñ‡ÐµÑˆÑŒ Ð±Ñ‹ÑÑ‚Ñ€ÐµÐµ Ñ€Ð°ÑÑ‚Ð¸?*\n"
-                    f"ÐŸÑ€Ð¾Ð¹Ð´Ð¸ ÐºÑƒÑ€Ñ Ð¸ Ð¿Ñ€Ð¾ÐºÐ°Ñ‡Ð°Ð¹ ÑÐ²Ð¾Ð¹ Ñ‚Ñ€ÐµÐ¹Ð´Ð¸Ð½Ð³!"
-                )
+            next_tag = config.LOYALTY_TIERS[next_tier]['tag']
+            text += f"\nСледующий ранг: *{next_tag}*\nОсталось: *{target_months - consecutive_months}* мес."
         else:
-            text += (
-                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
-                f"ðŸ”± *Ð¢Ð« ÐÐ Ð’Ð•Ð Ð¨Ð˜ÐÐ•!*\n"
-                f"ÐœÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑŒÐ½Ð°Ñ ÑÐºÐ¸Ð´ÐºÐ° *{discount}%* Ð½Ð° Ð²ÑÑ‘!\n\n"
-                f"ðŸ™ Ð¡Ð¿Ð°ÑÐ¸Ð±Ð¾ Ð·Ð° *{consecutive_months}* Ð¼ÐµÑÑÑ†ÐµÐ² Ñ Ð½Ð°Ð¼Ð¸! ðŸ†"
-            )
-    
-    else:  # EN
-        discount_text = f" â€” *{discount}%* discount" if discount > 0 else ""
-        text = (
-            f"ðŸ† *Your Loyalty Level*\n\n"
-            f"{emoji} *{tag.upper()}*{discount_text}\n"
-            f"{bar} *{progress_pct}%*\n"
-        )
-        
-        if next_tier:
-            next_data = config.LOYALTY_TIERS[next_tier]
-            next_emoji = next_data['emoji']
-            next_tag = next_data['tag']
-            next_discount = next_data['chat_discount']
-            next_bonus = next_data['bonus_days']
-            
-            text += (
-                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
-                f"ðŸŽ¯ *Next level:* {next_emoji} {next_tag}\n"
-                f"ðŸ“… *{months_left}* month{'s' if months_left != 1 else ''} to go\n\n"
-                f"ðŸŽ *You'll unlock:*\n"
-                f"   â€¢ +{next_bonus} days free access\n"
-                f"   â€¢ Permanent {next_discount}% discount\n"
-                f"   â€¢ {next_emoji} {next_tag} status"
-            )
-            if next_tier == 'elite':
-                text += "\n   â€¢ ðŸŽ“ Free Power Up course ($100)"
-            
-            text += (
-                f"\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
-                f"ðŸ’¡ *Keep your subscription active to progress!*"
-            )
-            
-            if current_tier in ('rookie', 'active'):
-                text += (
-                    f"\n\nðŸ”¥ *Want to grow faster?*\n"
-                    f"Take a course and level up your trading!"
-                )
-        else:
-            text += (
-                f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
-                f"ðŸ”± *YOU'RE AT THE TOP!*\n"
-                f"Maximum *{discount}%* discount on everything!\n\n"
-                f"ðŸ™ Thank you for *{consecutive_months}* months with us! ðŸ†"
-            )
-    
-    if lang == 'ru':
-        text = (
-            f"ðŸ† *Ð¢Ð²Ð¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
-            f"{emoji} *{tag.upper()}*\n"
-            f"{bar} *{progress_pct}%*\n\n"
-            "ðŸŽ Ð›Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚ÑŒ Ñ‚ÐµÐ¿ÐµÑ€ÑŒ Ð´Ð°Ñ‘Ñ‚ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ðµ Ð´Ð½Ð¸ Ð·Ð° Ð´Ð»Ð¸Ñ‚ÐµÐ»ÑŒÐ½ÑƒÑŽ Ð°ÐºÑ‚Ð¸Ð²Ð½ÑƒÑŽ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ."
-        )
+            text += "\nТы уже достиг максимального ранга."
+        text += "\n\nСейчас ранги без бонусов и без скидок."
     elif lang == 'lv':
-        text = (
-            f"ðŸ† *Tavs lojalitÄtes lÄ«menis*\n\n"
-            f"{emoji} *{tag.upper()}*\n"
-            f"{bar} *{progress_pct}%*\n\n"
-            "ðŸŽ LojalitÄte tagad dod bezmaksas bonusa dienas par ilgstoÅ¡i aktÄ«vu abonementu."
-        )
+        text = f"🏅 *Tavs ranks*\n\n{emoji} *{tag.upper()}*\n{bar} *{progress_pct}%*\n\nAktīvie mēneši: *{consecutive_months}*"
+        if next_tier:
+            next_tag = config.LOYALTY_TIERS[next_tier]['tag']
+            text += f"\nNākamais ranks: *{next_tag}*\nAtlicis: *{target_months - consecutive_months}* mēn."
+        else:
+            text += "\nTu jau esi sasniedzis augstāko ranku."
+        text += "\n\nŠobrīd ranki ir bez bonusiem un bez atlaidēm."
     else:
-        text = (
-            f"ðŸ† *Your Loyalty Level*\n\n"
-            f"{emoji} *{tag.upper()}*\n"
-            f"{bar} *{progress_pct}%*\n\n"
-            "ðŸŽ Loyalty now rewards long active subscriptions with free bonus days."
-        )
+        text = f"🏅 *Your Rank*\n\n{emoji} *{tag.upper()}*\n{bar} *{progress_pct}%*\n\nActive months: *{consecutive_months}*"
+        if next_tier:
+            next_tag = config.LOYALTY_TIERS[next_tier]['tag']
+            text += f"\nNext rank: *{next_tag}*\nRemaining: *{target_months - consecutive_months}* mo."
+        else:
+            text += "\nYou already reached the highest rank."
+        text += "\n\nRanks are currently visual only with no bonuses or discounts."
 
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
     b = InlineKeyboardBuilder()
-    b.button(text="ðŸ“‹  " + ui_text(lang, "Visi lÄ«meÅ†i un bonusi", "Ð’ÑÐµ ÑƒÑ€Ð¾Ð²Ð½Ð¸ Ð¸ Ð±Ð¾Ð½ÑƒÑÑ‹", "All levels & rewards"),
-             callback_data="loyalty_tiers_info")
-    # Course upsell poga priekÅ¡ Rookie/Active
-    if current_tier in ('rookie', 'active'):
-        b.button(text="ðŸ”¥  " + ui_text(lang, "Kursi â€” uzlabo tradingu!", "ÐšÑƒÑ€ÑÑ‹ â€” Ð¿Ñ€Ð¾ÐºÐ°Ñ‡Ð°Ð¹ Ñ‚Ñ€ÐµÐ¹Ð´Ð¸Ð½Ð³!", "Courses â€” level up!"),
-                 callback_data="courses_menu")
-    b.button(text=back_button_text(lang),
-             callback_data="settings_back")
+    b.button(text="📋 " + ui_text(lang, "Visi ranki", "Все ранги", "All ranks"), callback_data="loyalty_tiers_info")
+    b.button(text=back_button_text(lang), callback_data="settings_back")
     b.adjust(1)
-    
     await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
     await callback.answer()
 
@@ -3790,7 +3602,6 @@ def _months_ru(n):
 
 @dp.callback_query(F.data == "loyalty_tiers_info")
 async def loyalty_tiers_info(callback: CallbackQuery):
-    """ParÄdÄ«t visu lÄ«meÅ†u aprakstu ar bonusiem"""
     user = await db.get_user(callback.from_user.id)
     lang = user.get('lang', 'ru') if user else 'ru'
     
@@ -3800,67 +3611,47 @@ async def loyalty_tiers_info(callback: CallbackQuery):
     tier_order = ['rookie', 'active', 'pro', 'elite', 'master', 'legend']
     
     if lang == 'ru':
-        text = "ðŸ“‹ *Ð’ÑÐµ ÑƒÑ€Ð¾Ð²Ð½Ð¸ Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\nÐ§ÐµÐ¼ Ð´Ð¾Ð»ÑŒÑˆÐµ Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° â€” Ñ‚ÐµÐ¼ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð¿Ñ€Ð¸Ð²Ð¸Ð»ÐµÐ³Ð¸Ð¹!\n"
+        text = "📋 *Все ранги*\n\nСейчас ранги только визуальные, без бонусов и скидок.\n"
     elif lang == 'lv':
-        text = "ðŸ“‹ *Visi lojalitÄtes lÄ«meÅ†i*\n\nJo ilgÄk abonÄ“, jo vairÄk bonusu!\n"
+        text = "📋 *Visi ranki*\n\nŠobrīd ranki ir tikai vizuāli, bez bonusiem un atlaidēm.\n"
     else:
-        text = "ðŸ“‹ *All Loyalty Levels*\n\nThe longer you subscribe â€” the more rewards!\n"
+        text = "📋 *All ranks*\n\nRanks are currently visual only, with no bonuses or discounts.\n"
     
     for tier_name in tier_order:
         td = config.LOYALTY_TIERS[tier_name]
         em = td['emoji']
         tg = td['tag']
-        disc = td['chat_discount']
-        bonus = td['bonus_days']
         min_m = td['min_months']
         
         is_current = (tier_name == current_tier)
-        marker = ui_text(lang, " â—€ TU ESI Å EIT", " â—€ Ð¢Ð« Ð—Ð”Ð•Ð¡Ð¬", " â—€ YOU") if is_current else ""
+        marker = ui_text(lang, " <- tu esi šeit", " <- ты здесь", " <- you are here") if is_current else ""
         
-        text += f"\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+        text += f"\n────────────────\n"
         text += f"{em} *{tg.upper()}*{marker}\n"
         
         if lang == 'ru':
             if min_m == 0:
-                text += "ðŸ“… Ð¡Ñ‚Ð°Ñ€Ñ‚\n"
+                text += "📅 Стартовый ранг\n"
             else:
-                text += f"ðŸ“… ÐŸÐ¾ÑÐ»Ðµ {min_m} {_months_ru(min_m)} Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ¸\n"
-            if disc > 0:
-                text += f"ðŸ’° Ð¡ÐºÐ¸Ð´ÐºÐ°: *{disc}%* Ð½Ð° Ð²ÑÑ‘\n"
-            if bonus > 0:
-                text += f"ðŸŽ Ð‘Ð¾Ð½ÑƒÑ: *+{bonus} Ð´Ð½ÐµÐ¹* Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ð¾\n"
-            if td.get('free_course'):
-                text += f"ðŸŽ“ Ð‘ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ð¹ Power Up ÐºÑƒÑ€Ñ ($100)\n"
+                text += f"📅 После {min_m} {_months_ru(min_m)} активной подписки\n"
         elif lang == 'lv':
             if min_m == 0:
-                text += "ðŸ“… SÄkuma lÄ«menis\n"
+                text += "📅 Sākuma ranks\n"
             else:
-                text += f"ðŸ“… PÄ“c {min_m} mÄ“neÅ¡u abonementa\n"
-            if disc > 0:
-                text += f"ðŸ’° Atlaide: *{disc}%* visam\n"
-            if bonus > 0:
-                text += f"ðŸŽ Bonuss: *+{bonus} dienas* bezmaksas\n"
-            if td.get('free_course'):
-                text += f"ðŸŽ“ Bezmaksas Power Up kurss ($100)\n"
+                text += f"📅 Pēc {min_m} aktīviem mēnešiem\n"
         else:
             if min_m == 0:
-                text += "ðŸ“… Starting level\n"
+                text += "📅 Starting rank\n"
             else:
-                text += f"ðŸ“… After {min_m} months\n"
-            if disc > 0:
-                text += f"ðŸ’° Discount: *{disc}%* on everything\n"
-            if bonus > 0:
-                text += f"ðŸŽ Bonus: *+{bonus} days* free\n"
-            if td.get('free_course'):
-                text += f"ðŸŽ“ Free Power Up course ($100)\n"
+                text += f"📅 After {min_m} active months\n"
     
-    text += "\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n"
+    text += "\n────────────────\n"
     if lang == 'ru':
-        text += "\nðŸ’¡ *Ð¢Ð²Ð¾Ð¹ Ð¿Ñ€Ð¾Ð³Ñ€ÐµÑÑ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ÑÑ Ð¿Ð¾ÐºÐ° Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° Ð°ÐºÑ‚Ð¸Ð²Ð½Ð°!*"
+        text += "\n💡 *Ранг растет, пока подписка активна.*"
     elif lang == 'lv':
-        text += "\nðŸ’¡ *Tavs progress saglabÄjas, kamÄ“r abonements ir aktÄ«vs!*"
+        text += "\n💡 *Tavs ranks aug, kamēr abonements ir aktīvs.*"
     else:
-        text += "\nðŸ’¡ *Your progress is saved while subscription is active!*"
+        text += "\n💡 *Your rank grows while the subscription stays active.*"
     
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     b = InlineKeyboardBuilder()
@@ -4033,13 +3824,12 @@ async def start_back_callback(callback: CallbackQuery):
         tier_data = config.LOYALTY_TIERS.get(current_tier, {})
         tier_emoji = tier_data.get('emoji', 'ðŸŒ±')
         tier_tag = tier_data.get('tag', 'Rookie')
-        tier_discount = tier_data.get('chat_discount', 0)
         if lang == "ru":
-            loyalty_line = f"\n\n{tier_emoji} Ð£Ñ€Ð¾Ð²ÐµÐ½ÑŒ: *{tier_tag}*" + (f" ({tier_discount}% ÑÐºÐ¸Ð´ÐºÐ°)" if tier_discount > 0 else "")
+            loyalty_line = f"\n\n{tier_emoji} Ранг: *{tier_tag}*"
         elif lang == "lv":
-            loyalty_line = f"\n\n{tier_emoji} LÄ«menis: *{tier_tag}*" + (f" ({tier_discount}% atlaide)" if tier_discount > 0 else "")
+            loyalty_line = f"\n\n{tier_emoji} Rangs: *{tier_tag}*"
         else:
-            loyalty_line = f"\n\n{tier_emoji} Level: *{tier_tag}*" + (f" ({tier_discount}% discount)" if tier_discount > 0 else "")
+            loyalty_line = f"\n\n{tier_emoji} Rank: *{tier_tag}*"
         welcome_text = t(lang, "active_sub", name=name, expires=expires_dt.strftime("%d.%m.%Y"), plan=user.get("plan_name", "â€”"), days=days_left) + loyalty_line
         await callback.message.edit_text(welcome_text, reply_markup=active_keyboard(lang), parse_mode="Markdown")
     else:
@@ -4381,7 +4171,7 @@ async def website_purchase_webhook(request: web.Request):
             raise
         for aid in config.ADMIN_IDS:
             try:
-                await bot.send_message(aid, f"âš ï¸ *Webhook purchase without bot user*\n\nðŸ“§ `{email}`\nðŸ“¦ `{product_key}`\nðŸ’³ `{payment_system}`", parse_mode="Markdown")
+                await bot.send_message(aid, f"⚠️ *Webhook purchase without bot user*\n\n📧 `{email}`\n📦 `{product_key}`\n💳 `{payment_system}`", parse_mode="Markdown")
             except Exception:
                 pass
         return web.json_response({
