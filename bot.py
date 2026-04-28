@@ -406,7 +406,7 @@ def menu_button(emoji, label):
     return f"{emoji}  {label}"
 
 def market_scanner_label(lang):
-    return ui_text(lang, "Tirgus Skaneris/AI signāli", "Сканер рынка/AI сигналы", "Market Scanner/AI Signals")
+    return ui_text(lang, "PRO Tirgus Skaneris/AI Signāli", "PRO Сканер рынка/AI сигналы", "PRO Market Scanner/AI Signals")
 
 def email_binding_notice(lang):
     return ui_text(
@@ -736,11 +736,16 @@ async def _send_onboarding(message, lang, name):
     """3 ziÅ†u karuselis jaunajiem lietotÄjiem"""
     if lang == "lv":
         msg1 = (
-            f"👋 *Sveiks, {name}!*\n\n"
-            f"Laipni lūgts *MNtradepro*! 🚀\n\n"
-            f"💎 *VIP Treideru čats*\n"
-            f"Slēgta community ar AI (Mākslīgā intelekta) signāliem, analītiku un atbalstu.\n"
-            f"Izvēlies plānu un pievienojies!"
+            "Laipni lūgts *MNtradepro VIP Treideru čatā* 🚀\n\n"
+            "💎 Šeit tu iegūsi piekļuvi slēgtai treideru community ar:\n\n"
+            "✅ AI signāliem\n"
+            "✅ Tirgus analītiku\n"
+            "✅ Idejām darījumiem\n"
+            "✅ Atbalstu un pieredzes apmaiņu\n"
+            "✅ Papildu materiāliem un jaunumiem\n\n"
+            "Izvēlies sev piemērotāko plānu un pievienojies VIP čatam 👇\n\n"
+            "Atgādinājums: signāli un analītika nav finanšu konsultācija. "
+            "Lēmumus par darījumiem pieņem pats."
         )
         msg2 = (
             f"📚 *MNtradepro kursi*\n\n"
@@ -752,16 +757,20 @@ async def _send_onboarding(message, lang, name):
             f"Jo aktīvāks esi community, jo augstāku ranku sasniedz:\n"
             f"🔥 Audzē savu statusu ar aktivitāti\n"
             f"🎯 Sasniedz jaunus līmeņus čatā\n"
-            f"👏 Par katru jaunu ranku saņemsi apsveikuma ziņu\n\n"
             f"Sāc tagad! 👇"
         )
     elif lang == "ru":
         msg1 = (
-            f"👋 *Привет, {name}!*\n\n"
-            f"Добро пожаловать в *MNtradepro*! 🚀\n\n"
-            f"💎 *VIP чат трейдеров*\n"
-            f"Закрытое community с AI (искусственный интеллект) сигналами, аналитикой и поддержкой.\n"
-            f"Выбирай тариф и присоединяйся!"
+            "Добро пожаловать в *MNtradepro VIP чат трейдеров* 🚀\n\n"
+            "💎 Здесь ты получишь доступ к закрытой community трейдеров с:\n\n"
+            "✅ AI сигналами\n"
+            "✅ Аналитикой рынка\n"
+            "✅ Идеями для сделок\n"
+            "✅ Поддержкой и обменом опытом\n"
+            "✅ Дополнительными материалами и новостями\n\n"
+            "Выбери подходящий план и присоединяйся к VIP чату 👇\n\n"
+            "Напоминание: сигналы и аналитика не являются финансовой консультацией. "
+            "Решения по сделкам ты принимаешь сам."
         )
         msg2 = (
             f"📚 *Курсы MNtradepro Academy*\n\n"
@@ -773,16 +782,20 @@ async def _send_onboarding(message, lang, name):
             f"Чем активнее ты в community, тем выше твой ранг:\n"
             f"🔥 Повышай статус через активность\n"
             f"🎯 Открывай новые уровни в чате\n"
-            f"👏 За каждый новый ранг ты получишь поздравительное сообщение\n\n"
             f"Начни прямо сейчас! 👇"
         )
     else:
         msg1 = (
-            f"👋 *Hi, {name}!*\n\n"
-            f"Welcome to *MNtradepro*! 🚀\n\n"
-            f"💎 *VIP Traders Chat*\n"
-            f"Private community with AI signals, analytics and support.\n"
-            f"Pick a plan and join!"
+            "Welcome to *MNtradepro VIP Traders Chat* 🚀\n\n"
+            "💎 Here you get access to a private traders community with:\n\n"
+            "✅ AI signals\n"
+            "✅ Market analysis\n"
+            "✅ Trade ideas\n"
+            "✅ Support and knowledge sharing\n"
+            "✅ Extra materials and updates\n\n"
+            "Choose the plan that fits you and join the VIP chat 👇\n\n"
+            "Reminder: signals and analysis are not financial advice. "
+            "You make your own trading decisions."
         )
         msg2 = (
             f"📚 *MNtradepro Academy Courses*\n\n"
@@ -794,7 +807,6 @@ async def _send_onboarding(message, lang, name):
             f"The more active you are in the community, the higher your rank:\n"
             f"🔥 Grow your status through activity\n"
             f"🎯 Reach new levels in the chat\n"
-            f"👏 Each new rank unlock sends you a congratulation message\n\n"
             f"Start now! 👇"
         )
     
