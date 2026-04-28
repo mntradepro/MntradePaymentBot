@@ -464,7 +464,11 @@ async def checkout_url_for_lang(lang):
     return (await db.get_setting(f"checkout_url_{lang}")) or ""
 
 
-async def checkout_url_for_course(course_key):
+async def checkout_url_for_course(course_key, course_lang=None):
+    if course_lang:
+        specific = (await db.get_setting(f"course_checkout_url_{course_key}_{course_lang}")) or ""
+        if specific:
+            return specific
     return (await db.get_setting(f"course_checkout_url_{course_key}")) or ""
 
 
@@ -2100,7 +2104,7 @@ async def courses_menu(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("course_info_"))
 async def course_info_menu(callback: CallbackQuery):
-    """RÄda kursa info un payment metodes"""
+    """Show course info and let the user choose the course language."""
     course_key = callback.data.replace("course_info_", "")
     course = config.COURSES.get(course_key)
     if not course:
@@ -2122,14 +2126,14 @@ async def course_info_menu(callback: CallbackQuery):
             f"{course['emoji']} *{name}*\n\n"
             f"💰 Cena: *{price_str}*\n\n"
             "📖 Detalizēts kursa apraksts un programma ir pieejama MNtradepro mājaslapā.\n\n"
-            "Izvēlies apmaksas veidu:"
+            "Izvēlies kursa valodu:"
         )
     elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
             f"💰 Цена: *{price_str}*\n\n"
             "📖 Подробное описание курса и программу можно посмотреть на сайте MNtradepro.\n\n"
-            "Выбери способ оплаты:"
+            "Выбери язык курса:"
         )
     else:
         text = (
@@ -2137,16 +2141,13 @@ async def course_info_menu(callback: CallbackQuery):
             f"💰 Price: *{price_str}*\n\n"
             "📖 Detailed course description and curriculum "
             "available on MNtradepro website.\n\n"
-            "Choose payment method:"
+            "Choose the course language:"
         )
     
-    checkout_url = await checkout_url_for_course(course_key)
-    
     b = InlineKeyboardBuilder()
-    if checkout_url:
-        b.button(text=("💳 Maksāt ar karti / banku / crypto" if ui_lang == "lv" else ("💳 Оплатить картой / банком / crypto" if ui_lang == "ru" else "💳 Pay with card / bank / crypto")), url=checkout_url)
-    else:
-        b.button(text=("💳 Maksāt ar karti / banku / crypto" if ui_lang == "lv" else ("💳 Оплатить картой / банком / crypto" if ui_lang == "ru" else "💳 Pay with card / bank / crypto")), callback_data=f"course_checkout_missing_{course_key}")
+    b.button(text="🇱🇻 Latviešu", callback_data=f"course_lang_{course_key}_lv")
+    b.button(text="🇬🇧 English", callback_data=f"course_lang_{course_key}_en")
+    b.button(text="🇷🇺 Русский", callback_data=f"course_lang_{course_key}_ru")
     b.button(text=back_button_text(ui_lang), callback_data="courses_menu")
     b.adjust(1)
     
@@ -2154,9 +2155,77 @@ async def course_info_menu(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data.startswith("course_lang_"))
+async def course_language_selected(callback: CallbackQuery):
+    payload = callback.data.replace("course_lang_", "")
+    try:
+        course_key, course_lang = payload.rsplit("_", 1)
+    except ValueError:
+        await callback.answer("❌", show_alert=True)
+        return
+    course = config.COURSES.get(course_key)
+    if not course or course_lang not in ("lv", "en", "ru"):
+        await callback.answer("❌", show_alert=True)
+        return
+
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "ru") if user else "ru"
+    ui_lang = _course_ui_lang(lang)
+    saved_price = await db.get_setting(f"course_price_{course_key}")
+    price = float(saved_price) if saved_price else course['price_usdt']
+    price_str = _format_eur_price(price)
+    name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
+    selected_lang_label = {"lv": "🇱🇻 Latviešu", "en": "🇬🇧 English", "ru": "🇷🇺 Русский"}[course_lang]
+
+    if ui_lang == "lv":
+        text = (
+            f"{course['emoji']} *{name}*\n\n"
+            f"💰 Cena: *{price_str}*\n"
+            f"🌐 Kursa valoda: *{selected_lang_label}*\n\n"
+            "Izmanto checkout pogu zemāk:"
+        )
+    elif ui_lang == "ru":
+        text = (
+            f"{course['emoji']} *{name}*\n\n"
+            f"💰 Цена: *{price_str}*\n"
+            f"🌐 Язык курса: *{selected_lang_label}*\n\n"
+            "Используй checkout-кнопку ниже:"
+        )
+    else:
+        text = (
+            f"{course['emoji']} *{name}*\n\n"
+            f"💰 Price: *{price_str}*\n"
+            f"🌐 Course language: *{selected_lang_label}*\n\n"
+            "Use the checkout button below:"
+        )
+
+    checkout_url = await checkout_url_for_course(course_key, course_lang)
+    b = InlineKeyboardBuilder()
+    checkout_btn = ui_text(
+        ui_lang,
+        "💳 Maksāt ar karti / banku / crypto",
+        "💳 Оплатить картой / банком / crypto",
+        "💳 Pay with card / bank / crypto",
+    )
+    if checkout_url:
+        b.button(text=checkout_btn, url=checkout_url)
+    else:
+        b.button(text=checkout_btn, callback_data=f"course_checkout_missing_{course_key}_{course_lang}")
+    b.button(text=back_button_text(ui_lang), callback_data=f"course_info_{course_key}")
+    b.adjust(1)
+    await callback.message.edit_text(text, reply_markup=b.as_markup(), parse_mode="Markdown")
+    await callback.answer()
+
+
 @dp.callback_query(F.data.startswith("course_checkout_missing_"))
 async def course_checkout_missing(callback: CallbackQuery):
-    await callback.answer("Checkout links sim kursam vel nav iestatits admin paneli.", show_alert=True)
+    payload = callback.data.replace("course_checkout_missing_", "")
+    try:
+        course_key, course_lang = payload.rsplit("_", 1)
+    except ValueError:
+        course_key, course_lang = payload, ""
+    lang_name = {"lv": "Latvian", "en": "English", "ru": "Russian"}.get(course_lang, "selected")
+    await callback.answer(f"Checkout URL for this course language is not set in admin panel yet ({course_key} / {lang_name}).", show_alert=True)
 
 
 @dp.callback_query(F.data.startswith("course_crypto_"))
