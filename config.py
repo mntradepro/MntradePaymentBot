@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Deploy trigger: no behavior change.
 
 @dataclass
 class Config:
@@ -24,14 +23,16 @@ class Config:
     })
     SCANNER_CHAT_ID: int = int(os.getenv("SCANNER_CHAT_ID", "0"))
     SCANNER_CHAT_LINK: str = os.getenv("SCANNER_CHAT_LINK", "https://t.me/promarketscanner")
+
+    # Legacy field kept so old code paths do not crash.
     CRYPTO_WALLET: str = os.getenv("CRYPTO_WALLET", "")
+
     # Website purchase webhook
     WEBHOOK_HOST: str = os.getenv("WEBHOOK_HOST", "0.0.0.0")
     WEBHOOK_PORT: int = int(os.getenv("WEBHOOK_PORT", "8080"))
     WEBHOOK_PATH: str = os.getenv("WEBHOOK_PATH", "/webhook/purchase")
     WEBHOOK_SECRET: str = os.getenv("WEBHOOK_SECRET", "")
 
-    # Support kontakts — @username vai grupa
     SUPPORT_CONTACT: str = os.getenv("SUPPORT_CONTACT", "https://t.me/mntrade_support")
 
     ADMIN_IDS: List[int] = field(default_factory=lambda: [
@@ -40,8 +41,8 @@ class Config:
 
     PLANS: Dict[str, Any] = field(default_factory=lambda: {
         "monthly": {
-            "name": {"ru": "1 Месяц", "en": "1 Month", "lv": "1 mēnesis"},
-            "price_usd": "10€",
+            "name": {"ru": "1 месяц", "en": "1 Month", "lv": "1 mēnesis"},
+            "price_usd": "10 EUR",
             "price_usdt": 10.0,
             "days": 30,
             "emoji": "📅",
@@ -68,34 +69,30 @@ class Config:
             "emoji": "📕",
         },
         "autotrading": {
-            "name": {"ru": "Автотрейдинг курс", "en": "Autotrading Course", "lv": "Autotrading kurss"},
+            "name": {"ru": "Курс по автотрейдингу", "en": "Autotrading Course", "lv": "Autotrading kurss"},
             "price_usd": "499 EUR",
             "price_usdt": 499.0,
             "emoji": "🤖",
         },
         "vip": {
-            "name": {"ru": "VIP курс - приватный менторинг", "en": "VIP Course - private mentoring", "lv": "VIP Kurss - privāts mentorings"},
+            "name": {
+                "ru": "VIP курс - приватный менторинг",
+                "en": "VIP Course - private mentoring",
+                "lv": "VIP Kurss - privāts mentorings",
+            },
             "price_usd": "4990 EUR",
             "price_usdt": 4990.0,
             "emoji": "👑",
         },
     })
 
-    # Referral bonus days. Referrals no longer earn money or discounts.
+    # Referral rewards remain active as free access days only.
     REFERRAL_COMMISSION_COURSES: int = 0
     REFERRAL_COMMISSION_CHAT: int = 0
-    
-    # Minimālā withdrawal summa USD
     MIN_WITHDRAWAL_AMOUNT: float = 50.0
-    
-    # Referral bonus dienas (chat subscription)
-    REFERRAL_BONUS_DAYS: int = 10  # 10 dienas par chat subscription
+    REFERRAL_BONUS_DAYS: int = 10
 
-    
-    # ═══════════════════════════════════════════════════════════════
-    # LOYALTY SYSTEM CONFIGURATION
-    # ═══════════════════════════════════════════════════════════════
-    
+    # Rank system: visual only for now.
     LOYALTY_TIERS: Dict[str, Any] = field(default_factory=lambda: {
         "rookie": {
             "min_months": 0,
@@ -111,7 +108,7 @@ class Config:
             "max_months": 6,
             "chat_discount": 0,
             "course_discount": 0,
-            "bonus_days": 5,
+            "bonus_days": 0,
             "tag": "Active Trader",
             "emoji": "🔥",
         },
@@ -120,7 +117,7 @@ class Config:
             "max_months": 12,
             "chat_discount": 0,
             "course_discount": 0,
-            "bonus_days": 10,
+            "bonus_days": 0,
             "tag": "Pro Trader",
             "emoji": "⭐",
         },
@@ -129,8 +126,7 @@ class Config:
             "max_months": 13,
             "chat_discount": 0,
             "course_discount": 0,
-            "bonus_days": 15,
-            "free_course": "powerup",
+            "bonus_days": 0,
             "tag": "Elite Trader",
             "emoji": "👑",
         },
@@ -139,7 +135,7 @@ class Config:
             "max_months": 18,
             "chat_discount": 0,
             "course_discount": 0,
-            "bonus_days": 20,
+            "bonus_days": 0,
             "tag": "Master Trader",
             "emoji": "💎",
         },
@@ -148,32 +144,27 @@ class Config:
             "max_months": 999,
             "chat_discount": 0,
             "course_discount": 0,
-            "bonus_days": 30,
+            "bonus_days": 0,
             "tag": "Legend Trader",
             "emoji": "🔱",
         },
     })
-    
-    # Consecutive months calculation
-    CONSECUTIVE_GAP_THRESHOLD: int = 7  # days
-    
-    # Loyalty reset
+
+    CONSECUTIVE_GAP_THRESHOLD: int = 7
     LOYALTY_RESET_DAYS: int = 30
     LOYALTY_RESET_GRACE_HOURS: int = 6
-    
-    # Reminders
-    REMINDER_BONUS_DAYS: int = 5
+
+    # Legacy promo/win-back config retained for compatibility with old DB/code paths.
+    REMINDER_BONUS_DAYS: int = 0
     REMINDER_COUPON_DISCOUNT: int = 5
     REMINDER_COUPON_HOURS: int = 24
     YEARLY_REMINDER_DAYS: List[int] = field(default_factory=lambda: [30, 7, 3, 1])
     MONTHLY_REMINDER_DAYS: List[int] = field(default_factory=lambda: [7, 3, 1])
-    
-    # Win-back
     WINBACK_TRIGGER_DAYS: int = 5
     WINBACK_MAX_PER_YEAR: int = 2
-    WINBACK_YEARLY_DISCOUNT: int = 10
-    SURVEY_REWARD_DISCOUNT: int = 20
-    SURVEY_REWARD_HOURS: int = 24
+    WINBACK_YEARLY_DISCOUNT: int = 0
+    SURVEY_REWARD_DISCOUNT: int = 0
+    SURVEY_REWARD_HOURS: int = 0
 
     def __post_init__(self):
         logger.info(f"CONFIG: support={self.SUPPORT_CONTACT}")

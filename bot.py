@@ -257,6 +257,48 @@ TEXTS["lv"].update({
     "support": "📩 *Atbalsts*\n\nJa rodas jautājumi, raksti: https://t.me/mntrade_support",
 })
 
+TEXTS["ru"].update({
+    "referral_info": (
+        "👥 *Реферальная программа*\n\n"
+        f"🎁 За каждого друга, который совершит покупку, ты получаешь *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n\n"
+        "📌 Поделись своей ссылкой и получай бонусные дни для своих активных чатов."
+    ),
+    "referral_welcome": (
+        f"👋 Тебя пригласил друг!\n\n"
+        f"🎁 Когда ты совершишь покупку, друг получит *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n\n"
+        "🔐 Выбери продукт:"
+    ),
+    "help": "📘 *Команды:*\n\n/start — Старт\n/status — Статус\n/language — Язык\n/support — Поддержка\n/id — Мой ID\n/help — Помощь",
+})
+
+TEXTS["en"].update({
+    "referral_info": (
+        "👥 *Referral Program*\n\n"
+        f"🎁 For every friend who completes a purchase, you receive *+{REFERRAL_BONUS_DAYS} bonus days*.\n\n"
+        "📌 Share your link and collect bonus days for your own active chats."
+    ),
+    "referral_welcome": (
+        f"👋 Invited by a friend!\n\n"
+        f"🎁 When you complete a purchase, your friend will receive *+{REFERRAL_BONUS_DAYS} bonus days*.\n\n"
+        "🔐 Choose a product:"
+    ),
+    "help": "📘 *Commands:*\n\n/start — Start\n/status — Status\n/language — Language\n/support — Support\n/id — My ID\n/help — Help",
+})
+
+TEXTS["lv"].update({
+    "referral_info": (
+        "👥 *Referral programma*\n\n"
+        f"🎁 Par katru draugu, kurš veic pirkumu, tu saņem *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n\n"
+        "📌 Dalies ar savu saiti un krāj bonusu dienas saviem aktīvajiem čatiem."
+    ),
+    "referral_welcome": (
+        f"👋 Tevi uzaicināja draugs!\n\n"
+        f"🎁 Kad tu veiksi pirkumu, draugs saņems *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n\n"
+        "🔐 Izvēlies produktu:"
+    ),
+    "help": "📘 *Komandas:*\n\n/start — Sākt\n/status — Statuss\n/language — Valoda\n/support — Atbalsts\n/id — Mans ID\n/help — Palīdzība",
+})
+
 def t(lang, key, **kw):
     text = TEXTS.get(lang, TEXTS["ru"]).get(key, key)
     return text.format(**kw) if kw else text
@@ -361,29 +403,29 @@ async def build_referral_overview_text(user_id: int, lang: str) -> str:
     return ui_text(
         lang,
         (
-            "ðŸ‘¥ *Referral programma*\n\n"
-            f"ðŸ“Œ Tava saite:\n`{ref_link}`\n\n"
-            f"ðŸ“Š UzaicinÄti: *{ref_count}*\n"
-            f"âœ… Draugi ar saÅ†emtu bonusu: *{bonus_count}*\n"
-            f"ðŸŽ PieejamÄs bonusu dienas: *{bonus_days_balance}*\n\n"
-            f"Par katru draugu, kurÅ¡ veic pirkumu, tu saÅ†em *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
-            "Bonusu dienas vari izmantot pats un izvÄ“lÄ“ties, kuram aktÄ«vajam Äatam tÄs pielikt."
+            "👥 *Referral programma*\n\n"
+            f"📌 Tava saite:\n`{ref_link}`\n\n"
+            f"📊 Uzaicināti: *{ref_count}*\n"
+            f"✅ Draugi ar saņemtu bonusu: *{bonus_count}*\n"
+            f"🎁 Pieejamās bonusu dienas: *{bonus_days_balance}*\n\n"
+            f"Par katru draugu, kurš veic pirkumu, tu saņem *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
+            "Bonusu dienas vari izmantot pats un izvēlēties, kuram aktīvajam čatam tās pielikt."
         ),
         (
-            "ðŸ‘¥ *Ð ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ð°Ñ Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð°*\n\n"
-            f"ðŸ“Œ Ð¢Ð²Ð¾Ñ ÑÑÑ‹Ð»ÐºÐ°:\n`{ref_link}`\n\n"
-            f"ðŸ“Š ÐŸÑ€Ð¸Ð³Ð»Ð°ÑˆÐµÐ½Ð¾: *{ref_count}*\n"
-            f"âœ… Ð”Ñ€ÑƒÐ·ÑŒÑ Ñ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð½Ñ‹Ð¼ Ð±Ð¾Ð½ÑƒÑÐ¾Ð¼: *{bonus_count}*\n"
-            f"ðŸŽ Ð”Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹: *{bonus_days_balance}*\n\n"
-            f"Ð—Ð° ÐºÐ°Ð¶Ð´Ð¾Ð³Ð¾ Ð´Ñ€ÑƒÐ³Ð°, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ð¹ ÑÐ¾Ð²ÐµÑ€ÑˆÐ¸Ñ‚ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ, Ñ‚Ñ‹ Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑˆÑŒ *+{REFERRAL_BONUS_DAYS} Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n"
-            "Ð‘Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸ Ñ‚Ñ‹ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑˆÑŒ ÑÐ°Ð¼ Ð¸ Ð²Ñ‹Ð±Ð¸Ñ€Ð°ÐµÑˆÑŒ, Ðº ÐºÐ°ÐºÐ¾Ð¼Ñƒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñƒ Ð¸Ñ… Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ."
+            "👥 *Реферальная программа*\n\n"
+            f"📌 Твоя ссылка:\n`{ref_link}`\n\n"
+            f"📊 Приглашено: *{ref_count}*\n"
+            f"✅ Друзья с начисленным бонусом: *{bonus_count}*\n"
+            f"🎁 Доступно бонусных дней: *{bonus_days_balance}*\n\n"
+            f"За каждого друга, который совершит покупку, ты получаешь *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
+            "Бонусные дни ты используешь сам и выбираешь, к какому активному чату их применить."
         ),
         (
-            "ðŸ‘¥ *Referral Program*\n\n"
-            f"ðŸ“Œ Your link:\n`{ref_link}`\n\n"
-            f"ðŸ“Š Invited: *{ref_count}*\n"
-            f"âœ… Friends with granted bonus: *{bonus_count}*\n"
-            f"ðŸŽ Available bonus days: *{bonus_days_balance}*\n\n"
+            "👥 *Referral Program*\n\n"
+            f"📌 Your link:\n`{ref_link}`\n\n"
+            f"📊 Invited: *{ref_count}*\n"
+            f"✅ Friends with granted bonus: *{bonus_count}*\n"
+            f"🎁 Available bonus days: *{bonus_days_balance}*\n\n"
             f"For every friend who makes a purchase, you get *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
             "You can use those bonus days yourself and choose which active chat to apply them to."
         ),
@@ -934,7 +976,7 @@ async def _send_referral_reminder(user_id, lang):
 
 
 def market_scanner_label(lang):
-    return ui_text(lang, "Tirgus Skaneris/AI signāli", "Сканер рынка/AI сигналы", "Market Scanner/AI Signals")
+    return ui_text(lang, "PRO Tirgus Skaneris/AI Signāli", "PRO Сканер рынка/AI сигналы", "PRO Market Scanner/AI Signals")
 
 
 def main_menu_keyboard(lang):
@@ -1478,8 +1520,6 @@ async def get_access_links(callback: CallbackQuery):
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from loyalty_system import LoyaltySystem
-from cron_jobs import setup_loyalty_cron
 
 
 class UserSettingsState(StatesGroup):
@@ -2782,25 +2822,6 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount,
     if active_promo_code:
         await db.use_promo_code(active_promo_code)
         await db.clear_user_promo(user_id)
-    winback_bonus_days = 0
-    active_winback = await db.get_active_winback_offer(user_id)
-    if active_winback and product_meta and int(product_meta.get("chat_id") or 0) != 0:
-        bonus_days = int(active_winback.get("bonus_days") or 0)
-        bonus_exp = await db.extend_product_subscription(user_id, canonical_key, bonus_days)
-        if bonus_exp:
-            winback_bonus_days = bonus_days
-            new_exp = bonus_exp
-            await db.redeem_winback_offer(user_id, tx_hash)
-            bonus_text = ui_text(
-                lang,
-                f"ðŸŽ *AtgrieÅ¡anÄs bonuss aktivizÄ“ts!*\n\nTev pievienotas *+{bonus_days} bezmaksas dienas*.\nðŸ“… AktÄ«vs lÄ«dz: *{new_exp.strftime('%d.%m.%Y')}*",
-                f"ðŸŽ *Win-back Ð±Ð¾Ð½ÑƒÑ Ð°ÐºÑ‚Ð¸Ð²Ð¸Ñ€Ð¾Ð²Ð°Ð½!*\n\nÐ¢ÐµÐ±Ðµ Ð´Ð¾Ð±Ð°Ð²Ð»ÐµÐ½Ð¾ *+{bonus_days} Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\nðŸ“… ÐÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð´Ð¾: *{new_exp.strftime('%d.%m.%Y')}*",
-                f"ðŸŽ *Win-back bonus activated!*\n\nYou received *+{bonus_days} free days*.\nðŸ“… Active until: *{new_exp.strftime('%d.%m.%Y')}*",
-            )
-            try:
-                await bot.send_message(user_id, bonus_text, parse_mode="Markdown")
-            except Exception as e:
-                logger.warning(f"Failed to send winback bonus notice {user_id}: {e}")
     # Referral bonus days
     ref = await db.get_referral_by_referred(user_id)
     if ref and not ref.get("bonus_given"):
@@ -2872,8 +2893,7 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount,
     uname = f"@{username}" if username else f"ID {user_id}"
     for aid in config.ADMIN_IDS:
         try:
-            extra = f"\n🎁 Win-back bonus: *+{winback_bonus_days} d.*" if winback_bonus_days else ""
-            await bot.send_message(aid, f"💰 *New payment!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Until: *{new_exp.strftime('%d.%m.%Y')}*{extra}\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
+            await bot.send_message(aid, f"💰 *New payment!*\n\n👤 {uname} (`{user_id}`)\n📦 *{plan_name_loc}*\n💵 *{amount} USDT*\n📅 Until: *{new_exp.strftime('%d.%m.%Y')}*\n🔖 TX: `{tx_hash[:24]}...`", parse_mode="Markdown")
         except: pass
     return new_exp, plan_name_loc, product_meta
 
@@ -4255,34 +4275,6 @@ async def start_webhook_server():
 async def main():
     await db.init()
     webhook_runner = await start_webhook_server()
-    
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    # LOYALTY SYSTEM INITIALIZATION
-    # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    loyalty_system = LoyaltySystem(config, db)
-    
-    # Include loyalty routers
-    
-    
-    # Configure loyalty router dependencies
-
-    
-    # Configure admin loyalty router dependencies
-        
-    # Middleware to pass dependencies
-    @dp.update.outer_middleware()
-    async def inject_loyalty_deps(handler, event, data):
-        data['db'] = db
-        data['config'] = config
-        data['loyalty_system'] = loyalty_system
-        return await handler(event, data)
-    
-    # Setup loyalty cron jobs uz globÄlo scheduler
-    try:
-        setup_loyalty_cron(scheduler, bot, db, config, loyalty_system)
-        logger.info("âœ… Loyalty cron jobs pievienoti")
-    except Exception as e:
-        logger.error(f"âŒ Loyalty cron kÄ¼Å«da: {e}")
 
     # Admini automÄtiski ir friend listÄ
     for admin_id in config.ADMIN_IDS:
@@ -4315,8 +4307,6 @@ async def main():
     scheduler.add_job(check_expiring_subscriptions, 'cron', hour=10, minute=0)
     scheduler.add_job(send_upsell_offers, 'cron', hour=11, minute=0)
     scheduler.add_job(kick_expired_users, 'interval', hours=1)
-    # Giveaway â€” katra mÄ“neÅ¡a 1. datumÄ plkst 12:00 UTC
-    scheduler.add_job(run_monthly_giveaway, 'cron', day=1, hour=12, minute=0)
     scheduler.start()
     logger.info("Bot started!")
     try:
