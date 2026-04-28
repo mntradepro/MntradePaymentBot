@@ -216,6 +216,22 @@ TEXTS["lv"] = {
     "support": "ðŸ“© *Atbalsts*\n\nJa rodas jautÄjumi raksti https://t.me/mntrade_support",
 }
 
+# Clean runtime overrides for user-facing labels/texts after earlier encoding damage.
+VIP_CHANNEL_LABELS["lv"] = "🇱🇻 Latviešu"
+VIP_CHANNEL_LABELS["ru"] = "🇷🇺 Русский"
+
+TEXTS["lv"].update({
+    "welcome": "👋 Sveiks, {name}!\n\n🔐 Šis ir slēgts maksas treideru community.\n\n📋 *Izvēlies abonementa plānu:*",
+    "active_sub": "👋 Sveiks, {name}!\n\n✅ Abonements aktīvs līdz *{expires}*\n📦 Plāns: *{plan}*\n⏳ Atlikušas dienas: *{days}*",
+    "inactive_welcome": "👋 Sveiks, {name}!\n\n❌ Tev šobrīd nav aktīva abonementa.\n\n📋 *Izvēlies produktu:*",
+    "inactive_welcome_note": "❌ Tev šobrīd nav aktīva abonementa.",
+    "choose_plan": "📋 *Izvēlies abonementa plānu:*",
+    "status_active": "🟢 *Abonements*\n\n📅 Beidzas: {expires}\n⏳ Atlikušas dienas: {days}\n📦 Plāns: {plan}",
+    "status_none": "❌ Tev nav aktīva abonementa.\n\nIzmanto /start, lai iegādātos piekļuvi.",
+    "btn_back": "🔙 Atpakaļ",
+    "support": "📩 *Atbalsts*\n\nJa rodas jautājumi, raksti: https://t.me/mntrade_support",
+})
+
 def t(lang, key, **kw):
     text = TEXTS.get(lang, TEXTS["ru"]).get(key, key)
     return text.format(**kw) if kw else text
@@ -873,6 +889,94 @@ async def _send_referral_reminder(user_id, lang):
         await bot.send_message(user_id, text, parse_mode="Markdown")
     except Exception as e:
         logger.warning(f"Referral reminder failed for {user_id}: {e}")
+
+
+def market_scanner_label(lang):
+    return ui_text(lang, "Tirgus Skaneris/AI signāli", "Сканер рынка/AI сигналы", "Market Scanner/AI Signals")
+
+
+def main_menu_keyboard(lang):
+    b = InlineKeyboardBuilder()
+    if lang == "lv":
+        b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+    elif lang == "ru":
+        b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+    else:
+        b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def active_keyboard(lang):
+    b = InlineKeyboardBuilder()
+    if lang == "lv":
+        b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
+        b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+    elif lang == "ru":
+        b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
+        b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+    else:
+        b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
+        b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def _urgency_keyboard(lang):
+    b = InlineKeyboardBuilder()
+    if lang == "lv":
+        b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
+        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+    elif lang == "ru":
+        b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
+        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+    else:
+        b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
+        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+    b.adjust(1)
+    return b.as_markup()
 
 
 # â”€â”€â”€ HANDLERS â”€â”€â”€
