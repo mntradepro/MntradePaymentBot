@@ -484,6 +484,32 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
             payment_system=sub.get("payment_system", "") or "webhook",
         )
         await db.deactivate_pending_email_subscription(sub["id"])
+        product_meta = resolve_subscription_product(sub.get("product_key") or "", lang)
+        if not product_meta and (sub.get("chat_id") or sub.get("chat_link")):
+            product_meta = {
+                "product_key": sub.get("product_key") or "website_subscription",
+                "chat_id": sub.get("chat_id", 0) or 0,
+                "chat_link": sub.get("chat_link", "") or "",
+                "name": {
+                    "lv": sub.get("product_name") or sub.get("product_key") or "Piekļuve",
+                    "ru": sub.get("product_name") or sub.get("product_key") or "Доступ",
+                    "en": sub.get("product_name") or sub.get("product_key") or "Access",
+                },
+            }
+        try:
+            invite = await invite_text_for_product(user_id, lang, product_meta, expires_at)
+            if invite:
+                product_name = sub.get("product_name") or sub.get("product_key") or "Access"
+                invite_text = ui_text(
+                    lang,
+                    f"✅ Atrasta iepriekšēja apmaksa: *{product_name}*\n📅 Aktīvs līdz: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                    f"✅ Найдена предыдущая оплата: *{product_name}*\n📅 Активно до: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                    f"✅ Previous purchase found: *{product_name}*\n📅 Active until: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                )
+                await bot.send_message(user_id, invite_text, parse_mode="Markdown")
+        except Exception as e:
+            logger.warning(f"Failed to send claimed invite to user {user_id}: {e}")
+            await notify_admins_error(f"claim_notify user={user_id} product={sub.get('product_key')}", e)
         activated.append(sub)
     return activated
 
@@ -502,21 +528,18 @@ def main_menu_keyboard(lang):
         b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
         b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
         b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
@@ -554,7 +577,6 @@ def active_keyboard(lang):
         b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("🎟", "Ikmēneša izloze"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
@@ -562,7 +584,6 @@ def active_keyboard(lang):
         b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("🎟", "Розыгрыш призов"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
@@ -570,7 +591,6 @@ def active_keyboard(lang):
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
-        b.button(text=menu_button("🎟", "Monthly Giveaway"), callback_data="giveaway_join")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
@@ -1347,6 +1367,20 @@ async def _giveaway_settings():
 
 @dp.callback_query(F.data == "giveaway_join")
 async def giveaway_join(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    lang = await user_lang(callback.from_user.id)
+    await callback.answer(
+        ui_text(
+            lang,
+            "Giveaway pašlaik ir izslēgts.",
+            "Розыгрыш сейчас отключён.",
+            "Giveaway is currently disabled.",
+        ),
+        show_alert=True,
+    )
+    return
+
+    # Legacy giveaway flow left below, currently disabled.
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
     lang = user.get("lang", "ru") if user else "ru"
