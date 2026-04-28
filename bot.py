@@ -20,7 +20,7 @@ from database import db
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-REFERRAL_BONUS_DAYS = 10  # Chat subscription bonus
+REFERRAL_BONUS_DAYS = 0
 SUPPORTED_LANGS = ("ru", "en", "lv")
 DEFAULT_LANG = "lv"
 VIP_CHANNEL_LANGS = ("lv", "ru")
@@ -260,12 +260,10 @@ TEXTS["lv"].update({
 TEXTS["ru"].update({
     "referral_info": (
         "👥 *Реферальная программа*\n\n"
-        f"🎁 За каждого друга, который совершит покупку, ты получаешь *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n\n"
-        "📌 Поделись своей ссылкой и получай бонусные дни для своих активных чатов."
+        "📌 Поделись своей ссылкой. Сейчас автоматические бонусные дни отключены."
     ),
     "referral_welcome": (
-        f"👋 Тебя пригласил друг!\n\n"
-        f"🎁 Когда ты совершишь покупку, друг получит *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n\n"
+        "👋 Тебя пригласил друг!\n\n"
         "🔐 Выбери продукт:"
     ),
     "help": "📘 *Команды:*\n\n/start — Старт\n/status — Статус\n/language — Язык\n/support — Поддержка\n/id — Мой ID\n/help — Помощь",
@@ -274,12 +272,10 @@ TEXTS["ru"].update({
 TEXTS["en"].update({
     "referral_info": (
         "👥 *Referral Program*\n\n"
-        f"🎁 For every friend who completes a purchase, you receive *+{REFERRAL_BONUS_DAYS} bonus days*.\n\n"
-        "📌 Share your link and collect bonus days for your own active chats."
+        "📌 Share your link. Automatic bonus days are currently disabled."
     ),
     "referral_welcome": (
-        f"👋 Invited by a friend!\n\n"
-        f"🎁 When you complete a purchase, your friend will receive *+{REFERRAL_BONUS_DAYS} bonus days*.\n\n"
+        "👋 Invited by a friend!\n\n"
         "🔐 Choose a product:"
     ),
     "help": "📘 *Commands:*\n\n/start — Start\n/status — Status\n/language — Language\n/support — Support\n/id — My ID\n/help — Help",
@@ -288,12 +284,10 @@ TEXTS["en"].update({
 TEXTS["lv"].update({
     "referral_info": (
         "👥 *Referral programma*\n\n"
-        f"🎁 Par katru draugu, kurš veic pirkumu, tu saņem *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n\n"
-        "📌 Dalies ar savu saiti un krāj bonusu dienas saviem aktīvajiem čatiem."
+        "📌 Dalies ar savu saiti. Automātiskās bonusu dienas pašlaik ir izslēgtas."
     ),
     "referral_welcome": (
-        f"👋 Tevi uzaicināja draugs!\n\n"
-        f"🎁 Kad tu veiksi pirkumu, draugs saņems *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n\n"
+        "👋 Tevi uzaicināja draugs!\n\n"
         "🔐 Izvēlies produktu:"
     ),
     "help": "📘 *Komandas:*\n\n/start — Sākt\n/status — Statuss\n/language — Valoda\n/support — Atbalsts\n/id — Mans ID\n/help — Palīdzība",
@@ -408,8 +402,7 @@ async def build_referral_overview_text(user_id: int, lang: str) -> str:
             f"📊 Uzaicināti: *{ref_count}*\n"
             f"✅ Draugi ar saņemtu bonusu: *{bonus_count}*\n"
             f"🎁 Pieejamās bonusu dienas: *{bonus_days_balance}*\n\n"
-            f"Par katru draugu, kurš veic pirkumu, tu saņem *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
-            "Bonusu dienas vari izmantot pats un izvēlēties, kuram aktīvajam čatam tās pielikt."
+            "Automātiskās bonusu dienas pašlaik ir izslēgtas."
         ),
         (
             "👥 *Реферальная программа*\n\n"
@@ -417,8 +410,7 @@ async def build_referral_overview_text(user_id: int, lang: str) -> str:
             f"📊 Приглашено: *{ref_count}*\n"
             f"✅ Друзья с начисленным бонусом: *{bonus_count}*\n"
             f"🎁 Доступно бонусных дней: *{bonus_days_balance}*\n\n"
-            f"За каждого друга, который совершит покупку, ты получаешь *+{REFERRAL_BONUS_DAYS} бонусных дней*.\n"
-            "Бонусные дни ты используешь сам и выбираешь, к какому активному чату их применить."
+            "Автоматические бонусные дни сейчас отключены."
         ),
         (
             "👥 *Referral Program*\n\n"
@@ -426,8 +418,7 @@ async def build_referral_overview_text(user_id: int, lang: str) -> str:
             f"📊 Invited: *{ref_count}*\n"
             f"✅ Friends with granted bonus: *{bonus_count}*\n"
             f"🎁 Available bonus days: *{bonus_days_balance}*\n\n"
-            f"For every friend who makes a purchase, you get *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
-            "You can use those bonus days yourself and choose which active chat to apply them to."
+            "Automatic bonus days are currently disabled."
         ),
     )
 
@@ -2600,44 +2591,7 @@ async def check_course_payment(callback: CallbackQuery):
             try: await bot.send_message(aid, admin_text, parse_mode="Markdown")
             except: pass
 
-        # Referral bonus wallet arÄ« par kursa pirkumu
-        ref = await db.get_referral_by_referred(user_id)
-        if ref and not ref.get("bonus_given"):
-            referrer = await db.get_user(ref["referrer_id"])
-            if referrer:
-                new_balance_days = await db.add_referral_bonus_days(
-                    ref["referrer_id"],
-                    REFERRAL_BONUS_DAYS,
-                    note=f"referred_course_purchase:{user_id}"
-                )
-                await db.mark_referral_bonus_given(user_id)
-                rlang = referrer.get("lang", "ru")
-                try:
-                    await bot.send_message(
-                        ref["referrer_id"],
-                        ui_text(
-                            rlang,
-                            (
-                                "ðŸŽ‰ *Referral bonuss saÅ†emts!*\n\n"
-                                f"Tavs draugs veica pirkumu, un tev pieÅ¡Ä·irtas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
-                                f"Tagad tavÄ balansÄ ir *{new_balance_days}* bonusu dienas.\n\n"
-                                "Atver referral sadaÄ¼u un izvÄ“lies, kuram aktÄ«vajam Äatam tÄs pielikt."
-                            ),
-                            (
-                                "ðŸŽ‰ *Ð ÐµÑ„ÐµÑ€Ð°Ð»ÑŒÐ½Ñ‹Ð¹ Ð±Ð¾Ð½ÑƒÑ Ð¿Ð¾Ð»ÑƒÑ‡ÐµÐ½!*\n\n"
-                                f"Ð¢Ð²Ð¾Ð¹ Ð´Ñ€ÑƒÐ³ ÑÐ¾Ð²ÐµÑ€ÑˆÐ¸Ð» Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ, Ð¸ Ñ‚ÐµÐ±Ðµ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¾ *+{REFERRAL_BONUS_DAYS} Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n"
-                                f"Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð½Ð° Ñ‚Ð²Ð¾ÐµÐ¼ Ð±Ð°Ð»Ð°Ð½ÑÐµ *{new_balance_days}* Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹.\n\n"
-                                "ÐžÑ‚ÐºÑ€Ð¾Ð¹ Ñ€Ð°Ð·Ð´ÐµÐ» referral Ð¸ Ð²Ñ‹Ð±ÐµÑ€Ð¸, Ðº ÐºÐ°ÐºÐ¾Ð¼Ñƒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñƒ Ð¸Ñ… Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ."
-                            ),
-                            (
-                                "ðŸŽ‰ *Referral bonus received!*\n\n"
-                                f"Your friend made a purchase and you received *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
-                                f"You now have *{new_balance_days}* bonus days in your balance.\n\n"
-                                "Open the referral section and choose which active chat to apply them to."
-                            ),
-                        ),
-                        parse_mode="Markdown")
-                except: pass
+        await db.mark_referral_bonus_given(user_id)
     else:
         if lang == "ru":
             text = f"âŒ *ÐŸÐ»Ð°Ñ‚Ñ‘Ð¶ Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½*\n\nÐ£Ð±ÐµÐ´Ð¸ÑÑŒ Ñ‡Ñ‚Ð¾ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð¸Ð» *{expected} USDT (BEP-20)*"
@@ -2817,46 +2771,9 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount,
     if active_promo_code:
         await db.use_promo_code(active_promo_code)
         await db.clear_user_promo(user_id)
-    # Referral bonus days
     ref = await db.get_referral_by_referred(user_id)
     if ref and not ref.get("bonus_given"):
-        referrer = await db.get_user(ref["referrer_id"])
-        if referrer:
-            new_balance_days = await db.add_referral_bonus_days(
-                ref["referrer_id"],
-                REFERRAL_BONUS_DAYS,
-                note=f"referred_user_purchase:{user_id}"
-            )
-            await db.mark_referral_bonus_given(user_id)
-            ref_lang = referrer.get("lang", "ru")
-            if ref_lang == "ru":
-                ref_text = (
-                    f"ðŸŽ *Ð‘Ð¾Ð½ÑƒÑ Ð·Ð° Ð´Ñ€ÑƒÐ³Ð°!*\n\n"
-                    f"Ð¢Ð²Ð¾Ð¹ Ñ€ÐµÑ„ÐµÑ€Ð°Ð» Ð¾Ñ„Ð¾Ñ€Ð¼Ð¸Ð» Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÑƒ.\n"
-                    f"Ð¢ÐµÐ±Ðµ Ð½Ð°Ñ‡Ð¸ÑÐ»ÐµÐ½Ð¾ *+{REFERRAL_BONUS_DAYS} Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ñ… Ð´Ð½ÐµÐ¹*.\n"
-                    f"Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð¾: *{new_balance_days}* Ð´Ð½ÐµÐ¹.\n\n"
-                    "Ð˜ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐ¹ Ð¸Ñ… ÑÐ°Ð¼ Ð¸ Ð²Ñ‹Ð±ÐµÑ€Ð¸, Ðº ÐºÐ°ÐºÐ¾Ð¼Ñƒ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾Ð¼Ñƒ Ñ‡Ð°Ñ‚Ñƒ Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ð¸Ñ‚ÑŒ Ð±Ð¾Ð½ÑƒÑ."
-                )
-            elif ref_lang == "lv":
-                ref_text = (
-                    f"ðŸŽ *Bonuss par draugu!*\n\n"
-                    f"Tavs referral noformÄ“ja abonementu.\n"
-                    f"Tev ieskaitÄ«tas *+{REFERRAL_BONUS_DAYS} bonusu dienas*.\n"
-                    f"Tagad pieejams: *{new_balance_days}* dienas.\n\n"
-                    "Izmanto tÄs pats un izvÄ“lies, kuram aktÄ«vajam Äatam pielikt bonusu."
-                )
-            else:
-                ref_text = (
-                    f"ðŸŽ *Referral bonus!*\n\n"
-                    f"Your referral purchased a subscription.\n"
-                    f"You received *+{REFERRAL_BONUS_DAYS} bonus days*.\n"
-                    f"You now have: *{new_balance_days}* days available.\n\n"
-                    "Use them yourself and choose which active chat should receive the bonus."
-                )
-            try:
-                await bot.send_message(ref["referrer_id"], ref_text, parse_mode="Markdown")
-            except Exception as e:
-                logger.warning(f"Failed to notify referrer {ref['referrer_id']}: {e}")
+        await db.mark_referral_bonus_given(user_id)
 
     # Legacy referral branch kept disabled for compatibility
     ref = await db.get_referral_by_referred(user_id)

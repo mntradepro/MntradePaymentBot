@@ -86,11 +86,11 @@ class Config:
         },
     })
 
-    # Referral rewards remain active as free access days only.
+    # Referral rewards are disabled for automatic subscription extensions.
     REFERRAL_COMMISSION_COURSES: int = 0
     REFERRAL_COMMISSION_CHAT: int = 0
     MIN_WITHDRAWAL_AMOUNT: float = 50.0
-    REFERRAL_BONUS_DAYS: int = 10
+    REFERRAL_BONUS_DAYS: int = 0
 
     # Rank system: visual only for now.
     LOYALTY_TIERS: Dict[str, Any] = field(default_factory=lambda: {
