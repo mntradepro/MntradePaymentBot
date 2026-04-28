@@ -109,6 +109,26 @@ CallbackQuery.answer = _patched_callback_answer
 Bot.send_message = _patched_bot_send_message
 Bot.send_document = _patched_bot_send_document
 
+
+class EditState(StatesGroup):
+    waiting_text = State()
+    waiting_price = State()
+    waiting_checkout_url = State()
+
+
+class FriendState(StatesGroup):
+    waiting_id = State()
+    waiting_remove_id = State()
+
+
+class PromoState(StatesGroup):
+    waiting_code = State()
+    waiting_discount = State()
+    waiting_plan = State()
+    waiting_max_uses = State()
+    waiting_expiry = State()
+
+
 class MarketingState(StatesGroup):
     waiting_text = State()
 
