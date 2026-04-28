@@ -185,7 +185,15 @@ class Config:
         return self.CHAT_LINKS.get(lang, self.CHAT_LINK)
 
     def all_chat_ids(self) -> List[int]:
-        return list(dict.fromkeys([self.CHAT_ID, *self.CHAT_IDS.values()]))
+        return list(
+            dict.fromkeys(
+                [
+                    self.CHAT_ID,
+                    *self.CHAT_IDS.values(),
+                    self.SCANNER_CHAT_ID,
+                ]
+            )
+        )
 
 
 config = Config()

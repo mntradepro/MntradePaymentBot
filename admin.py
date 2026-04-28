@@ -59,33 +59,52 @@ class RevokeState(StatesGroup):
 
 def admin_menu_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="ðŸ“Š Statistika", callback_data="adm_stats")
-    builder.button(text="ðŸ“ˆ DetalizÄ“ta", callback_data="adm_detailed_stats")
-    builder.button(text="ðŸ“œ Retention Logs", callback_data="adm_retention_logs")
-    builder.button(text="ðŸ‘¥ LietotÄji", callback_data="adm_users")
-    builder.button(text="â³ Pirkumi bez TG", callback_data="adm_pending_email_users")
-    builder.button(text="ðŸ‘‹ Welcome teksts", callback_data="adm_edit_welcome")
-    builder.button(text="ðŸ“š Kursu teksts", callback_data="adm_edit_courses_text")
-    builder.button(text="âš™ï¸ Remarketing", callback_data="adm_marketing_remarketing")
-    builder.button(text="ðŸ“¤ Marketing", callback_data="adm_send_marketing")
-    builder.button(text="ðŸ· Promo kodi", callback_data="adm_promo_menu")
-    builder.button(text="ðŸ”— Checkout linki", callback_data="adm_edit_prices")
-    builder.button(text="ðŸ“¥ Excel eksports", callback_data="adm_export_excel")
-    builder.button(text="ðŸŽŸ Giveaway", callback_data="adm_giveaway")
-    builder.button(text="ðŸ’¾ DB Backup", callback_data="adm_backup")
-    builder.button(text="ðŸš« Bans", callback_data="adm_bans")
-    builder.button(text="ðŸ“Š Loyalty Stats", callback_data="adm_loyalty_stats")
-    builder.button(text="ðŸ§¾ MaksÄjumi", callback_data="adm_payments_menu")
-    builder.button(text="ðŸŽ PieÅ¡Ä·irt abonementu", callback_data="adm_grant_sub")
-    builder.button(text="âš™ï¸ Settings", callback_data="adm_settings")
+    builder.button(text="Statistika", callback_data="adm_stats")
+    builder.button(text="Detalizeta", callback_data="adm_detailed_stats")
+    builder.button(text="Retention Logs", callback_data="adm_retention_logs")
+    builder.button(text="Lietotaji", callback_data="adm_users")
+    builder.button(text="Pirkumi bez TG", callback_data="adm_pending_email_users")
+    builder.button(text="Chats", callback_data="adm_chats")
+    builder.button(text="Welcome teksts", callback_data="adm_edit_welcome")
+    builder.button(text="Kursu teksts", callback_data="adm_edit_courses_text")
+    builder.button(text="Remarketing", callback_data="adm_marketing_remarketing")
+    builder.button(text="Marketing", callback_data="adm_send_marketing")
+    builder.button(text="Promo kodi", callback_data="adm_promo_menu")
+    builder.button(text="Checkout linki", callback_data="adm_edit_prices")
+    builder.button(text="Excel eksports", callback_data="adm_export_excel")
+    builder.button(text="Giveaway", callback_data="adm_giveaway")
+    builder.button(text="DB Backup", callback_data="adm_backup")
+    builder.button(text="Bans", callback_data="adm_bans")
+    builder.button(text="Loyalty Stats", callback_data="adm_loyalty_stats")
+    builder.button(text="Maksajumi", callback_data="adm_payments_menu")
+    builder.button(text="Pieskirt abonementu", callback_data="adm_grant_sub")
+    builder.button(text="Settings", callback_data="adm_settings")
     builder.adjust(2)
     return builder.as_markup()
 
 
 def back_kb(cb: str = "adm_main"):
     builder = InlineKeyboardBuilder()
-    builder.button(text="ðŸ”™ AtpakaÄ¼", callback_data=cb)
+    builder.button(text="Atpakal", callback_data=cb)
     return builder.as_markup()
+
+
+def configured_chat_rows():
+    rows = [
+        ("VIP default", config.CHAT_ID, config.CHAT_LINK),
+        ("VIP LV", config.CHAT_IDS.get("lv", 0), config.CHAT_LINKS.get("lv", "")),
+        ("VIP EN", config.CHAT_IDS.get("en", 0), config.CHAT_LINKS.get("en", "")),
+        ("VIP RU", config.CHAT_IDS.get("ru", 0), config.CHAT_LINKS.get("ru", "")),
+        ("Scanner", getattr(config, "SCANNER_CHAT_ID", 0), getattr(config, "SCANNER_CHAT_LINK", "")),
+    ]
+    seen = set()
+    unique_rows = []
+    for label, chat_id, link in rows:
+        if not chat_id or chat_id in seen:
+            continue
+        seen.add(chat_id)
+        unique_rows.append((label, chat_id, link))
+    return unique_rows
 
 
 # â”€â”€â”€ MAIN ADMIN â”€â”€â”€
@@ -94,7 +113,7 @@ def back_kb(cb: str = "adm_main"):
 async def admin_panel(message: Message):
     if not is_admin(message.from_user.id):
         return
-    await message.answer("ðŸ›  *Admin Panel*", reply_markup=admin_menu_kb(), parse_mode="Markdown")
+    await message.answer("*Admin Panel*", reply_markup=admin_menu_kb(), parse_mode="Markdown")
 
 
 @router.message(Command("helpadmin"))
@@ -132,7 +151,41 @@ async def adm_main(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
     await state.clear()
-    await callback.message.edit_text("ðŸ›  *Admin Panel*", reply_markup=admin_menu_kb(), parse_mode="Markdown")
+    await callback.message.edit_text("*Admin Panel*", reply_markup=admin_menu_kb(), parse_mode="Markdown")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "adm_chats")
+async def adm_chats(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+
+    counts = await db.get_active_subscription_counts_by_chat()
+    lines = []
+    for label, chat_id, link in configured_chat_rows():
+        joined = "No"
+        title = "Unknown"
+        try:
+            chat = await bot.get_chat(chat_id)
+            joined = "Yes"
+            title = getattr(chat, "title", None) or getattr(chat, "username", None) or "OK"
+        except Exception as e:
+            title = f"Error: {str(e)[:80]}"
+        lines.append(
+            f"<b>{_safe_text(label)}</b>\n"
+            f"ID: <code>{chat_id}</code>\n"
+            f"Bot joined: <b>{joined}</b>\n"
+            f"Chat: {_safe_text(title)}\n"
+            f"Active subs: <b>{counts.get(int(chat_id), 0)}</b>\n"
+            f"Link: <code>{_safe_text(link or '—')}</code>"
+        )
+
+    text = "<b>Configured chats</b>\n\n" + ("\n\n".join(lines) if lines else "No chats configured.")
+    await callback.message.edit_text(
+        _trim_for_telegram(text),
+        reply_markup=back_kb("adm_main"),
+        parse_mode="HTML",
+    )
     await callback.answer()
 
 
