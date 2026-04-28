@@ -7,6 +7,78 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command, CommandStart
+@dp.callback_query(F.data == "get_access_links")
+async def get_access_links(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    user = await db.get_user(user_id)
+    lang = user.get("lang", "ru") if user else "ru"
+    active_subs = await db.get_active_user_subscriptions(user_id)
+    if not active_subs:
+        await callback.answer(
+            ui_text(
+                lang,
+                "Tev nav aktÄ«vu piekÄ¼uvju.",
+                "Ð£ Ñ‚ÐµÐ±Ñ Ð½ÐµÑ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ñ‹Ñ… Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð¾Ð².",
+                "You do not have any active access.",
+            ),
+            show_alert=True,
+        )
+        return
+
+    rows = []
+    for sub in active_subs:
+        try:
+            expires_at = datetime.fromisoformat(sub["expires_at"])
+        except Exception:
+            continue
+        product_meta = resolve_subscription_product(sub.get("product_key") or "", lang)
+        if not product_meta and (sub.get("chat_id") or sub.get("chat_link")):
+            product_meta = {
+                "product_key": sub.get("product_key") or "website_subscription",
+                "chat_id": sub.get("chat_id", 0) or 0,
+                "chat_link": sub.get("chat_link", "") or "",
+            }
+        invite = await invite_text_for_product(user_id, lang, product_meta, expires_at)
+        if not invite:
+            continue
+        product_name = sub.get("product_name") or sub.get("product_key") or "Access"
+        rows.append(
+            ui_text(
+                lang,
+                f"ðŸ“¦ *{product_name}*\nðŸ“… AktÄ«vs lÄ«dz: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                f"ðŸ“¦ *{product_name}*\nðŸ“… ÐÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð´Ð¾: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+                f"ðŸ“¦ *{product_name}*\nðŸ“… Active until: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
+            )
+        )
+
+    if not rows:
+        await callback.answer(
+            ui_text(
+                lang,
+                "NeizdevÄs izveidot piekÄ¼uves linku.",
+                "ÐÐµ ÑƒÐ´Ð°Ð»Ð¾ÑÑŒ ÑÐ¾Ð·Ð´Ð°Ñ‚ÑŒ ÑÑÑ‹Ð»ÐºÑƒ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°.",
+                "Failed to create an access link.",
+            ),
+            show_alert=True,
+        )
+        return
+
+    text = ui_text(
+        lang,
+        "ðŸ”— *Tavi jaunie piekÄ¼uves linki*\n\n",
+        "ðŸ”— *Ð¢Ð²Ð¾Ð¸ Ð½Ð¾Ð²Ñ‹Ðµ ÑÑÑ‹Ð»ÐºÐ¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð°*\n\n",
+        "ðŸ”— *Your new access links*\n\n",
+    ) + "\n\n".join(rows)
+    await callback.message.answer(text, parse_mode="Markdown")
+    await callback.answer(
+        ui_text(
+            lang,
+            "Jaunie linki nosÅ«tÄ«ti.",
+            "ÐÐ¾Ð²Ñ‹Ðµ ÑÑÑ‹Ð»ÐºÐ¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÐµÐ½Ñ‹.",
+            "Fresh access links sent.",
+        )
+    )
+
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -778,6 +850,66 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
         b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def active_keyboard(lang):
+    b = InlineKeyboardBuilder()
+    if lang == "lv":
+        b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
+        b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+    elif lang == "ru":
+        b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
+        b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+    else:
+        b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
+        b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Support"), callback_data="user_support")
+    b.adjust(1)
+    return b.as_markup()
+
+
+def _urgency_keyboard(lang):
+    b = InlineKeyboardBuilder()
+    if lang == "lv":
+        b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
+        b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
+    elif lang == "ru":
+        b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
+        b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
+        b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
+        b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
+    else:
+        b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
