@@ -216,6 +216,31 @@ TEXTS["lv"] = {
     "support": "ðŸ“© *Atbalsts*\n\nJa rodas jautÄjumi raksti https://t.me/mntrade_support",
 }
 
+# Clean runtime overrides for RU/EN user-facing texts.
+TEXTS["ru"].update({
+    "welcome": "👋 Привет, {name}!\n\n🔐 Это закрытое платное community трейдеров.\n\n📋 *Выбери план подписки:*",
+    "active_sub": "👋 Привет, {name}!\n\n✅ Подписка активна до *{expires}*\n📦 План: *{plan}*\n⏳ Осталось дней: *{days}*",
+    "inactive_welcome": "👋 Привет, {name}!\n\n❌ Сейчас у тебя нет активной подписки.\n\n📋 *Выбери продукт:*",
+    "inactive_welcome_note": "❌ Сейчас у тебя нет активной подписки.",
+    "choose_plan": "📋 *Выбери план подписки:*",
+    "status_active": "🟢 *Подписка*\n\n📅 Истекает: {expires}\n⏳ Осталось дней: {days}\n📦 План: {plan}",
+    "status_none": "❌ У тебя нет активной подписки.\n\nИспользуй /start, чтобы купить доступ.",
+    "btn_back": "🔙 Назад",
+    "support": "📩 *Поддержка*\n\nЕсли есть вопросы, напиши: https://t.me/mntrade_support",
+})
+
+TEXTS["en"].update({
+    "welcome": "👋 Hello, {name}!\n\n🔐 This is a private paid traders community.\n\n📋 *Choose your subscription plan:*",
+    "active_sub": "👋 Hello, {name}!\n\n✅ Subscription active until *{expires}*\n📦 Plan: *{plan}*\n⏳ Days left: *{days}*",
+    "inactive_welcome": "👋 Hello, {name}!\n\n❌ You do not have an active subscription right now.\n\n📋 *Choose a product:*",
+    "inactive_welcome_note": "❌ You do not have an active subscription right now.",
+    "choose_plan": "📋 *Choose your subscription plan:*",
+    "status_active": "🟢 *Subscription*\n\n📅 Expires: {expires}\n⏳ Days left: {days}\n📦 Plan: {plan}",
+    "status_none": "❌ You do not have an active subscription.\n\nUse /start to purchase access.",
+    "btn_back": "🔙 Back",
+    "support": "📩 *Support*\n\nIf you have questions, write: https://t.me/mntrade_support",
+})
+
 # Clean runtime overrides for user-facing labels/texts after earlier encoding damage.
 VIP_CHANNEL_LABELS["lv"] = "🇱🇻 Latviešu"
 VIP_CHANNEL_LABELS["ru"] = "🇷🇺 Русский"
@@ -381,7 +406,7 @@ def menu_button(emoji, label):
     return f"{emoji}  {label}"
 
 def market_scanner_label(lang):
-    return ui_text(lang, "Tirgus Skaneris/AI signÄli", "Ð¡ÐºÐ°Ð½ÐµÑ€ Ñ€Ñ‹Ð½ÐºÐ°/AI ÑÐ¸Ð³Ð½Ð°Ð»Ñ‹", "Market Scanner/AI Signals")
+    return ui_text(lang, "Tirgus Skaneris/AI signāli", "Сканер рынка/AI сигналы", "Market Scanner/AI Signals")
 
 def email_binding_notice(lang):
     return ui_text(
@@ -531,9 +556,9 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
 
 def lang_keyboard():
     b = InlineKeyboardBuilder()
-    b.button(text="ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹", callback_data="lang_ru")
-    b.button(text="ðŸ‡¬ðŸ‡§ English", callback_data="lang_en")
-    b.button(text="ðŸ‡±ðŸ‡» LatvieÅ¡u", callback_data="lang_lv")
+    b.button(text="🇷🇺 Русский", callback_data="lang_ru")
+    b.button(text="🇬🇧 English", callback_data="lang_en")
+    b.button(text="🇱🇻 Latviešu", callback_data="lang_lv")
     b.adjust(2, 1)
     return b.as_markup()
 
@@ -655,13 +680,13 @@ async def first_lang_selected(callback: CallbackQuery, state: FSMContext):
         )
     elif lang == "ru":
         text = (
-            "ðŸ“§ *Ð£ÐºÐ°Ð¶Ð¸ ÑÐ²Ð¾Ð¹ e-mail*\n\n"
-            "Ðš Ð½ÐµÐ¼Ñƒ Ð±ÑƒÐ´ÐµÑ‚ Ð¿Ñ€Ð¸Ð²ÑÐ·Ð°Ð½Ð° Ð¿Ð¾Ð´Ð¿Ð¸ÑÐºÐ° Ð¸ Ð´Ð¾ÑÑ‚ÑƒÐ¿. ÐŸÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ Ð±Ð¾Ñ‚ ÑÐ²ÐµÑ€Ð¸Ñ‚ Ð¿Ð¾ÐºÑƒÐ¿ÐºÑƒ Ð¿Ð¾ ÑÑ‚Ð¾Ð¼Ñƒ e-mail.\n\n"
-            "_ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ e-mail Ð¾Ð´Ð½Ð¸Ð¼ ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸ÐµÐ¼:_"
+            "📧 *Укажи свой e-mail*\n\n"
+            "К нему будет привязана подписка и доступ. После оплаты на сайте бот сверит покупку по этому e-mail.\n\n"
+            "_Отправь e-mail одним сообщением:_"
         )
     else:
         text = (
-            "ðŸ“§ *Enter your e-mail*\n\n"
+            "📧 *Enter your e-mail*\n\n"
             "Your subscription and access will be linked to it. After website payment the bot will verify the purchase by this e-mail.\n\n"
             "_Send your e-mail as one message:_"
         )
@@ -678,7 +703,7 @@ async def registration_receive_email(message: Message, state: FSMContext):
     lang = data.get("reg_lang", "ru")
     name = data.get("reg_name", md_escape(message.from_user.first_name))
     if "@" not in email or "." not in email or len(email) < 5:
-        await message.answer("âŒ " + ("Nepareizs e-pasta formÄts. PamÄ“Ä£ini vÄ“lreiz:" if lang == "lv" else ("ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÐµÑ‰Ñ‘:" if lang == "ru" else "Invalid e-mail. Try again:")))
+        await message.answer("❌ " + ("Nepareizs e-pasta formāts. Pamēģini vēlreiz:" if lang == "lv" else ("Неверный e-mail. Попробуй ещё:" if lang == "ru" else "Invalid e-mail. Try again:")))
         return
     await db.set_user_lang(message.from_user.id, lang)
     await db.set_user_email(message.from_user.id, email)
@@ -691,9 +716,17 @@ async def registration_receive_email(message: Message, state: FSMContext):
         f"ðŸ“¦ AktivizÄ“ti gaidoÅ¡ie pirkumi: *{len(claimed)}*"
     )
     await state.clear()
-    await message.answer(("âœ… E-pasts saglabÄts." if lang == "lv" else ("âœ… E-mail ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½." if lang == "ru" else "âœ… E-mail saved.")), parse_mode="Markdown")
+    await message.answer(("✅ E-pasts saglabāts." if lang == "lv" else ("✅ E-mail сохранён." if lang == "ru" else "✅ E-mail saved.")), parse_mode="Markdown")
     if claimed:
-        await message.answer(ui_text(lang, f"Ã¢Å“â€¦ Atrasti iepriekÃ…Â¡Ã„â€œji pirkumi pÃ„â€œc e-pasta. AktivizÃ„â€œtas {len(claimed)} piekÃ„Â¼uves.", f"Ã¢Å“â€¦ ÃÂÃÂ°ÃÂ¹ÃÂ´ÃÂµÃÂ½Ã‘â€¹ Ã‘â‚¬ÃÂ°ÃÂ½ÃÂµÃÂµ ÃÂ¾ÃÂ¿ÃÂ»ÃÂ°Ã‘â€¡ÃÂµÃÂ½ÃÂ½Ã‘â€¹ÃÂµ ÃÂ¿ÃÂ¾ÃÂºÃ‘Æ’ÃÂ¿ÃÂºÃÂ¸ ÃÂ¿ÃÂ¾ e-mail. ÃÂÃÂºÃ‘â€šÃÂ¸ÃÂ²ÃÂ¸Ã‘â‚¬ÃÂ¾ÃÂ²ÃÂ°ÃÂ½ÃÂ¾ ÃÂ´ÃÂ¾Ã‘ÂÃ‘â€šÃ‘Æ’ÃÂ¿ÃÂ¾ÃÂ²: {len(claimed)}.", f"Ã¢Å“â€¦ Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
+        await message.answer(
+            ui_text(
+                lang,
+                f"✅ Atrasti iepriekšēji pirkumi pēc e-pasta. Aktivizētas piekļuves: {len(claimed)}.",
+                f"✅ Найдены предыдущие покупки по e-mail. Активировано доступов: {len(claimed)}.",
+                f"✅ Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}.",
+            ),
+            parse_mode="Markdown",
+        )
     await _send_onboarding(message, lang, name)
 
 
@@ -703,69 +736,66 @@ async def _send_onboarding(message, lang, name):
     """3 ziÅ†u karuselis jaunajiem lietotÄjiem"""
     if lang == "lv":
         msg1 = (
-            f"ðŸ‘‹ *Sveiks, {name}!*\n\n"
-            f"Laipni lÅ«gts *MNtradepro*! ðŸš€\n\n"
-            f"ðŸ’Ž *VIP Treideru Äats*\n"
-            f"SlÄ“gta community ar signÄliem, analÄ«tiku un atbalstu.\n"
-            f"IzvÄ“lies plÄnu un pievienojies!"
+            f"👋 *Sveiks, {name}!*\n\n"
+            f"Laipni lūgts *MNtradepro*! 🚀\n\n"
+            f"💎 *VIP Treideru čats*\n"
+            f"Slēgta community ar signāliem, analītiku un atbalstu.\n"
+            f"Izvēlies plānu un pievienojies!"
         )
         msg2 = (
-            f"ðŸ“š *MNtradepro kursi*\n\n"
-            f"No iesÄcÄ“ja lÄ«dz pÄrliecinÄtam treiderim â€” soli pa solim.\n"
-            f"AudzÄ“ zinÄÅ¡anas un izmanto community pieredzi."
+            f"📚 *MNtradepro kursi*\n\n"
+            f"No iesācēja līdz pārliecinātam treiderim — soli pa solim.\n"
+            f"Audzē zināšanas un izmanto community pieredzi."
         )
         msg3 = (
-            f"ðŸ† *LojalitÄtes programma*\n\n"
-            f"Jo ilgÄk esi community biedrs, jo lielÄkus bonusus iegÅ«sti:\n"
-            f"ðŸ”¥ AudzÄ“ savu statusu ar aktivitÄti\n"
-            f"ðŸŽ SaÅ†em bezmaksas bonusa dienas\n"
-            f"ðŸŽ“ AtbloÄ·Ä“ papildu privilÄ“Ä£ijas aktÄ«vÄkajiem biedriem\n\n"
-            f"SÄc tagad! ðŸ‘‡"
+            f"🏆 *Lojalitātes programma*\n\n"
+            f"Jo ilgāk esi community biedrs, jo lielākus bonusus iegūsti:\n"
+            f"🔥 Audzē savu statusu ar aktivitāti\n"
+            f"🎁 Saņem bezmaksas bonusa dienas\n"
+            f"🎓 Atbloķē papildu privilēģijas aktīvākajiem biedriem\n\n"
+            f"Sāc tagad! 👇"
         )
     elif lang == "ru":
-        # ZiÅ†a 1 â€” VIP Äats
         msg1 = (
-            f"ðŸ‘‹ *ÐŸÑ€Ð¸Ð²ÐµÑ‚, {name}!*\n\n"
-            f"Ð”Ð¾Ð±Ñ€Ð¾ Ð¿Ð¾Ð¶Ð°Ð»Ð¾Ð²Ð°Ñ‚ÑŒ Ð² *MNtradepro*! ðŸš€\n\n"
-            f"ðŸ’Ž *VIP Ñ‡Ð°Ñ‚ Ñ‚Ñ€ÐµÐ¹Ð´ÐµÑ€Ð¾Ð²*\n"
-            f"Ð—Ð°ÐºÑ€Ñ‹Ñ‚Ð¾Ðµ ÑÐ¾Ð¾Ð±Ñ‰ÐµÑÑ‚Ð²Ð¾ Ñ ÑÐ¸Ð³Ð½Ð°Ð»Ð°Ð¼Ð¸, Ð°Ð½Ð°Ð»Ð¸Ñ‚Ð¸ÐºÐ¾Ð¹ Ð¸ Ð¿Ð¾Ð´Ð´ÐµÑ€Ð¶ÐºÐ¾Ð¹ Ð¾Ñ‚ Ð¿Ñ€Ð¾Ñ„ÐµÑÑÐ¸Ð¾Ð½Ð°Ð»Ð¾Ð².\n"
-            f"Ð’Ñ‹Ð±Ð¸Ñ€Ð°Ð¹ Ñ‚Ð°Ñ€Ð¸Ñ„ Ð¸ Ð¿Ñ€Ð¸ÑÐ¾ÐµÐ´Ð¸Ð½ÑÐ¹ÑÑ!"
+            f"👋 *Привет, {name}!*\n\n"
+            f"Добро пожаловать в *MNtradepro*! 🚀\n\n"
+            f"💎 *VIP чат трейдеров*\n"
+            f"Закрытое community с сигналами, аналитикой и поддержкой.\n"
+            f"Выбирай тариф и присоединяйся!"
         )
-        # ZiÅ†a 2 â€” Kursi
         msg2 = (
-            f"ðŸ“š *ÐšÑƒÑ€ÑÑ‹ MNtradepro Academy*\n\n"
-            f"ÐžÑ‚ Ð½Ð¾Ð²Ð¸Ñ‡ÐºÐ° Ð´Ð¾ Ð¿Ñ€Ð¾Ñ„Ð¸ â€” Ð¿Ð¾ÑˆÐ°Ð³Ð¾Ð²Ð¾Ðµ Ð¾Ð±ÑƒÑ‡ÐµÐ½Ð¸Ðµ Ñ‚Ñ€ÐµÐ¹Ð´Ð¸Ð½Ð³Ñƒ.\n"
-            f"ÐšÐ°Ð¶Ð´Ñ‹Ð¹ Ð½ÑŽÐ°Ð½Ñ Ð¼Ð¾Ð¶ÐµÑ‚ Ð¿Ñ€Ð¸Ð½ÐµÑÑ‚Ð¸ Ñ‚ÐµÐ±Ðµ ÑÐµÑ€ÑŒÑ‘Ð·Ð½Ñ‹Ðµ Ð´ÐµÐ½ÑŒÐ³Ð¸! ðŸ’°"
+            f"📚 *Курсы MNtradepro Academy*\n\n"
+            f"От новичка до уверенного трейдера — пошаговое обучение.\n"
+            f"Прокачивай знания и используй опыт community."
         )
-        # ZiÅ†a 3 â€” Loyalty
         msg3 = (
-            f"ðŸ† *ÐŸÑ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð° Ð»Ð¾ÑÐ»ÑŒÐ½Ð¾ÑÑ‚Ð¸*\n\n"
-            f"Ð§ÐµÐ¼ Ð´Ð¾Ð»ÑŒÑˆÐµ Ñ‚Ñ‹ Ð² community â€” Ñ‚ÐµÐ¼ Ð±Ð¾Ð»ÑŒÑˆÐµ Ð±Ð¾Ð½ÑƒÑÐ¾Ð² Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑˆÑŒ:\n"
-            f"ðŸ”¥ Ð Ð°ÑÑ‚Ð¸ Ð² ÑÑ‚Ð°Ñ‚ÑƒÑÐµ Ñ‡ÐµÑ€ÐµÐ· Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¾ÑÑ‚ÑŒ\n"
-            f"ðŸŽ ÐŸÐ¾Ð»ÑƒÑ‡Ð°Ð¹ Ð±ÐµÑÐ¿Ð»Ð°Ñ‚Ð½Ñ‹Ðµ Ð±Ð¾Ð½ÑƒÑÐ½Ñ‹Ðµ Ð´Ð½Ð¸\n"
-            f"ðŸŽ“ ÐžÑ‚ÐºÑ€Ñ‹Ð²Ð°Ð¹ Ð´Ð¾Ð¿Ð¾Ð»Ð½Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ñ‹Ðµ Ð¿Ñ€Ð¸Ð²Ð¸Ð»ÐµÐ³Ð¸Ð¸ Ð´Ð»Ñ Ñ‚Ð¾Ð¿-ÑƒÑ‡Ð°ÑÑ‚Ð½Ð¸ÐºÐ¾Ð²\n\n"
-            f"ÐÐ°Ñ‡Ð½Ð¸ Ð¿Ñ€ÑÐ¼Ð¾ ÑÐµÐ¹Ñ‡Ð°Ñ! ðŸ‘‡"
+            f"🏆 *Программа лояльности*\n\n"
+            f"Чем дольше ты в community, тем больше бонусов получаешь:\n"
+            f"🔥 Расти в статусе через активность\n"
+            f"🎁 Получай бесплатные бонусные дни\n"
+            f"🎓 Открывай дополнительные привилегии для активных участников\n\n"
+            f"Начни прямо сейчас! 👇"
         )
     else:
         msg1 = (
-            f"ðŸ‘‹ *Hi, {name}!*\n\n"
-            f"Welcome to *MNtradepro*! ðŸš€\n\n"
-            f"ðŸ’Ž *VIP Traders Chat*\n"
-            f"Exclusive community with signals, analytics and professional support.\n"
+            f"👋 *Hi, {name}!*\n\n"
+            f"Welcome to *MNtradepro*! 🚀\n\n"
+            f"💎 *VIP Traders Chat*\n"
+            f"Private community with signals, analytics and support.\n"
             f"Pick a plan and join!"
         )
         msg2 = (
-            f"ðŸ“š *MNtradepro Academy Courses*\n\n"
-            f"From beginner to pro â€” step-by-step trading education.\n"
-            f"Every detail can bring you serious money! ðŸ’°"
+            f"📚 *MNtradepro Academy Courses*\n\n"
+            f"From beginner to confident trader — step-by-step education.\n"
+            f"Build your knowledge and use the community experience."
         )
         msg3 = (
-            f"ðŸ† *Loyalty Program*\n\n"
-            f"The longer you stay in the community â€” the bigger bonuses you unlock:\n"
-            f"ðŸ”¥ Grow your status through activity\n"
-            f"ðŸŽ Earn free bonus days\n"
-            f"ðŸŽ“ Unlock extra perks for top members\n\n"
-            f"Start now! ðŸ‘‡"
+            f"🏆 *Loyalty Program*\n\n"
+            f"The longer you stay in the community, the bigger bonuses you unlock:\n"
+            f"🔥 Grow your status through activity\n"
+            f"🎁 Earn free bonus days\n"
+            f"🎓 Unlock extra perks for active members\n\n"
+            f"Start now! 👇"
         )
     
     await message.answer(msg1, parse_mode="Markdown")
@@ -899,20 +929,20 @@ def main_menu_keyboard(lang):
     b = InlineKeyboardBuilder()
     if lang == "lv":
         b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
         b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
         b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
@@ -925,24 +955,24 @@ def active_keyboard(lang):
         b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
         b.button(text=menu_button("🔄", "Mainīt / pagarināt plānu"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
         b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
         b.button(text=menu_button("🔄", "Сменить / продлить тариф"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
         b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
         b.button(text=menu_button("🔄", "Change / Renew Plan"), callback_data="vip_chat_plans")
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
@@ -955,24 +985,24 @@ def _urgency_keyboard(lang):
         b.button(text=menu_button("🚨", "Pagarināt tagad!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("🔗", "Saņemt piekļuves linku"), callback_data="get_access_links")
         b.button(text=menu_button("💎", "Mans lojalitātes līmenis"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
         b.button(text=menu_button("🚨", "Продлить сейчас!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("🔗", "Получить ссылку доступа"), callback_data="get_access_links")
         b.button(text=menu_button("💎", "Мой уровень лояльности"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
         b.button(text=menu_button("🚨", "Renew Now!"), callback_data="vip_chat_plans")
         b.button(text=menu_button("🔗", "Get Access Link"), callback_data="get_access_links")
         b.button(text=menu_button("💎", "My Loyalty Level"), callback_data="loyalty_status")
-        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
+        b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Support"), callback_data="user_support")
     b.adjust(1)
@@ -1978,7 +2008,11 @@ def _format_eur_price(value):
 
 
 def _course_ui_lang(lang):
-    return "ru" if lang == "ru" else "lv"
+    if lang == "ru":
+        return "ru"
+    if lang == "en":
+        return "en"
+    return "lv"
 
 
 @dp.callback_query(F.data == "courses_menu")
@@ -1995,12 +2029,12 @@ async def courses_menu(callback: CallbackQuery):
         )
     elif ui_lang == "ru":
         text = (
-            "ðŸ“š *ÐšÑƒÑ€ÑÑ‹ MNtradepro*\n\n"
-            "Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÐºÑƒÑ€Ñ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑƒÐ·Ð½Ð°Ñ‚ÑŒ Ð´ÐµÑ‚Ð°Ð»Ð¸ Ð¸ ÑÐ¿Ð¾ÑÐ¾Ð±Ñ‹ Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹:"
+            "📚 *Курсы MNtradepro*\n\n"
+            "Выбери курс, чтобы посмотреть детали и способы оплаты:"
         )
     else:
         text = (
-            "ðŸ“š *MNtradepro Courses*\n\n"
+            "📚 *MNtradepro Courses*\n\n"
             "Choose a course to see details and payment options:"
         )
     
@@ -2055,16 +2089,15 @@ async def course_info_menu(callback: CallbackQuery):
     elif ui_lang == "ru":
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"ðŸ’° Ð¦ÐµÐ½Ð°: *{price_str}*\n\n"
-            "ðŸ“– ÐŸÐ¾Ð´Ñ€Ð¾Ð±Ð½Ð¾Ðµ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸Ðµ ÐºÑƒÑ€ÑÐ° Ð¸ Ð¿Ñ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ñƒ "
-            "Ð¼Ð¾Ð¶Ð½Ð¾ Ð¿Ð¾ÑÐ¼Ð¾Ñ‚Ñ€ÐµÑ‚ÑŒ Ð½Ð° ÑÐ°Ð¹Ñ‚Ðµ MNtradepro.\n\n"
-            "Ð’Ñ‹Ð±ÐµÑ€Ð¸ ÑÐ¿Ð¾ÑÐ¾Ð± Ð¾Ð¿Ð»Ð°Ñ‚Ñ‹:"
+            f"💰 Цена: *{price_str}*\n\n"
+            "📖 Подробное описание курса и программу можно посмотреть на сайте MNtradepro.\n\n"
+            "Выбери способ оплаты:"
         )
     else:
         text = (
             f"{course['emoji']} *{name}*\n\n"
-            f"ðŸ’° Price: *{price_str}*\n\n"
-            "ðŸ“– Detailed course description and curriculum "
+            f"💰 Price: *{price_str}*\n\n"
+            "📖 Detailed course description and curriculum "
             "available on MNtradepro website.\n\n"
             "Choose payment method:"
         )
@@ -2073,9 +2106,9 @@ async def course_info_menu(callback: CallbackQuery):
     
     b = InlineKeyboardBuilder()
     if checkout_url:
-        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), url=checkout_url)
+        b.button(text=("💳 Maksāt ar karti / banku / crypto" if ui_lang == "lv" else ("💳 Оплатить картой / банком / crypto" if ui_lang == "ru" else "💳 Pay with card / bank / crypto")), url=checkout_url)
     else:
-        b.button(text="💳 " + ("Maksāt ar karti / banku / crypto" if ui_lang == "lv" else "Оплатить картой / банком / crypto"), callback_data=f"course_checkout_missing_{course_key}")
+        b.button(text=("💳 Maksāt ar karti / banku / crypto" if ui_lang == "lv" else ("💳 Оплатить картой / банком / crypto" if ui_lang == "ru" else "💳 Pay with card / bank / crypto")), callback_data=f"course_checkout_missing_{course_key}")
     b.button(text=back_button_text(ui_lang), callback_data="courses_menu")
     b.adjust(1)
     
