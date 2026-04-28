@@ -974,11 +974,6 @@ async def _send_referral_reminder(user_id, lang):
     except Exception as e:
         logger.warning(f"Referral reminder failed for {user_id}: {e}")
 
-
-def market_scanner_label(lang):
-    return ui_text(lang, "PRO Tirgus Skaneris/AI Signāli", "PRO Сканер рынка/AI сигналы", "PRO Market Scanner/AI Signals")
-
-
 def main_menu_keyboard(lang):
     b = InlineKeyboardBuilder()
     if lang == "lv":
@@ -3884,7 +3879,17 @@ async def show_winback_survey(callback: CallbackQuery):
     """Show win-back survey"""
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
-    lang = user.get('lang', 'ru')
+    lang = user.get('lang', 'lv') if user else 'lv'
+    await callback.answer(
+        ui_text(
+            lang,
+            "Šī aptaujas plūsma pašlaik ir izslēgta.",
+            "Эта ветка опроса сейчас отключена.",
+            "This survey flow is currently disabled.",
+        ),
+        show_alert=True,
+    )
+    return
     
     if lang == 'ru':
         text = """ðŸ“Š ÐŸÐ¾Ñ‡ÐµÐ¼Ñƒ ÑƒÑˆÑ‘Ð»? ÐŸÐ¾Ð¼Ð¾Ð³Ð¸ Ð½Ð°Ð¼ ÑÑ‚Ð°Ñ‚ÑŒ Ð»ÑƒÑ‡ÑˆÐµ!
@@ -3936,7 +3941,18 @@ async def handle_survey_response(callback: CallbackQuery, state: FSMContext):
     """Handle survey response"""
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
-    lang = user.get('lang', 'ru')
+    lang = user.get('lang', 'lv') if user else 'lv'
+    await state.clear()
+    await callback.answer(
+        ui_text(
+            lang,
+            "Šī aptaujas plūsma pašlaik ir izslēgta.",
+            "Эта ветка опроса сейчас отключена.",
+            "This survey flow is currently disabled.",
+        ),
+        show_alert=True,
+    )
+    return
     
     response_type = callback.data[7:]  # Remove "survey_"
     
@@ -3953,7 +3969,7 @@ async def handle_survey_response(callback: CallbackQuery, state: FSMContext):
         return
     
     # Generate reward coupon
-    coupon_code = await loyalty_system.generate_winback_coupon(user_id, survey_response=True)
+    coupon_code = "DISABLED"
     
     # Save response
     await db.save_survey_response(user_id, response_type, coupon_code)
@@ -4005,17 +4021,23 @@ Use at checkout!
 async def survey_custom_text(message: Message, state: FSMContext):
     """SaÅ†em custom survey atbildi"""
     user = await db.get_user(message.from_user.id)
-    lang = user.get('lang', 'ru') if user else 'ru'
-    if message.text == "/cancel":
-        await state.clear()
-        await message.answer("âŒ " + ui_text(lang, "Atcelts", "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", "Cancelled"))
-        return
-    
+    lang = user.get('lang', 'lv') if user else 'lv'
+    await state.clear()
+    await message.answer(
+        ui_text(
+            lang,
+            "Šī aptaujas plūsma pašlaik ir izslēgta.",
+            "Эта ветка опроса сейчас отключена.",
+            "This survey flow is currently disabled.",
+        )
+    )
+    return
+
     user_id = message.from_user.id
     custom_text = message.text[:500]  # LimitÄ“t garumu
     await state.clear()
     
-    coupon_code = await loyalty_system.generate_winback_coupon(user_id, survey_response=True)
+    coupon_code = "DISABLED"
     await db.save_survey_response(user_id, custom_text, coupon_code)
     
     if lang == 'ru':
@@ -4276,15 +4298,16 @@ async def main():
     await db.init()
     webhook_runner = await start_webhook_server()
 
-    # Admini automÄtiski ir friend listÄ
+    # Admins are always in the friend list.
     for admin_id in config.ADMIN_IDS:
         await db.register_user_as_friend(admin_id)
     for pk, plan in config.PLANS.items():
         sp = await db.get_setting(f"price_{pk}")
         if sp:
             try:
-                p = float(sp); plan['price_usdt'] = p
-                plan['price_usd'] = f"{p:.0f}â‚¬" if p == int(p) else f"{p}â‚¬"
+                p = float(sp)
+                plan['price_usdt'] = p
+                plan['price_usd'] = f"{p:.0f} EUR" if p == int(p) else f"{p} EUR"
             except: pass
     old_course_defaults = {
         "mini": 25.0,
