@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command, CommandStart
-@dp.callback_query(F.data == "get_access_links")
+@router.callback_query(F.data == "get_access_links")
 async def get_access_links(callback: CallbackQuery):
     user_id = callback.from_user.id
     user = await db.get_user(user_id)
