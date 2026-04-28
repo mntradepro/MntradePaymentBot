@@ -355,31 +355,31 @@ async def adm_users(callback: CallbackQuery):
 
     reg_lines = []
     for u in registered[:10]:
-        status = "AktÄ«vs" if u.get("is_active") and u.get("expires_at") and u.get("expires_at") > datetime.utcnow().isoformat() else "NeaktÄ«vs"
-        exp = (u.get("expires_at") or "â€”")[:10]
-        email = u.get("email") or "â€”"
-        registered_at = (u.get("email_registered_at") or u.get("created_at") or "â€”")[:10]
+        status = "Aktivs" if u.get("is_active") and u.get("expires_at") and u.get("expires_at") > datetime.utcnow().isoformat() else "Neaktivs"
+        exp = (u.get("expires_at") or "-")[:10]
+        email = u.get("email") or "-"
+        registered_at = (u.get("email_registered_at") or u.get("created_at") or "-")[:10]
         uname = f"@{u['username']}" if u.get("username") else str(u["user_id"])
-        reg_lines.append(f"â€¢ {_safe_text(uname)} | {_safe_text(email)} | reg. {_safe_text(registered_at)} | {status} | lÄ«dz {_safe_text(exp)}")
+        reg_lines.append(f"- {_safe_text(uname)} | {_safe_text(email)} | reg. {_safe_text(registered_at)} | {status} | lidz {_safe_text(exp)}")
 
     text = (
-        f"ðŸ‘¥ <b>ReÄ£istrÄ“tie ({len(registered)}):</b>\n"
-        + ("\n".join(reg_lines) if reg_lines else "â€”")
-        + f"\n\nâœ… <b>AktÄ«vie ({len(users)}):</b>\n"
-        + ("\n".join(lines) if lines else "â€”")
+        f"<b>Registretie ({len(registered)}):</b>\n"
+        + ("\n".join(reg_lines) if reg_lines else "-")
+        + f"\n\n<b>Aktivie ({len(users)}):</b>\n"
+        + ("\n".join(lines) if lines else "-")
     )
     if len(registered) > 10:
-        text += f"\n...un vÄ“l {len(registered) - 10} reÄ£istrÄ“ti"
+        text += f"\n...un vel {len(registered) - 10} registreti"
     if len(users) > 20:
-        text += f"\n...un vÄ“l {len(users) - 20}"
+        text += f"\n...un vel {len(users) - 20}"
     if friends:
         friend_lines = [
-            f"â€¢ {_safe_text('@' + f['username'])} ðŸ‘«"
+            f"- {_safe_text('@' + f['username'])} friend"
             if f.get("username")
-            else f"â€¢ {_safe_text(f['user_id'])} ðŸ‘«"
+            else f"- {_safe_text(f['user_id'])} friend"
             for f in friends[:10]
         ]
-        text += f"\n\nðŸ‘« <b>Draugi ({len(friends)}):</b>\n" + "\n".join(friend_lines)
+        text += f"\n\n<b>Draugi ({len(friends)}):</b>\n" + "\n".join(friend_lines)
 
     await callback.message.edit_text(
         _trim_for_telegram(text),
@@ -398,36 +398,36 @@ async def adm_user_view(callback: CallbackQuery):
     try:
         user_id = int(callback.data.replace("adm_user_view_", ""))
     except ValueError:
-        await callback.answer("NederÄ«gs user ID", show_alert=True)
+        await callback.answer("Nederigs user ID", show_alert=True)
         return
 
     user = await db.get_user(user_id)
     if not user:
-        await callback.answer("LietotÄjs nav atrasts", show_alert=True)
+        await callback.answer("Lietotajs nav atrasts", show_alert=True)
         return
 
     active_subs = await db.get_active_user_subscriptions(user_id)
     uname = f"@{user['username']}" if user.get("username") else str(user_id)
     lines = []
     for sub in active_subs:
-        exp = sub.get("expires_at") or "â€”"
+        exp = sub.get("expires_at") or "-"
         if "T" in exp:
             exp = exp[:10]
         lines.append(
-            f"â€¢ {_safe_text(sub.get('product_name') or sub.get('product_key') or 'â€”')} â†’ {_safe_text(exp)}"
+            f"- {_safe_text(sub.get('product_name') or sub.get('product_key') or '-')} -> {_safe_text(exp)}"
         )
 
     text = (
-        f"ðŸ‘¤ <b>LietotÄja profils</b>\n\n"
+        f"<b>Lietotaja profils</b>\n\n"
         f"ID: <code>{user_id}</code>\n"
         f"Username: <b>{_safe_text(uname)}</b>\n"
-        f"E-pasts: <code>{_safe_text(user.get('email') or 'â€”')}</code>\n"
-        f"Valoda: <code>{_safe_text(user.get('lang') or 'â€”')}</code>\n"
-        f"Statuss: <b>{'AktÄ«vs' if user.get('is_active') else 'NeaktÄ«vs'}</b>\n"
-        f"ReÄ£istrÄ“ts: <code>{_safe_text((user.get('email_registered_at') or user.get('created_at') or 'â€”')[:19])}</code>\n"
-        f"PÄ“dÄ“jÄ aktivitÄte: <code>{_safe_text((user.get('last_seen_at') or 'â€”')[:19])}</code>\n\n"
-        f"ðŸ“¦ <b>AktÄ«vÄs piekÄ¼uves ({len(active_subs)}):</b>\n"
-        + ("\n".join(lines) if lines else "â€”")
+        f"E-pasts: <code>{_safe_text(user.get('email') or '-')}</code>\n"
+        f"Valoda: <code>{_safe_text(user.get('lang') or '-')}</code>\n"
+        f"Statuss: <b>{'Aktivs' if user.get('is_active') else 'Neaktivs'}</b>\n"
+        f"Registrets: <code>{_safe_text((user.get('email_registered_at') or user.get('created_at') or '-')[:19])}</code>\n"
+        f"Ped. aktivit.: <code>{_safe_text((user.get('last_seen_at') or '-')[:19])}</code>\n\n"
+        f"<b>Aktivas piekluves ({len(active_subs)}):</b>\n"
+        + ("\n".join(lines) if lines else "-")
     )
 
     await callback.message.edit_text(
@@ -446,7 +446,7 @@ async def adm_pending_email_users(callback: CallbackQuery):
     pending = await db.get_all_pending_email_subscriptions()
     if not pending:
         await callback.message.edit_text(
-            "â³ <b>Pirkumi bez TG konta</b>\n\nPaÅ¡laik nav neviena pirkuma, kas gaida lietotÄja pirmo ieieÅ¡anu botÄ.",
+            "<b>Pirkumi bez TG konta</b>\n\nPaslaik nav neviena pirkuma, kas gaida lietotaja pirmo ieiesanu bota.",
             reply_markup=back_kb("adm_main"),
             parse_mode="HTML",
         )
@@ -457,30 +457,30 @@ async def adm_pending_email_users(callback: CallbackQuery):
     seen_emails = set()
     for row in pending[:25]:
         email = (row.get("email") or "").strip().lower()
-        expires_at = row.get("expires_at") or "â€”"
-        activated_at = row.get("activated_at") or "â€”"
-        product_name = row.get("product_name") or row.get("product_key") or "â€”"
+        expires_at = row.get("expires_at") or "-"
+        activated_at = row.get("activated_at") or "-"
+        product_name = row.get("product_name") or row.get("product_key") or "-"
         if "T" in expires_at:
             expires_at = expires_at[:10]
         if "T" in activated_at:
             activated_at = activated_at[:10]
         seen_emails.add(email)
         lines.append(
-            f"â€¢ <b>{_safe_text(email)}</b>\n"
-            f"  â”œ Produkts: {_safe_text(product_name)}\n"
-            f"  â”œ MaksÄjums: {_safe_text(row.get('payment_system') or 'â€”')}\n"
-            f"  â”œ Pirkts: {_safe_text(activated_at)}\n"
-            f"  â”” AktÄ«vs lÄ«dz: {_safe_text(expires_at)}"
+            f"- <b>{_safe_text(email)}</b>\n"
+            f"  Produkts: {_safe_text(product_name)}\n"
+            f"  Maksajums: {_safe_text(row.get('payment_system') or '-')}\n"
+            f"  Pirkts: {_safe_text(activated_at)}\n"
+            f"  Aktivs lidz: {_safe_text(expires_at)}"
         )
 
     text = (
-        f"â³ <b>Pirkumi bez TG konta</b>\n\n"
-        f"ðŸ“§ UnikÄlie e-pasti: <b>{len(seen_emails)}</b>\n"
-        f"ðŸ“¦ AktÄ«vie gaidoÅ¡ie pirkumi: <b>{len(pending)}</b>\n\n"
+        f"<b>Pirkumi bez TG konta</b>\n\n"
+        f"Unikalie e-pasti: <b>{len(seen_emails)}</b>\n"
+        f"Aktivie gaidosie pirkumi: <b>{len(pending)}</b>\n\n"
         + "\n\n".join(lines)
     )
     if len(pending) > 25:
-        text += f"\n\n...un vÄ“l {len(pending) - 25} ieraksti"
+        text += f"\n\n...un vel {len(pending) - 25} ieraksti"
 
     await callback.message.edit_text(
         _trim_for_telegram(text),
