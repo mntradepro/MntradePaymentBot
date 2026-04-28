@@ -2732,7 +2732,7 @@ async def check_payment_cb(callback: CallbackQuery):
     asyncio.create_task(_confirm_payment(user_id, plan_key, plan, lang, msg, callback.from_user.username or ""))
 
 # â”€â”€â”€ UNIVERSÄ€LA AKTIVIZÄ€CIJA â”€â”€â”€
-async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount):
+async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount, explicit_expires_at=None):
     now = datetime.utcnow()
     product_meta = resolve_subscription_product(plan_key, lang)
     canonical_key = product_meta.get("product_key", plan_key)
@@ -2742,13 +2742,18 @@ async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount)
         plan_name_loc = product_meta["name"].get(lang, plan_name_save)
     else:
         plan_name_loc = plan['name'].get(lang, plan_name_save) if isinstance(plan['name'], dict) else plan['name']
-    active_subs = await db.get_active_user_subscriptions(user_id)
-    current_same = next((s for s in active_subs if s.get("product_key") == canonical_key), None)
-    if current_same and current_same.get("expires_at"):
-        cur_exp = datetime.fromisoformat(current_same["expires_at"])
-        new_exp = (cur_exp if cur_exp > now else now) + timedelta(days=plan['days'])
+    if explicit_expires_at is not None:
+        if explicit_expires_at.tzinfo is not None:
+            explicit_expires_at = explicit_expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+        new_exp = explicit_expires_at
     else:
-        new_exp = now + timedelta(days=plan['days'])
+        active_subs = await db.get_active_user_subscriptions(user_id)
+        current_same = next((s for s in active_subs if s.get("product_key") == canonical_key), None)
+        if current_same and current_same.get("expires_at"):
+            cur_exp = datetime.fromisoformat(current_same["expires_at"])
+            new_exp = (cur_exp if cur_exp > now else now) + timedelta(days=plan['days'])
+        else:
+            new_exp = now + timedelta(days=plan['days'])
     await db.activate_product_subscription(
         user_id=user_id,
         username=username,
@@ -4255,6 +4260,29 @@ def _webhook_plan_from_payload(payload: dict):
     return product_key or "website_subscription", plan, None
 
 
+def _webhook_expiry_from_payload(payload: dict):
+    raw = (
+        payload.get("expires_at")
+        or payload.get("expires_date")
+        or payload.get("subscription_expires_at")
+        or payload.get("subscription_expires")
+        or payload.get("valid_until")
+        or payload.get("expiry_date")
+    )
+    if not raw:
+        return None
+    value = str(raw).strip()
+    if not value:
+        return None
+    try:
+        normalized = value.replace("Z", "+00:00")
+        if len(normalized) == 10:
+            return datetime.fromisoformat(normalized + "T23:59:59")
+        return datetime.fromisoformat(normalized)
+    except Exception:
+        return None
+
+
 async def website_purchase_webhook(request: web.Request):
     raw_body = await request.read()
     if not _verify_webhook_request(raw_body, request):
@@ -4279,6 +4307,7 @@ async def website_purchase_webhook(request: web.Request):
     event_id = str(payload.get("event_id") or payload.get("order_id") or payload.get("payment_id") or "").strip()
     amount = float(payload.get("amount") or payload.get("amount_usd") or payload.get("amount_usdt") or 0)
     product_key, plan, plan_error = _webhook_plan_from_payload(payload)
+    explicit_expires_at = _webhook_expiry_from_payload(payload)
 
     if not email or "@" not in email:
         return web.json_response({
@@ -4323,7 +4352,11 @@ async def website_purchase_webhook(request: web.Request):
         product_meta = resolve_subscription_product(product_key, "lv")
         pending_existing = await db.get_pending_email_subscription(email, product_key)
         now = datetime.utcnow()
-        if pending_existing and pending_existing.get("expires_at"):
+        if explicit_expires_at is not None:
+            if explicit_expires_at.tzinfo is not None:
+                explicit_expires_at = explicit_expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+            pending_expires = explicit_expires_at
+        elif pending_existing and pending_existing.get("expires_at"):
             try:
                 current_exp = datetime.fromisoformat(pending_existing["expires_at"])
             except Exception:
@@ -4365,7 +4398,16 @@ async def website_purchase_webhook(request: web.Request):
     lang = user.get("lang", "ru")
     username = user.get("username") or ""
     try:
-        new_exp, plan_name, product_meta = await _do_activate(user["user_id"], product_key, plan, lang, username, tx_hash, amount)
+        new_exp, plan_name, product_meta = await _do_activate(
+            user["user_id"],
+            product_key,
+            plan,
+            lang,
+            username,
+            tx_hash,
+            amount,
+            explicit_expires_at=explicit_expires_at,
+        )
     except Exception:
         await notify_admins_error(f"webhook_activate user={user['user_id']} product={product_key}", "Failed to activate purchase from webhook")
         await db.delete_webhook_event(event_key)
