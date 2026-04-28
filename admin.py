@@ -466,22 +466,61 @@ async def delete_promo(callback: CallbackQuery):
 async def adm_edit_prices(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
+    labels = {
+        "checkout_url_lv": "VIP chat button - Latvian",
+        "checkout_url_en": "VIP chat button - English",
+        "checkout_url_ru": "VIP chat button - Russian",
+        "checkout_url_scanner_chat": "PRO Market Scanner/AI Signals button",
+        "price_monthly": "VIP 1 month price",
+        "course_price_mini": "Mini course price",
+        "course_checkout_url_mini": "Mini course checkout button",
+        "course_price_basic": "Basic course price",
+        "course_checkout_url_basic": "Basic course checkout button",
+        "course_price_full": "Full course price",
+        "course_checkout_url_full": "Full course checkout button",
+        "course_price_autotrading": "Autotrading course price",
+        "course_checkout_url_autotrading": "Autotrading course checkout button",
+        "course_price_vip": "VIP mentoring course price",
+        "course_checkout_url_vip": "VIP mentoring course checkout button",
+    }
     rows = []
     for key in ("checkout_url_lv", "checkout_url_en", "checkout_url_ru", "checkout_url_scanner_chat", "price_monthly"):
-        rows.append(f"{h(key)} = <code>{h(await db.get_setting(key) or '(empty)')}</code>")
+        rows.append(f"<b>{h(labels.get(key, key))}</b>\n<code>{h(key)}</code> = <code>{h(await db.get_setting(key) or '(empty)')}</code>")
     for course_key in config.COURSES.keys():
-        rows.append(f"course_price_{course_key} = <code>{h(await db.get_setting(f'course_price_{course_key}') or '(default)')}</code>")
-        rows.append(f"course_checkout_url_{course_key} = <code>{h(await db.get_setting(f'course_checkout_url_{course_key}') or '(empty)')}</code>")
+        price_key = f"course_price_{course_key}"
+        checkout_key = f"course_checkout_url_{course_key}"
+        rows.append(f"<b>{h(labels.get(price_key, price_key))}</b>\n<code>{h(price_key)}</code> = <code>{h(await db.get_setting(price_key) or '(default)')}</code>")
+        rows.append(f"<b>{h(labels.get(checkout_key, checkout_key))}</b>\n<code>{h(checkout_key)}</code> = <code>{h(await db.get_setting(checkout_key) or '(empty)')}</code>")
     b = InlineKeyboardBuilder()
-    for key in ("checkout_url_lv", "checkout_url_en", "checkout_url_ru", "checkout_url_scanner_chat"):
-        b.button(text=key, callback_data=f"adm_link_{key}")
-    b.button(text="price_monthly", callback_data="adm_price_price_monthly")
-    for course_key in config.COURSES.keys():
-        b.button(text=f"{course_key} price", callback_data=f"adm_price_course_price_{course_key}")
-        b.button(text=f"{course_key} checkout", callback_data=f"adm_link_course_checkout_url_{course_key}")
+    b.button(text="VIP button LV", callback_data="adm_link_checkout_url_lv")
+    b.button(text="VIP button EN", callback_data="adm_link_checkout_url_en")
+    b.button(text="VIP button RU", callback_data="adm_link_checkout_url_ru")
+    b.button(text="Scanner button", callback_data="adm_link_checkout_url_scanner_chat")
+    b.button(text="VIP monthly price", callback_data="adm_price_price_monthly")
+    b.button(text="Mini price", callback_data="adm_price_course_price_mini")
+    b.button(text="Mini checkout", callback_data="adm_link_course_checkout_url_mini")
+    b.button(text="Basic price", callback_data="adm_price_course_price_basic")
+    b.button(text="Basic checkout", callback_data="adm_link_course_checkout_url_basic")
+    b.button(text="Full price", callback_data="adm_price_course_price_full")
+    b.button(text="Full checkout", callback_data="adm_link_course_checkout_url_full")
+    b.button(text="Autotrading price", callback_data="adm_price_course_price_autotrading")
+    b.button(text="Autotrading checkout", callback_data="adm_link_course_checkout_url_autotrading")
+    b.button(text="VIP mentoring price", callback_data="adm_price_course_price_vip")
+    b.button(text="VIP mentoring checkout", callback_data="adm_link_course_checkout_url_vip")
     b.button(text="Back", callback_data="adm_main")
     b.adjust(2)
-    await render(callback, "<b>Checkout links and prices</b>\n\n" + "\n".join(rows), b.as_markup())
+    await render(
+        callback,
+        "<b>Checkout links and prices</b>\n\n"
+        "Use the labels below exactly like this:\n"
+        "- VIP chat button - Latvian = link for the Latvian VIP chat purchase button\n"
+        "- VIP chat button - English = link for the English VIP chat purchase button\n"
+        "- VIP chat button - Russian = link for the Russian VIP chat purchase button\n"
+        "- PRO Market Scanner/AI Signals button = link for the scanner product button\n"
+        "- Course checkout button = link for that exact course buy button\n\n"
+        + "\n".join(rows),
+        b.as_markup(),
+    )
     await callback.answer()
 
 
@@ -490,9 +529,28 @@ async def adm_link_edit(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
     key = callback.data.replace("adm_link_", "")
+    labels = {
+        "checkout_url_lv": "VIP chat button - Latvian",
+        "checkout_url_en": "VIP chat button - English",
+        "checkout_url_ru": "VIP chat button - Russian",
+        "checkout_url_scanner_chat": "PRO Market Scanner/AI Signals button",
+        "course_checkout_url_mini": "Mini course checkout button",
+        "course_checkout_url_basic": "Basic course checkout button",
+        "course_checkout_url_full": "Full course checkout button",
+        "course_checkout_url_autotrading": "Autotrading course checkout button",
+        "course_checkout_url_vip": "VIP mentoring course checkout button",
+    }
     await state.set_state(EditState.waiting_checkout_url)
     await state.update_data(edit_key=key)
-    await render(callback, f"<b>Edit URL</b>\n\nSetting: <code>{h(key)}</code>\nCurrent: <code>{h(await db.get_setting(key) or '(empty)')}</code>\n\nSend the new URL.", back_kb("adm_edit_prices"))
+    await render(
+        callback,
+        f"<b>Edit URL</b>\n\n"
+        f"Product/button: <b>{h(labels.get(key, key))}</b>\n"
+        f"Setting key: <code>{h(key)}</code>\n"
+        f"Current: <code>{h(await db.get_setting(key) or '(empty)')}</code>\n\n"
+        f"Send the new checkout URL for this exact button.",
+        back_kb("adm_edit_prices"),
+    )
     await callback.answer()
 
 
@@ -511,9 +569,25 @@ async def adm_price_edit(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
     key = callback.data.replace("adm_price_", "")
+    labels = {
+        "price_monthly": "VIP 1 month price",
+        "course_price_mini": "Mini course price",
+        "course_price_basic": "Basic course price",
+        "course_price_full": "Full course price",
+        "course_price_autotrading": "Autotrading course price",
+        "course_price_vip": "VIP mentoring course price",
+    }
     await state.set_state(EditState.waiting_price)
     await state.update_data(edit_key=key)
-    await render(callback, f"<b>Edit price</b>\n\nSetting: <code>{h(key)}</code>\nCurrent: <code>{h(await db.get_setting(key) or '(default)')}</code>\n\nSend the new numeric price.", back_kb("adm_edit_prices"))
+    await render(
+        callback,
+        f"<b>Edit price</b>\n\n"
+        f"Product: <b>{h(labels.get(key, key))}</b>\n"
+        f"Setting key: <code>{h(key)}</code>\n"
+        f"Current: <code>{h(await db.get_setting(key) or '(default)')}</code>\n\n"
+        f"Send the new numeric price.",
+        back_kb("adm_edit_prices"),
+    )
     await callback.answer()
 
 
