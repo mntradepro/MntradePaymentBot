@@ -4186,14 +4186,39 @@ def _webhook_plan_from_payload(payload: dict):
     if product_key in config.PLANS:
         plan = dict(config.PLANS[product_key])
     else:
-        if not days_raw:
+        product_meta = resolve_subscription_product(product_key, "lv")
+        if product_meta:
+            localized_name = product_meta.get("name", {})
+            plan = {
+                "name": {
+                    "lv": localized_name.get("lv", product_key or "Website subscription"),
+                    "ru": localized_name.get("ru", product_key or "Website subscription"),
+                    "en": localized_name.get("en", product_key or "Website subscription"),
+                },
+                "days": int(days_raw or 0),
+                "price_usdt": float(payload.get("amount") or payload.get("amount_usd") or payload.get("amount_usdt") or 0),
+                "emoji": "🌐",
+            }
+        elif not days_raw and not (
+            payload.get("expires_at")
+            or payload.get("expires_date")
+            or payload.get("subscription_expires_at")
+            or payload.get("subscription_expires")
+            or payload.get("valid_until")
+            or payload.get("expiry_date")
+        ):
             return None, None, "unknown_product"
-        plan = {
-            "name": {"ru": product_key or "Website subscription", "en": product_key or "Website subscription"},
-            "days": int(days_raw),
-            "price_usdt": float(payload.get("amount") or 0),
-            "emoji": "ðŸŒ",
-        }
+        else:
+            plan = {
+                "name": {
+                    "lv": product_key or "Website subscription",
+                    "ru": product_key or "Website subscription",
+                    "en": product_key or "Website subscription",
+                },
+                "days": int(days_raw or 0),
+                "price_usdt": float(payload.get("amount") or 0),
+                "emoji": "🌐",
+            }
     if days_raw:
         plan["days"] = int(days_raw)
     return product_key or "website_subscription", plan, None
@@ -4219,7 +4244,25 @@ def _webhook_expiry_from_payload(payload: dict):
             return datetime.fromisoformat(normalized + "T23:59:59")
         return datetime.fromisoformat(normalized)
     except Exception:
-        return None
+        pass
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%d.%m.%Y %H:%M:%S",
+        "%d.%m.%Y %H:%M",
+        "%d.%m.%Y",
+        "%Y/%m/%d",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y/%m/%d %H:%M",
+    ):
+        try:
+            parsed = datetime.strptime(value, fmt)
+            if fmt in ("%d.%m.%Y", "%Y/%m/%d"):
+                return parsed.replace(hour=23, minute=59, second=59)
+            return parsed
+        except Exception:
+            continue
+    return None
 
 
 async def website_purchase_webhook(request: web.Request):
@@ -4247,6 +4290,14 @@ async def website_purchase_webhook(request: web.Request):
     amount = float(payload.get("amount") or payload.get("amount_usd") or payload.get("amount_usdt") or 0)
     product_key, plan, plan_error = _webhook_plan_from_payload(payload)
     explicit_expires_at = _webhook_expiry_from_payload(payload)
+    raw_expires_value = (
+        payload.get("expires_at")
+        or payload.get("expires_date")
+        or payload.get("subscription_expires_at")
+        or payload.get("subscription_expires")
+        or payload.get("valid_until")
+        or payload.get("expiry_date")
+    )
 
     if not email or "@" not in email:
         return web.json_response({
@@ -4261,6 +4312,14 @@ async def website_purchase_webhook(request: web.Request):
             "status": "invalid_product",
             "error": plan_error,
             "message": f"Webhook payload could not be mapped to a valid product: {plan_error}.",
+        }, status=400)
+    if raw_expires_value and explicit_expires_at is None:
+        return web.json_response({
+            "ok": False,
+            "status": "invalid_expires_at",
+            "error": "invalid_expires_at",
+            "message": "Webhook expires_at/expires_date format could not be parsed.",
+            "received_value": str(raw_expires_value),
         }, status=400)
     if not event_id:
         event_id = hashlib.sha256(raw_body).hexdigest()
