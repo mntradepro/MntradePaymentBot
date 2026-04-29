@@ -19,6 +19,50 @@ from database import db
 router = Router()
 
 
+DEFAULT_TEXTS = {
+    "welcome": {
+        "lv": (
+            "Laipni lūgts MNtradepro VIP Treideru čatā 🚀\n\n"
+            "💎 Šeit tu iegūsi piekļuvi slēgtai treideru community ar:\n\n"
+            "✅ AI signāliem\n"
+            "✅ Tirgus analītiku\n"
+            "✅ Idejām darījumiem\n"
+            "✅ Atbalstu un pieredzes apmaiņu\n"
+            "✅ Papildu materiāliem un jaunumiem\n\n"
+            "Izvēlies sev piemērotāko plānu un pievienojies VIP čatam 👇\n\n"
+            "Atgādinājums: signāli un analītika nav finanšu konsultācija. Lēmumus par darījumiem pieņem pats."
+        ),
+        "en": (
+            "Welcome to the MNtradepro VIP Traders Chat 🚀\n\n"
+            "💎 Here you get access to a private trading community with:\n\n"
+            "✅ AI signals\n"
+            "✅ Market analysis\n"
+            "✅ Trade ideas\n"
+            "✅ Support and experience sharing\n"
+            "✅ Extra materials and updates\n\n"
+            "Choose the plan that fits you and join the VIP chat 👇\n\n"
+            "Reminder: signals and analysis are not financial advice. You make your own trading decisions."
+        ),
+        "ru": (
+            "Добро пожаловать в VIP чат трейдеров MNtradepro 🚀\n\n"
+            "💎 Здесь ты получишь доступ к закрытому трейдерскому community с:\n\n"
+            "✅ AI сигналами\n"
+            "✅ Аналитикой рынка\n"
+            "✅ Идеями для сделок\n"
+            "✅ Поддержкой и обменом опытом\n"
+            "✅ Дополнительными материалами и новостями\n\n"
+            "Выбери подходящий план и присоединяйся к VIP чату 👇\n\n"
+            "Напоминание: сигналы и аналитика не являются финансовой консультацией. Решения по сделкам принимаешь ты сам."
+        ),
+    },
+    "courses_text": {
+        "lv": "Izvēlies kursu, lai apskatītu detaļas un apmaksas iespējas:",
+        "en": "Choose a course to see details and payment options:",
+        "ru": "Выбери курс, чтобы посмотреть детали и способы оплаты:",
+    },
+}
+
+
 class EditState(StatesGroup):
     waiting_text = State()
     waiting_price = State()
@@ -72,6 +116,13 @@ def back_kb(cb: str = "adm_main"):
     b = InlineKeyboardBuilder()
     b.button(text="Back", callback_data=cb)
     return b.as_markup()
+
+
+async def effective_text(setting_prefix: str, lang: str) -> str:
+    stored = await db.get_setting(f"{setting_prefix}_{lang}")
+    if stored:
+        return stored
+    return DEFAULT_TEXTS.get(setting_prefix, {}).get(lang, "(default)")
 
 
 def menu_kb():
@@ -329,11 +380,15 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
 async def adm_edit_welcome(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
+    current_lv = await effective_text("welcome", "lv")
+    current_en = await effective_text("welcome", "en")
+    current_ru = await effective_text("welcome", "ru")
     text = (
         "<b>Welcome Text</b>\n\n"
-        f"LV:\n<code>{h((await db.get_setting('welcome_lv') or '(default)')[:220])}</code>\n\n"
-        f"EN:\n<code>{h((await db.get_setting('welcome_en') or '(default)')[:220])}</code>\n\n"
-        f"RU:\n<code>{h((await db.get_setting('welcome_ru') or '(default)')[:220])}</code>"
+        "These are the effective texts users see right now.\n\n"
+        f"LV:\n<code>{h(current_lv[:500])}</code>\n\n"
+        f"EN:\n<code>{h(current_en[:500])}</code>\n\n"
+        f"RU:\n<code>{h(current_ru[:500])}</code>"
     )
     b = InlineKeyboardBuilder()
     for code in ("lv", "en", "ru"):
@@ -358,8 +413,14 @@ async def adm_welcome_edit(callback: CallbackQuery, state: FSMContext):
         return
     await state.set_state(EditState.waiting_text)
     await state.update_data(edit_key=f"welcome_{code}", return_cb="adm_edit_welcome")
-    current = await db.get_setting(f"welcome_{code}") or "(default)"
-    await render(callback, f"<b>Edit welcome text {code.upper()}</b>\n\n<code>{h(current[:800])}</code>\n\nSend the new text in your next message.", back_kb("adm_edit_welcome"))
+    current = await effective_text("welcome", code)
+    await render(
+        callback,
+        f"<b>Edit welcome text {code.upper()}</b>\n\n"
+        f"Current effective text:\n<code>{h(current[:1600])}</code>\n\n"
+        f"Send the new text in your next message.",
+        back_kb("adm_edit_welcome"),
+    )
     await callback.answer()
 
 
@@ -367,11 +428,15 @@ async def adm_welcome_edit(callback: CallbackQuery, state: FSMContext):
 async def adm_edit_courses_text(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
+    current_lv = await effective_text("courses_text", "lv")
+    current_en = await effective_text("courses_text", "en")
+    current_ru = await effective_text("courses_text", "ru")
     text = (
         "<b>Courses Text</b>\n\n"
-        f"LV:\n<code>{h((await db.get_setting('courses_text_lv') or '(default)')[:220])}</code>\n\n"
-        f"EN:\n<code>{h((await db.get_setting('courses_text_en') or '(default)')[:220])}</code>\n\n"
-        f"RU:\n<code>{h((await db.get_setting('courses_text_ru') or '(default)')[:220])}</code>"
+        "These are the effective texts users see right now.\n\n"
+        f"LV:\n<code>{h(current_lv[:500])}</code>\n\n"
+        f"EN:\n<code>{h(current_en[:500])}</code>\n\n"
+        f"RU:\n<code>{h(current_ru[:500])}</code>"
     )
     b = InlineKeyboardBuilder()
     for code in ("lv", "en", "ru"):
@@ -396,8 +461,14 @@ async def adm_courses_edit(callback: CallbackQuery, state: FSMContext):
         return
     await state.set_state(EditState.waiting_text)
     await state.update_data(edit_key=f"courses_text_{code}", return_cb="adm_edit_courses_text")
-    current = await db.get_setting(f"courses_text_{code}") or "(default)"
-    await render(callback, f"<b>Edit courses text {code.upper()}</b>\n\n<code>{h(current[:800])}</code>\n\nSend the new text in your next message.", back_kb("adm_edit_courses_text"))
+    current = await effective_text("courses_text", code)
+    await render(
+        callback,
+        f"<b>Edit courses text {code.upper()}</b>\n\n"
+        f"Current effective text:\n<code>{h(current[:1600])}</code>\n\n"
+        f"Send the new text in your next message.",
+        back_kb("adm_edit_courses_text"),
+    )
     await callback.answer()
 
 
