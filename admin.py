@@ -301,8 +301,18 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
     if not is_admin(callback.from_user.id):
         return
     counts = await db.get_active_subscription_counts_by_chat()
+    managed = await db.get_managed_chats()
+    rows = list(configured_chat_rows())
+    seen = {chat_id for _, chat_id, _ in rows}
+    for item in managed:
+        chat_id = int(item.get("chat_id") or 0)
+        if not chat_id or chat_id in seen:
+            continue
+        seen.add(chat_id)
+        label = f"Managed: {item.get('title') or item.get('username') or chat_id}"
+        rows.append((label, chat_id, item.get("invite_link") or ""))
     lines = []
-    for label, chat_id, link in configured_chat_rows():
+    for label, chat_id, link in rows:
         joined, title = "No", "Unknown"
         try:
             chat = await bot.get_chat(chat_id)

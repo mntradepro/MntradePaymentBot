@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 REFERRAL_BONUS_DAYS = 0
 SUPPORTED_LANGS = ("ru", "en", "lv")
 DEFAULT_LANG = "lv"
+SUBSCRIPTION_GRACE_DAYS = 5
 VIP_CHANNEL_LANGS = ("lv", "ru")
 VIP_CHANNEL_LABELS = {
     "lv": "ðŸ‡±ðŸ‡» LatvieÅ¡u",
@@ -227,6 +228,7 @@ TEXTS["ru"].update({
     "status_none": "❌ У тебя нет активной подписки.\n\nИспользуй /start, чтобы купить доступ.",
     "btn_back": "🔙 Назад",
     "support": "📩 *Поддержка*\n\nЕсли есть вопросы, напиши: https://t.me/mntrade_support",
+    "kicked": "😔 *С сожалением сообщаем, что сейчас доступ в чат для вас закрыт.*\n\nБудем рады видеть вас снова.\n\nКак только поступит оплата за продление подписки, вам придёт сообщение, и вы сможете получить новую ссылку, чтобы снова присоединиться к чату.",
 })
 
 TEXTS["en"].update({
@@ -239,6 +241,7 @@ TEXTS["en"].update({
     "status_none": "❌ You do not have an active subscription.\n\nUse /start to purchase access.",
     "btn_back": "🔙 Back",
     "support": "📩 *Support*\n\nIf you have questions, write: https://t.me/mntrade_support",
+    "kicked": "😔 *We are sorry to let you know that your access to the chat is currently closed.*\n\nWe will be glad to welcome you back.\n\nAs soon as payment for the subscription renewal is received, you will get a message and will be able to receive a new link to join the chat again.",
 })
 
 # Clean runtime overrides for user-facing labels/texts after earlier encoding damage.
@@ -255,6 +258,7 @@ TEXTS["lv"].update({
     "status_none": "❌ Tev nav aktīva abonementa.\n\nIzmanto /start, lai iegādātos piekļuvi.",
     "btn_back": "🔙 Atpakaļ",
     "support": "📩 *Atbalsts*\n\nJa rodas jautājumi, raksti: https://t.me/mntrade_support",
+    "kicked": "😔 *Ar nožēlu paziņojam, ka šobrīd pieeja čatam Jums ir slēgta.*\n\nPriecāsimies Jūs redzēt atpakaļ.\n\nTiklīdz tiks saņemta apmaksa par abonēšanas pagarinājumu, Jums atnāks ziņa, un Jūs varēsiet iegūt jaunu linku, lai pievienotos čatam atpakaļ.",
 })
 
 TEXTS["ru"].update({
@@ -459,6 +463,22 @@ def chat_id_for_lang(lang):
 
 def chat_link_for_lang(lang):
     return config.chat_link_for_lang(lang) if hasattr(config, "chat_link_for_lang") else config.CHAT_LINK
+
+
+def chat_public_link(chat) -> str:
+    username = getattr(chat, "username", None)
+    if username:
+        return f"https://t.me/{username}"
+    invite_link = getattr(chat, "invite_link", None)
+    return invite_link or ""
+
+
+async def user_is_chat_admin(chat_id: int, user_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(chat_id, user_id)
+        return getattr(member, "status", "") in {"administrator", "creator"}
+    except Exception:
+        return False
 
 async def checkout_url_for_lang(lang):
     return (await db.get_setting(f"checkout_url_{lang}")) or ""
@@ -1237,6 +1257,38 @@ async def cmd_id(message: Message):
     else:
         text = f"ðŸ†” *Your Telegram ID:*\n\n`{message.from_user.id}`\n\n_Copy and send to admin if needed._"
     await message.answer(text, parse_mode="Markdown")
+
+
+@dp.message(Command(commands=["STARTPAYMENT", "startpayment"]))
+async def cmd_startpayment(message: Message):
+    if message.chat.type == "private":
+        await message.answer("Use this command inside the target group or channel discussion chat.")
+        return
+    if not await user_is_chat_admin(message.chat.id, message.from_user.id):
+        await message.answer("Only a chat admin can use this command here.")
+        return
+    chat = await bot.get_chat(message.chat.id)
+    await db.register_managed_chat(
+        chat_id=message.chat.id,
+        title=getattr(chat, "title", None) or getattr(message.chat, "title", None) or str(message.chat.id),
+        username=getattr(chat, "username", None) or "",
+        chat_type=message.chat.type,
+        invite_link=chat_public_link(chat),
+        added_by_user_id=message.from_user.id,
+    )
+    await message.answer("This chat is now registered as a managed payment chat.")
+
+
+@dp.message(Command(commands=["DELETEPAYMENT", "deletepayment"]))
+async def cmd_deletepayment(message: Message):
+    if message.chat.type == "private":
+        await message.answer("Use this command inside the target group or channel discussion chat.")
+        return
+    if not await user_is_chat_admin(message.chat.id, message.from_user.id):
+        await message.answer("Only a chat admin can use this command here.")
+        return
+    await db.delete_managed_chat(message.chat.id)
+    await message.answer("This chat was removed from managed payment chats.")
 
 @dp.message(Command("help"))
 async def cmd_help(message: Message):
@@ -3148,6 +3200,7 @@ async def send_upsell_offers():
         except Exception as e: logger.error(f"Upsell {user['user_id']}: {e}")
 
 async def kick_expired_users():
+    now = datetime.utcnow()
     for user in await db.get_expired_chat_subscriptions():
         if user.get("is_friend"): continue
         # ADMIN AIZSARDZÄªBA â€” nekad nebanoj adminus
@@ -3155,6 +3208,33 @@ async def kick_expired_users():
             logger.info(f"Skip admin {user['user_id']} â€” cannot kick admin")
             continue
         try:
+            expires_dt = datetime.fromisoformat(user["expires_at"])
+            grace_until = expires_dt + timedelta(days=SUBSCRIPTION_GRACE_DAYS)
+            if now < grace_until:
+                reminder_sent_at = user.get("grace_reminder_sent_at")
+                should_remind = True
+                if reminder_sent_at:
+                    try:
+                        reminded_dt = datetime.fromisoformat(reminder_sent_at)
+                        should_remind = reminded_dt.date() < now.date()
+                    except Exception:
+                        should_remind = True
+                if should_remind:
+                    days_left = max(0, (grace_until - now).days)
+                    rlang = user.get("lang", "lv")
+                    reminder_text = ui_text(
+                        rlang,
+                        f"⚠️ Maksājums par abonementa pagarināšanu vēl nav saņemts.\n\nTava piekļuve beidzās: *{expires_dt.strftime('%d.%m.%Y')}*\nGrace periods: *{SUBSCRIPTION_GRACE_DAYS} dienas*\nAtlikušas aptuveni: *{days_left}* dienas.\n\nJa apmaksa neatnāks, bots pēc grace perioda beigām izņems tevi no čata.",
+                        f"⚠️ Оплата за продление подписки еще не получена.\n\nТвой доступ закончился: *{expires_dt.strftime('%d.%m.%Y')}*\nGrace period: *{SUBSCRIPTION_GRACE_DAYS} дней*\nОсталось примерно: *{days_left}* дней.\n\nЕсли оплата не поступит, бот удалит тебя из чата после окончания grace period.",
+                        f"⚠️ Payment for subscription renewal has not been received yet.\n\nYour access expired on: *{expires_dt.strftime('%d.%m.%Y')}*\nGrace period: *{SUBSCRIPTION_GRACE_DAYS} days*\nRoughly remaining: *{days_left}* days.\n\nIf no payment arrives, the bot will remove you from the chat after the grace period ends.",
+                    )
+                    try:
+                        await bot.send_message(user["user_id"], reminder_text, parse_mode="Markdown")
+                    except Exception as e:
+                        logger.warning(f"Grace reminder failed user={user['user_id']}: {e}")
+                    await db.mark_grace_reminder_sent(user["id"])
+                    await db.log_bot_event("grace_reminder", user["user_id"], meta=f"sub_id={user['id']}")
+                continue
             chat_id = int(user.get("chat_id") or 0)
             if chat_id:
                 try:

@@ -103,6 +103,7 @@ class Database:
                     activated_at  TEXT NOT NULL,
                     expires_at    TEXT NOT NULL,
                     is_active     INTEGER DEFAULT 1,
+                    grace_reminder_sent_at TEXT,
                     tx_hash       TEXT,
                     payment_system TEXT,
                     UNIQUE(user_id, product_key)
@@ -149,6 +150,19 @@ class Database:
                 CREATE TABLE IF NOT EXISTS bot_settings (
                     key   TEXT PRIMARY KEY,
                     value TEXT
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS managed_chats (
+                    chat_id            INTEGER PRIMARY KEY,
+                    title              TEXT,
+                    username           TEXT,
+                    chat_type          TEXT,
+                    invite_link        TEXT,
+                    added_by_user_id   INTEGER,
+                    is_active          INTEGER DEFAULT 1,
+                    added_at           TEXT DEFAULT (datetime('now')),
+                    removed_at         TEXT
                 )
             """)
             await conn.execute("""
@@ -204,6 +218,7 @@ class Database:
                 "ALTER TABLE users ADD COLUMN email TEXT",
                 "ALTER TABLE users ADD COLUMN email_registered_at TEXT",
                 "ALTER TABLE users ADD COLUMN last_seen_at TEXT",
+                "ALTER TABLE user_subscriptions ADD COLUMN grace_reminder_sent_at TEXT",
             ]:
                 try:
                     await conn.execute(col_sql)
@@ -711,6 +726,54 @@ class Database:
                 JOIN users u ON u.user_id = us.user_id
                 WHERE us.is_active = 1 AND us.expires_at < ? AND COALESCE(us.chat_id, 0) != 0
             """, (now,)) as cur:
+                return [dict(row) for row in await cur.fetchall()]
+
+    async def mark_grace_reminder_sent(self, subscription_id: int):
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute(
+                "UPDATE user_subscriptions SET grace_reminder_sent_at = ? WHERE id = ?",
+                (now, subscription_id),
+            )
+            await conn.commit()
+
+    async def register_managed_chat(self, chat_id: int, title: str, username: str, chat_type: str, invite_link: str, added_by_user_id: int):
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT INTO managed_chats (chat_id, title, username, chat_type, invite_link, added_by_user_id, is_active, added_at, removed_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, NULL)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    title = excluded.title,
+                    username = excluded.username,
+                    chat_type = excluded.chat_type,
+                    invite_link = excluded.invite_link,
+                    added_by_user_id = excluded.added_by_user_id,
+                    is_active = 1,
+                    added_at = excluded.added_at,
+                    removed_at = NULL
+            """, (chat_id, title, username, chat_type, invite_link, added_by_user_id, now))
+            await conn.commit()
+
+    async def delete_managed_chat(self, chat_id: int):
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute(
+                "UPDATE managed_chats SET is_active = 0, removed_at = ? WHERE chat_id = ?",
+                (now, chat_id),
+            )
+            await conn.commit()
+
+    async def get_managed_chats(self, active_only: bool = True) -> List[Dict]:
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            if active_only:
+                query = "SELECT * FROM managed_chats WHERE is_active = 1 ORDER BY added_at DESC"
+                params = ()
+            else:
+                query = "SELECT * FROM managed_chats ORDER BY added_at DESC"
+                params = ()
+            async with conn.execute(query, params) as cur:
                 return [dict(row) for row in await cur.fetchall()]
 
     async def mark_subscription_inactive(self, subscription_id: int):
