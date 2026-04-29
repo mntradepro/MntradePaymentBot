@@ -62,6 +62,44 @@ DEFAULT_TEXTS = {
     },
 }
 
+DEFAULT_TEXTS.update({
+    "vip_intro": {
+        "lv": "💎 *Izvēlies VIP čatu:*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski piesaistīs piekļuvi pēc tava e-pasta.",
+        "en": "💎 *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.",
+        "ru": "💎 *Выбери VIP чат:*\n\nПокупка происходит на сайте. После оплаты бот автоматически привяжет доступ по твоему e-mail.",
+    },
+    "scanner_text": {
+        "lv": "📡 *Tirgus Skaneris/AI signāli*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski iedos jaunu piekļuvi.",
+        "en": "📡 *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
+        "ru": "📡 *Сканер рынка/AI сигналы*\n\nПокупка происходит на сайте. После оплаты бот автоматически выдаст доступ.",
+    },
+    "payment_success": {
+        "lv": "✅ *Paldies! Jūsu abonements ir pagarināts.*\n\n📦 Produkts: *{name}*\n📅 Aktīvs līdz: *{expires}*",
+        "en": "✅ *Thank you! Your subscription has been extended.*\n\n📦 Product: *{name}*\n📅 Active until: *{expires}*",
+        "ru": "✅ *Спасибо! Ваша подписка продлена.*\n\n📦 Продукт: *{name}*\n📅 Активно до: *{expires}*",
+    },
+    "kick_message": {
+        "lv": "😔 *Ar nožēlu paziņojam, ka šobrīd pieeja čatam Jums ir slēgta.*\n\nPriecāsimies Jūs redzēt atpakaļ.\n\nTiklīdz tiks saņemta apmaksa par abonēšanas pagarinājumu, Jums atnāks ziņa, un Jūs varēsiet iegūt jaunu linku, lai pievienotos čatam atpakaļ.",
+        "en": "😔 *We are sorry to let you know that your access to the chat is currently closed.*\n\nWe will be glad to welcome you back.\n\nAs soon as payment for the subscription renewal is received, you will get a message and will be able to receive a new link to join the chat again.",
+        "ru": "😔 *С сожалением сообщаем, что сейчас доступ в чат для вас закрыт.*\n\nБудем рады видеть вас снова.\n\nКак только поступит оплата за продление подписки, вам придёт сообщение, и вы сможете получить новую ссылку, чтобы снова присоединиться к чату.",
+    },
+    "grace_reminder": {
+        "lv": "⚠️ Maksājums par abonementa pagarināšanu vēl nav saņemts.\n\nTava piekļuve beidzās: *{expires}*\nGrace periods: *{grace_days} dienas*\nAtlikušas aptuveni: *{days_left}* dienas.\n\nJa apmaksa neatnāks, bots pēc grace perioda beigām izņems tevi no čata.",
+        "en": "⚠️ Payment for subscription renewal has not been received yet.\n\nYour access expired on: *{expires}*\nGrace period: *{grace_days} days*\nRoughly remaining: *{days_left}* days.\n\nIf no payment arrives, the bot will remove you from the chat after the grace period ends.",
+        "ru": "⚠️ Оплата за продление подписки еще не получена.\n\nТвой доступ закончился: *{expires}*\nGrace period: *{grace_days} дней*\nОсталось примерно: *{days_left}* дней.\n\nЕсли оплата не поступит, бот удалит тебя из чата после окончания grace period.",
+    },
+})
+
+TEXT_GROUPS = [
+    ("welcome", "Welcome"),
+    ("vip_intro", "VIP Intro"),
+    ("scanner_text", "Scanner"),
+    ("courses_text", "Courses"),
+    ("payment_success", "Payment Success"),
+    ("kick_message", "Kick Message"),
+    ("grace_reminder", "Grace Reminder"),
+]
+
 
 class EditState(StatesGroup):
     waiting_text = State()
@@ -125,6 +163,26 @@ async def effective_text(setting_prefix: str, lang: str) -> str:
     return DEFAULT_TEXTS.get(setting_prefix, {}).get(lang, "(default)")
 
 
+async def render_text_group(callback: CallbackQuery, group_key: str, title: str):
+    current_lv = await effective_text(group_key, "lv")
+    current_en = await effective_text(group_key, "en")
+    current_ru = await effective_text(group_key, "ru")
+    text = (
+        f"<b>{h(title)} Text</b>\n\n"
+        "These are the effective texts users see right now.\n\n"
+        f"LV:\n<code>{h(current_lv[:500])}</code>\n\n"
+        f"EN:\n<code>{h(current_en[:500])}</code>\n\n"
+        f"RU:\n<code>{h(current_ru[:500])}</code>"
+    )
+    b = InlineKeyboardBuilder()
+    for code in ("lv", "en", "ru"):
+        b.button(text=f"Edit {code.upper()}", callback_data=f"adm_text_edit_{group_key}_{code}")
+    b.button(text="Reset All", callback_data=f"adm_text_reset_{group_key}")
+    b.button(text="Back", callback_data="adm_texts")
+    b.adjust(2, 2)
+    await render(callback, text, b.as_markup())
+
+
 def menu_kb():
     b = InlineKeyboardBuilder()
     for text, cb in [
@@ -134,8 +192,7 @@ def menu_kb():
         ("Users", "adm_users"),
         ("Pending Purchases", "adm_pending_email_users"),
         ("Chats", "adm_chats"),
-        ("Welcome Text", "adm_edit_welcome"),
-        ("Courses Text", "adm_edit_courses_text"),
+        ("Texts", "adm_texts"),
         ("Promo Codes", "adm_promo_menu"),
         ("Checkout Links", "adm_edit_prices"),
         ("Export CSV", "adm_export_excel"),
@@ -380,23 +437,7 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
 async def adm_edit_welcome(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
-    current_lv = await effective_text("welcome", "lv")
-    current_en = await effective_text("welcome", "en")
-    current_ru = await effective_text("welcome", "ru")
-    text = (
-        "<b>Welcome Text</b>\n\n"
-        "These are the effective texts users see right now.\n\n"
-        f"LV:\n<code>{h(current_lv[:500])}</code>\n\n"
-        f"EN:\n<code>{h(current_en[:500])}</code>\n\n"
-        f"RU:\n<code>{h(current_ru[:500])}</code>"
-    )
-    b = InlineKeyboardBuilder()
-    for code in ("lv", "en", "ru"):
-        b.button(text=f"Edit {code.upper()}", callback_data=f"adm_welcome_{code}")
-    b.button(text="Reset All", callback_data="adm_welcome_reset")
-    b.button(text="Back", callback_data="adm_main")
-    b.adjust(2, 2)
-    await render(callback, text, b.as_markup())
+    await render_text_group(callback, "welcome", "Welcome")
     await callback.answer()
 
 
@@ -428,23 +469,69 @@ async def adm_welcome_edit(callback: CallbackQuery, state: FSMContext):
 async def adm_edit_courses_text(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
-    current_lv = await effective_text("courses_text", "lv")
-    current_en = await effective_text("courses_text", "en")
-    current_ru = await effective_text("courses_text", "ru")
-    text = (
-        "<b>Courses Text</b>\n\n"
-        "These are the effective texts users see right now.\n\n"
-        f"LV:\n<code>{h(current_lv[:500])}</code>\n\n"
-        f"EN:\n<code>{h(current_en[:500])}</code>\n\n"
-        f"RU:\n<code>{h(current_ru[:500])}</code>"
-    )
+    await render_text_group(callback, "courses_text", "Courses")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "adm_texts")
+async def adm_texts(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    lines = []
+    for key, title in TEXT_GROUPS:
+        lines.append(f"• <b>{h(title)}</b> — setting prefix: <code>{h(key)}</code>")
     b = InlineKeyboardBuilder()
-    for code in ("lv", "en", "ru"):
-        b.button(text=f"Edit {code.upper()}", callback_data=f"adm_courses_{code}")
-    b.button(text="Reset All", callback_data="adm_courses_reset")
+    for key, title in TEXT_GROUPS:
+        b.button(text=title, callback_data=f"adm_text_group_{key}")
     b.button(text="Back", callback_data="adm_main")
-    b.adjust(2, 2)
-    await render(callback, text, b.as_markup())
+    b.adjust(2)
+    await render(
+        callback,
+        "<b>Texts</b>\n\nChoose which user-facing text block you want to view or edit.\n\n" + "\n".join(lines),
+        b.as_markup(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_text_group_"))
+async def adm_text_group(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    group_key = callback.data.replace("adm_text_group_", "")
+    title = next((title for key, title in TEXT_GROUPS if key == group_key), group_key)
+    await render_text_group(callback, group_key, title)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_text_reset_"))
+async def adm_text_reset(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    group_key = callback.data.replace("adm_text_reset_", "")
+    for lang in ("lv", "en", "ru"):
+        await db.set_setting(f"{group_key}_{lang}", "")
+    title = next((title for key, title in TEXT_GROUPS if key == group_key), group_key)
+    await callback.answer(f"{title} texts reset")
+    await render_text_group(callback, group_key, title)
+
+
+@router.callback_query(F.data.startswith("adm_text_edit_"))
+async def adm_text_edit(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    payload = callback.data.replace("adm_text_edit_", "")
+    group_key, code = payload.rsplit("_", 1)
+    title = next((title for key, title in TEXT_GROUPS if key == group_key), group_key)
+    await state.set_state(EditState.waiting_text)
+    await state.update_data(edit_key=f"{group_key}_{code}", return_cb=f"adm_text_group_{group_key}")
+    current = await effective_text(group_key, code)
+    await render(
+        callback,
+        f"<b>Edit {h(title)} text {code.upper()}</b>\n\n"
+        f"Current effective text:\n<code>{h(current[:1600])}</code>\n\n"
+        f"Send the new text in your next message.",
+        back_kb(f"adm_text_group_{group_key}"),
+    )
     await callback.answer()
 
 

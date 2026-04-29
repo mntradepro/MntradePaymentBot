@@ -315,6 +315,15 @@ async def inactive_welcome_text(lang, name):
     return t(lang, "inactive_welcome", name=name)
 
 
+async def override_text(setting_key: str, lang: str, default_text: str, **kwargs) -> str:
+    custom = await db.get_setting(f"{setting_key}_{lang}")
+    text = custom or default_text
+    try:
+        return text.format(**kwargs) if kwargs else text
+    except Exception:
+        return text
+
+
 async def build_active_access_text(user_id: int, lang: str, name: str = None) -> str:
     user = await db.get_user(user_id)
     active_subs = await db.get_active_user_subscriptions(user_id)
@@ -1332,12 +1341,13 @@ async def cb_market_scanner(callback: CallbackQuery):
         )
         return
     checkout_url = await checkout_url_for_subscription_product("scanner_chat", lang)
-    text = ui_text(
+    default_text = ui_text(
         lang,
         "📡 *Tirgus Skaneris/AI signāli*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski iedos jaunu piekļuvi.",
         "📡 *Сканер рынка/AI сигналы*\n\nПокупка происходит на сайте. После оплаты бот автоматически выдаст доступ.",
         "📡 *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
     )
+    text = await override_text("scanner_text", lang, default_text)
     b = InlineKeyboardBuilder()
     if checkout_url:
         b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), url=checkout_url)
@@ -2120,20 +2130,21 @@ async def courses_menu(callback: CallbackQuery):
     ui_lang = _course_ui_lang(lang)
     
     if ui_lang == "lv":
-        text = (
+        default_text = (
             "📚 *MNtradepro kursi*\n\n"
             "Izvēlies kursu, lai apskatītu detaļas un apmaksas iespējas:"
         )
     elif ui_lang == "ru":
-        text = (
+        default_text = (
             "📚 *Курсы MNtradepro*\n\n"
             "Выбери курс, чтобы посмотреть детали и способы оплаты:"
         )
     else:
-        text = (
+        default_text = (
             "📚 *MNtradepro Courses*\n\n"
             "Choose a course to see details and payment options:"
         )
+    text = await override_text("courses_text", ui_lang, default_text)
     
     b = InlineKeyboardBuilder()
     # RÄdÄm visus kursus
@@ -2988,13 +2999,14 @@ async def show_vip_chat_plans(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=main_menu_keyboard(lang), parse_mode="Markdown")
         await callback.answer()
         return
-    text = (
+    default_text = (
         "💎 *Izvēlies VIP čatu:*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski piesaistīs piekļuvi pēc tava e-pasta."
         if lang == "lv" else
         ("💎 *Выбери VIP чат:*\n\nПокупка происходит на сайте. После оплаты бот автоматически привяжет доступ по твоему e-mail."
          if lang == "ru" else
          "💎 *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
     )
+    text = await override_text("vip_intro", lang, default_text)
     await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
     await callback.answer()
 
@@ -3225,11 +3237,19 @@ async def kick_expired_users():
                 if should_remind:
                     days_left = max(0, (grace_until - now).days)
                     rlang = user.get("lang", "lv")
-                    reminder_text = ui_text(
+                    default_reminder_text = ui_text(
                         rlang,
                         f"⚠️ Maksājums par abonementa pagarināšanu vēl nav saņemts.\n\nTava piekļuve beidzās: *{expires_dt.strftime('%d.%m.%Y')}*\nGrace periods: *{SUBSCRIPTION_GRACE_DAYS} dienas*\nAtlikušas aptuveni: *{days_left}* dienas.\n\nJa apmaksa neatnāks, bots pēc grace perioda beigām izņems tevi no čata.",
                         f"⚠️ Оплата за продление подписки еще не получена.\n\nТвой доступ закончился: *{expires_dt.strftime('%d.%m.%Y')}*\nGrace period: *{SUBSCRIPTION_GRACE_DAYS} дней*\nОсталось примерно: *{days_left}* дней.\n\nЕсли оплата не поступит, бот удалит тебя из чата после окончания grace period.",
                         f"⚠️ Payment for subscription renewal has not been received yet.\n\nYour access expired on: *{expires_dt.strftime('%d.%m.%Y')}*\nGrace period: *{SUBSCRIPTION_GRACE_DAYS} days*\nRoughly remaining: *{days_left}* days.\n\nIf no payment arrives, the bot will remove you from the chat after the grace period ends.",
+                    )
+                    reminder_text = await override_text(
+                        "grace_reminder",
+                        rlang,
+                        default_reminder_text,
+                        expires=expires_dt.strftime('%d.%m.%Y'),
+                        grace_days=SUBSCRIPTION_GRACE_DAYS,
+                        days_left=days_left,
                     )
                     try:
                         await bot.send_message(user["user_id"], reminder_text, parse_mode="Markdown")
@@ -3246,7 +3266,13 @@ async def kick_expired_users():
                 except Exception as e:
                     logger.warning(f"Kick failed chat={chat_id} user={user['user_id']}: {e}")
             await db.mark_subscription_inactive(user['id'])
-            try: await bot.send_message(user['user_id'], t(user.get("lang","ru"), "kicked"), reply_markup=plans_keyboard(user.get("lang","ru")), parse_mode="Markdown")
+            try:
+                kicked_text = await override_text(
+                    "kick_message",
+                    user.get("lang", "ru"),
+                    t(user.get("lang", "ru"), "kicked"),
+                )
+                await bot.send_message(user['user_id'], kicked_text, reply_markup=plans_keyboard(user.get("lang","ru")), parse_mode="Markdown")
             except: pass
             username = f"@{user['username']}" if user.get("username") else f"ID {user['user_id']}"
             expires_at = user.get("expires_at", "")
@@ -4328,7 +4354,15 @@ async def website_purchase_webhook(request: web.Request):
 
     try:
         invite = await invite_text_for_product(user["user_id"], lang, product_meta, new_exp)
-        await bot.send_message(user["user_id"], t(lang, "paid_ok", name=plan_name, expires=new_exp.strftime("%d.%m.%Y"), tx=event_id[:20]) + invite, parse_mode="Markdown")
+        paid_text = await override_text(
+            "payment_success",
+            lang,
+            t(lang, "paid_ok", name=plan_name, expires=new_exp.strftime("%d.%m.%Y"), tx=event_id[:20]),
+            name=plan_name,
+            expires=new_exp.strftime("%d.%m.%Y"),
+            tx=event_id[:20],
+        )
+        await bot.send_message(user["user_id"], paid_text + invite, parse_mode="Markdown")
     except Exception as e:
         logger.warning(f"Failed to notify webhook buyer {user['user_id']}: {e}")
         await notify_admins_error(f"webhook_notify_user user={user['user_id']} product={product_key}", e)
