@@ -553,6 +553,50 @@ def resolve_subscription_product(product_key: str, user_lang: str) -> dict:
     return {"product_key": key, **meta}
 
 
+def _slugify_chat_key(value: str) -> str:
+    value = (value or "").strip().lower()
+    return "".join(ch for ch in value if ch.isalnum())
+
+
+async def resolve_subscription_product_any(product_key: str, user_lang: str) -> dict:
+    meta = resolve_subscription_product(product_key, user_lang)
+    if meta:
+        return meta
+
+    wanted = _slugify_chat_key(product_key)
+    if not wanted:
+        return {}
+
+    try:
+        managed_chats = await db.get_managed_chats(active_only=True)
+    except Exception:
+        return {}
+
+    for chat in managed_chats:
+        title = str(chat.get("title") or "")
+        username = str(chat.get("username") or "")
+        invite_link = str(chat.get("invite_link") or "")
+        candidates = {
+            _slugify_chat_key(title),
+            _slugify_chat_key(username),
+            _slugify_chat_key(invite_link),
+            _slugify_chat_key(str(chat.get("chat_id") or "")),
+        }
+        if wanted in candidates:
+            label = title or username or product_key or "Managed Chat"
+            return {
+                "product_key": product_key,
+                "chat_id": int(chat.get("chat_id") or 0),
+                "chat_link": invite_link,
+                "name": {
+                    "lv": label,
+                    "ru": label,
+                    "en": label,
+                },
+            }
+    return {}
+
+
 async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, expires_at: datetime) -> str:
     if not product_meta:
         return ""
@@ -594,7 +638,7 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
             payment_system=sub.get("payment_system", "") or "webhook",
         )
         await db.deactivate_pending_email_subscription(sub["id"])
-        product_meta = resolve_subscription_product(sub.get("product_key") or "", lang)
+        product_meta = await resolve_subscription_product_any(sub.get("product_key") or "", lang)
         if not product_meta and (sub.get("chat_id") or sub.get("chat_link")):
             product_meta = {
                 "product_key": sub.get("product_key") or "website_subscription",
@@ -1523,7 +1567,7 @@ async def get_access_links(callback: CallbackQuery):
             expires_at = datetime.fromisoformat(sub["expires_at"])
         except Exception:
             continue
-        product_meta = resolve_subscription_product(sub.get("product_key") or "", lang)
+        product_meta = await resolve_subscription_product_any(sub.get("product_key") or "", lang)
         if not product_meta and (sub.get("chat_id") or sub.get("chat_link")):
             product_meta = {
                 "product_key": sub.get("product_key") or "website_subscription",
@@ -4186,7 +4230,7 @@ def _webhook_plan_from_payload(payload: dict):
     if product_key in config.PLANS:
         plan = dict(config.PLANS[product_key])
     else:
-        product_meta = resolve_subscription_product(product_key, "lv")
+        product_meta = await resolve_subscription_product_any(product_key, "lv")
         if product_meta:
             localized_name = product_meta.get("name", {})
             plan = {
@@ -4347,7 +4391,7 @@ async def website_purchase_webhook(request: web.Request):
 
     user = await db.get_user_by_email(email)
     if not user:
-        product_meta = resolve_subscription_product(product_key, "lv")
+        product_meta = await resolve_subscription_product_any(product_key, "lv")
         pending_existing = await db.get_pending_email_subscription(email, product_key)
         now = datetime.utcnow()
         if explicit_expires_at is not None:
