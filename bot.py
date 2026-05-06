@@ -597,8 +597,12 @@ async def resolve_subscription_product_any(product_key: str, user_lang: str) -> 
     return {}
 
 
-async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, expires_at: datetime) -> str:
+async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, expires_at: datetime, debug_source: str = "") -> str:
     if not product_meta:
+        await notify_admins_error(
+            f"invite_meta_missing source={debug_source or 'unknown'} user={user_id}",
+            "No product metadata was resolved for invite link generation",
+        )
         return ""
     chat_id = int(product_meta.get("chat_id") or 0)
     chat_link = product_meta.get("chat_link") or ""
@@ -610,9 +614,18 @@ async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, e
         try:
             link = await bot.create_chat_invite_link(chat_id, member_limit=1, expire_date=int((expires_at + timedelta(days=7)).timestamp()))
             return t(lang, "invite", link=link.invite_link)
-        except Exception:
-            pass
-    return f"\n\nðŸ“¢ {chat_link}" if chat_link else ""
+        except Exception as e:
+            await notify_admins_error(
+                f"invite_create_failed source={debug_source or 'unknown'} user={user_id} product={product_meta.get('product_key') or ''} chat_id={chat_id}",
+                f"{e}\nchat_link={chat_link or '-'}\nexpires_at={expires_at.isoformat()}",
+            )
+    if chat_link:
+        return f"\n\nðŸ“¢ {chat_link}"
+    await notify_admins_error(
+        f"invite_target_missing source={debug_source or 'unknown'} user={user_id} product={product_meta.get('product_key') or ''}",
+        f"chat_id={chat_id}\nchat_link=-\nexpires_at={expires_at.isoformat()}",
+    )
+    return ""
 
 
 async def attach_pending_email_purchases(user_id: int, email: str, lang: str, username: str = ""):
@@ -656,7 +669,13 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
                 },
             }
         try:
-            invite = await invite_text_for_product(user_id, lang, product_meta, expires_at)
+            invite = await invite_text_for_product(
+                user_id,
+                lang,
+                product_meta,
+                expires_at,
+                debug_source=f"claim_pending email={email} product={sub.get('product_key') or ''}",
+            )
             if invite:
                 product_name = sub.get("product_name") or sub.get("product_key") or "Access"
                 invite_text = ui_text(
@@ -1579,7 +1598,13 @@ async def get_access_links(callback: CallbackQuery):
                 "chat_id": sub.get("chat_id", 0) or 0,
                 "chat_link": sub.get("chat_link", "") or "",
             }
-        invite = await invite_text_for_product(user_id, lang, product_meta, expires_at)
+        invite = await invite_text_for_product(
+            user_id,
+            lang,
+            product_meta,
+            expires_at,
+            debug_source=f"get_access_links product={sub.get('product_key') or ''}",
+        )
         if not invite:
             continue
         product_name = sub.get("product_name") or sub.get("product_key") or "Access"
@@ -3010,7 +3035,13 @@ async def _confirm_payment(user_id, plan_key, plan, lang, msg, username):
             paid = await check_payment(config.CRYPTO_WALLET, plan['price_usdt'], user_id)
             if paid:
                 new_exp, plan_name_loc, product_meta = await _do_activate(user_id, plan_key, plan, lang, username, paid, plan['price_usdt'])
-                inv = await invite_text_for_product(user_id, lang, product_meta, new_exp)
+                inv = await invite_text_for_product(
+                    user_id,
+                    lang,
+                    product_meta,
+                    new_exp,
+                    debug_source=f"renewal_notice user={user_id} product={pk}",
+                )
                 txt = t(lang, "paid_ok", name=plan_name_loc, expires=new_exp.strftime('%d.%m.%Y'), tx=paid[:20]) + inv
                 try: await msg.edit_text(txt, parse_mode="Markdown")
                 except: await bot.send_message(user_id, txt, parse_mode="Markdown")
@@ -3186,7 +3217,13 @@ async def auto_check_pending_payments():
                     # ÄŒata abonements
                     plan = config.PLANS[pk]
                     new_exp, pname, product_meta = await _do_activate(uid, pk, plan, lang, username, tx, amount)
-                    inv = await invite_text_for_product(uid, lang, product_meta, new_exp)
+                    inv = await invite_text_for_product(
+                        uid,
+                        lang,
+                        product_meta,
+                        new_exp,
+                        debug_source=f"auto_check user={uid} product={pk}",
+                    )
                     await bot.send_message(uid, t(lang, "auto_found", name=pname, expires=new_exp.strftime('%d.%m.%Y'), tx=tx[:20]) + inv, parse_mode="Markdown")
 
                 logger.info(f"[AUTO-CHECK] user={uid} TX={tx[:20]} plan={pk}")
@@ -4461,7 +4498,13 @@ async def website_purchase_webhook(request: web.Request):
         raise
 
     try:
-        invite = await invite_text_for_product(user["user_id"], lang, product_meta, new_exp)
+        invite = await invite_text_for_product(
+            user["user_id"],
+            lang,
+            product_meta,
+            new_exp,
+            debug_source=f"webhook_paid email={email} product={product_key}",
+        )
         paid_text = await override_text(
             "payment_success",
             lang,

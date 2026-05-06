@@ -374,7 +374,16 @@ async def adm_user_view(callback: CallbackQuery):
         await callback.answer("User not found", show_alert=True)
         return
     subs = await db.get_active_user_subscriptions(user["user_id"])
-    rows = "\n".join(f"- {h(s.get('product_name') or s.get('product_key'))} | exp. {fmt_dt(s.get('expires_at'), True)} | chat {s.get('chat_id', 0)}" for s in subs) or "None"
+    rows = "\n\n".join(
+        (
+            f"- <b>{h(s.get('product_name') or s.get('product_key') or 'Subscription')}</b>\n"
+            f"  key: <code>{h(s.get('product_key') or '-')}</code>\n"
+            f"  exp: {fmt_dt(s.get('expires_at'), True)}\n"
+            f"  chat_id: <code>{h(str(s.get('chat_id', 0) or 0))}</code>\n"
+            f"  chat_link: <code>{h((s.get('chat_link') or '-')[:120])}</code>"
+        )
+        for s in subs
+    ) or "None"
     text = (
         f"<b>User {user['user_id']}</b>\n\n"
         f"Username: {h('@' + user['username']) if user.get('username') else '-'}\n"
