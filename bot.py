@@ -625,6 +625,12 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
             expires_at = datetime.fromisoformat(sub["expires_at"])
         except Exception:
             continue
+        product_meta = await resolve_subscription_product_any(sub.get("product_key") or "", lang)
+        target_chat_id = sub.get("chat_id", 0) or 0
+        target_chat_link = sub.get("chat_link", "") or ""
+        if product_meta:
+            target_chat_id = int(product_meta.get("chat_id") or target_chat_id or 0)
+            target_chat_link = product_meta.get("chat_link") or target_chat_link
         await db.activate_product_subscription(
             user_id=user_id,
             username=username,
@@ -633,12 +639,11 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
             expires_at=expires_at,
             tx_hash=sub.get("tx_hash") or f"claimed:{sub.get('id')}",
             amount_usdt=0.0,
-            chat_id=sub.get("chat_id", 0) or 0,
-            chat_link=sub.get("chat_link", "") or "",
+            chat_id=target_chat_id,
+            chat_link=target_chat_link,
             payment_system=sub.get("payment_system", "") or "webhook",
         )
         await db.deactivate_pending_email_subscription(sub["id"])
-        product_meta = await resolve_subscription_product_any(sub.get("product_key") or "", lang)
         if not product_meta and (sub.get("chat_id") or sub.get("chat_link")):
             product_meta = {
                 "product_key": sub.get("product_key") or "website_subscription",
