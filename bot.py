@@ -4272,7 +4272,7 @@ def _webhook_plan_from_payload(payload: dict):
     if product_key in config.PLANS:
         plan = dict(config.PLANS[product_key])
     else:
-        product_meta = await resolve_subscription_product_any(product_key, "lv")
+        product_meta = resolve_subscription_product(product_key, "lv")
         if product_meta:
             localized_name = product_meta.get("name", {})
             plan = {
