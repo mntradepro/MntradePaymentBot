@@ -246,7 +246,9 @@ async def get_user_from_target(token: str):
 async def render(callback: CallbackQuery, text: str, reply_markup=None):
     try:
         await callback.message.edit_text(trim(text), reply_markup=reply_markup, parse_mode="HTML")
-    except Exception:
+    except Exception as e:
+        if "message is not modified" in str(e).lower():
+            return
         await callback.message.answer(trim(text), reply_markup=reply_markup, parse_mode="HTML")
 
 
@@ -340,7 +342,7 @@ async def adm_retention_logs(callback: CallbackQuery):
 async def adm_users(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
-    active = await db.get_all_active_users()
+    active = await db.get_users_with_active_subscriptions()
     registered = await db.get_registered_users()
     friends = await db.get_all_friends()
     reg = "\n".join(
@@ -348,10 +350,17 @@ async def adm_users(callback: CallbackQuery):
         for u in registered[:12]
     ) or "-"
     act = "\n".join(
-        f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | {h(u.get('plan_name') or '-')} | exp. {fmt_dt(u.get('expires_at'), True)}"
+        (
+            f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | "
+            f"subs: {int(u.get('active_subscription_count') or 0)} | "
+            f"nearest exp. {fmt_dt(u.get('nearest_subscription_expires_at'), True)}"
+        )
         for u in active[:20]
     ) or "-"
-    fr = "\n".join(f"- {h('@' + u['username']) if u.get('username') else u['user_id']}" for u in friends[:10]) or "-"
+    fr = "\n".join(
+        f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | {h(u.get('email') or '-')}"
+        for u in friends[:10]
+    ) or "-"
     b = InlineKeyboardBuilder()
     b.button(text="Add Friend", callback_data="adm_add_friend")
     b.button(text="Remove Friend", callback_data="adm_remove_friend")
@@ -360,7 +369,11 @@ async def adm_users(callback: CallbackQuery):
         b.button(text=f"@{u['username']}" if u.get("username") else str(u["user_id"]), callback_data=f"adm_user_view_{u['user_id']}")
     b.button(text="Back", callback_data="adm_main")
     b.adjust(2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
-    text = f"<b>Registered ({len(registered)})</b>\n{reg}\n\n<b>Active ({len(active)})</b>\n{act}\n\n<b>Friends ({len(friends)})</b>\n{fr}"
+    text = (
+        f"<b>Registered users ({len(registered)})</b>\n{reg}\n\n"
+        f"<b>Users with active subscriptions ({len(active)})</b>\n{act}\n\n"
+        f"<b>Friends ({len(friends)})</b>\n{fr}"
+    )
     await render(callback, text, b.as_markup())
     await callback.answer()
 
@@ -374,6 +387,7 @@ async def adm_user_view(callback: CallbackQuery):
         await callback.answer("User not found", show_alert=True)
         return
     subs = await db.get_active_user_subscriptions(user["user_id"])
+    is_active_now = bool(subs)
     rows = "\n\n".join(
         (
             f"- <b>{h(s.get('product_name') or s.get('product_key') or 'Subscription')}</b>\n"
@@ -389,9 +403,10 @@ async def adm_user_view(callback: CallbackQuery):
         f"Username: {h('@' + user['username']) if user.get('username') else '-'}\n"
         f"Email: {h(user.get('email') or '-')}\n"
         f"Language: {h(user.get('lang') or '-')}\n"
-        f"Active: <b>{'Yes' if user.get('is_active') else 'No'}</b>\n"
+        f"Active now: <b>{'Yes' if is_active_now else 'No'}</b>\n"
         f"Friend: <b>{'Yes' if user.get('is_friend') else 'No'}</b>\n"
         f"Last seen: {fmt_dt(user.get('last_seen_at'))}\n\n"
+        f"<b>Friend status</b>\n{'Listed in friends' if user.get('is_friend') else 'Not in friends'}\n\n"
         f"<b>Active subscriptions</b>\n{rows}"
     )
     await render(callback, text, back_kb("adm_users"))
@@ -620,10 +635,29 @@ async def save_promo(message: Message, state: FSMContext):
     except ValueError:
         await message.answer("Discount must be a whole number.", reply_markup=back_kb("adm_promo_menu"))
         return
+    if discount <= 0 or discount > 100:
+        await message.answer("Discount must be between 1 and 100.", reply_markup=back_kb("adm_promo_menu"))
+        return
     code = parts[0].upper()
     plan_key = parts[2] if len(parts) > 2 else None
-    max_uses = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
-    expires_at = parts[4] + "T23:59:59" if len(parts) > 4 else None
+    if len(parts) > 3:
+        try:
+            max_uses = int(parts[3])
+        except ValueError:
+            await message.answer("Max uses must be a whole number.", reply_markup=back_kb("adm_promo_menu"))
+            return
+        if max_uses < 0:
+            await message.answer("Max uses cannot be negative.", reply_markup=back_kb("adm_promo_menu"))
+            return
+    else:
+        max_uses = 0
+    expires_at = None
+    if len(parts) > 4:
+        try:
+            expires_at = datetime.strptime(parts[4], "%Y-%m-%d").strftime("%Y-%m-%dT23:59:59")
+        except ValueError:
+            await message.answer("Expiry date must be a real date in YYYY-MM-DD format.", reply_markup=back_kb("adm_promo_menu"))
+            return
     await db.create_promo_code(code, discount, plan_key=plan_key, max_uses=max_uses, expires_at=expires_at)
     await state.clear()
     await message.answer(f"Promo `{code}` created.", parse_mode="Markdown", reply_markup=back_kb("adm_promo_menu"))
@@ -830,8 +864,11 @@ async def adm_export_excel(callback: CallbackQuery):
         for row in rows:
             writer.writerow([row.get(hh, "") for hh in headers])
         path = tmp.name
-    await callback.message.answer_document(FSInputFile(path), caption="Users export CSV")
-    await callback.answer("CSV exported")
+    try:
+        await callback.message.answer_document(FSInputFile(path), caption="Users export CSV")
+        await callback.answer("CSV exported")
+    finally:
+        Path(path).unlink(missing_ok=True)
 
 
 @router.callback_query(F.data == "adm_backup")
@@ -949,11 +986,16 @@ async def adm_add_friend(callback: CallbackQuery, state: FSMContext):
 async def save_friend_add(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
-    user = await get_user_from_target(message.text or "")
+    raw_target = (message.text or "").strip()
+    user = await get_user_from_target(raw_target)
+    if not user and raw_target.lstrip("-").isdigit():
+        await db.register_user_as_friend(int(raw_target))
+        user = await db.get_user(int(raw_target))
     if not user:
         await message.answer("User not found.", reply_markup=back_kb("adm_users"))
         return
-    await db.set_friend(user["user_id"], True)
+    if not user.get("is_friend"):
+        await db.set_friend(user["user_id"], True)
     await state.clear()
     await message.answer(f"Friend added: `{user['user_id']}`", parse_mode="Markdown", reply_markup=back_kb("adm_users"))
 
@@ -1029,6 +1071,9 @@ async def save_grant_sub(message: Message, state: FSMContext):
         days = int(parts[2])
     except ValueError:
         await message.answer("Days must be a whole number.", reply_markup=back_kb("adm_main"))
+        return
+    if days <= 0:
+        await message.answer("Days must be greater than 0.", reply_markup=back_kb("adm_main"))
         return
     expires_at = datetime.utcnow() + timedelta(days=days)
     name, chat_id, chat_link = meta

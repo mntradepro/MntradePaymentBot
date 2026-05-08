@@ -690,6 +690,7 @@ class Database:
                 "UPDATE user_subscriptions SET is_active = 0 WHERE user_id = ?",
                 (user_id,)
             )
+            await self._refresh_user_access_summary(conn, user_id)
             await conn.commit()
 
     async def get_active_user_subscriptions(self, user_id: int) -> List[Dict]:
@@ -1093,6 +1094,24 @@ class Database:
         async with aiosqlite.connect(self.db_path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute("SELECT * FROM users WHERE is_active = 1") as cur:
+                return [dict(row) for row in await cur.fetchall()]
+
+    async def get_users_with_active_subscriptions(self) -> List[Dict]:
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT
+                    u.*,
+                    COUNT(us.id) AS active_subscription_count,
+                    MIN(us.expires_at) AS nearest_subscription_expires_at,
+                    MAX(us.expires_at) AS latest_subscription_expires_at
+                FROM users u
+                JOIN user_subscriptions us ON us.user_id = u.user_id
+                WHERE us.is_active = 1 AND us.expires_at > ?
+                GROUP BY u.user_id
+                ORDER BY latest_subscription_expires_at DESC, u.user_id DESC
+            """, (now,)) as cur:
                 return [dict(row) for row in await cur.fetchall()]
 
     async def get_registered_users(self) -> List[Dict]:
