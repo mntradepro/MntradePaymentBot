@@ -678,11 +678,8 @@ async def delete_promo(callback: CallbackQuery):
     await adm_promo_menu(callback)
 
 
-@router.callback_query(F.data == "adm_edit_prices")
-async def adm_edit_prices(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        return
-    labels = {
+def checkout_link_labels():
+    return {
         "checkout_url_lv": "VIP chat button - Latvian",
         "checkout_url_en": "VIP chat button - English",
         "checkout_url_ru": "VIP chat button - Russian",
@@ -712,6 +709,10 @@ async def adm_edit_prices(callback: CallbackQuery):
         "course_checkout_url_vip_en": "VIP mentoring course checkout button - English course",
         "course_checkout_url_vip_ru": "VIP mentoring course checkout button - Russian course",
     }
+
+
+async def build_checkout_links_panel(prefix: str = ""):
+    labels = checkout_link_labels()
     rows = []
     for key in (
         "checkout_url_lv",
@@ -760,8 +761,7 @@ async def adm_edit_prices(callback: CallbackQuery):
     b.button(text="VIP mentoring checkout RU", callback_data="adm_link_course_checkout_url_vip_ru")
     b.button(text="Back", callback_data="adm_main")
     b.adjust(2)
-    await render(
-        callback,
+    text = (
         "<b>Checkout links and prices</b>\n\n"
         "Use the labels below exactly like this:\n"
         "- VIP chat button - Latvian = link for the Latvian VIP chat purchase button\n"
@@ -769,9 +769,20 @@ async def adm_edit_prices(callback: CallbackQuery):
         "- VIP chat button - Russian = link for the Russian VIP chat purchase button\n"
         "- PRO Market Scanner/AI Signals button - Latvian/English/Russian = scanner checkout for that user language\n"
         "- Course checkout button - Latvian/English/Russian = link for that exact course language button after the user chooses the course language\n\n"
-        + "\n".join(rows),
-        b.as_markup(),
+        + "\n".join(rows)
     )
+    if prefix:
+        text = prefix + "\n\n" + text
+    return text, b.as_markup()
+
+
+@router.callback_query(F.data == "adm_edit_prices")
+async def adm_edit_prices(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.clear()
+    text, kb = await build_checkout_links_panel()
+    await render(callback, text, kb)
     await callback.answer()
 
 
@@ -780,30 +791,7 @@ async def adm_link_edit(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
     key = callback.data.replace("adm_link_", "")
-    labels = {
-        "checkout_url_lv": "VIP chat button - Latvian",
-        "checkout_url_en": "VIP chat button - English",
-        "checkout_url_ru": "VIP chat button - Russian",
-        "checkout_url_scanner_chat": "PRO Market Scanner/AI Signals button - fallback",
-        "checkout_url_scanner_chat_lv": "PRO Market Scanner/AI Signals button - Latvian",
-        "checkout_url_scanner_chat_en": "PRO Market Scanner/AI Signals button - English",
-        "checkout_url_scanner_chat_ru": "PRO Market Scanner/AI Signals button - Russian",
-        "course_checkout_url_mini_lv": "Mini course checkout button - Latvian course",
-        "course_checkout_url_mini_en": "Mini course checkout button - English course",
-        "course_checkout_url_mini_ru": "Mini course checkout button - Russian course",
-        "course_checkout_url_basic_lv": "Basic course checkout button - Latvian course",
-        "course_checkout_url_basic_en": "Basic course checkout button - English course",
-        "course_checkout_url_basic_ru": "Basic course checkout button - Russian course",
-        "course_checkout_url_full_lv": "Full course checkout button - Latvian course",
-        "course_checkout_url_full_en": "Full course checkout button - English course",
-        "course_checkout_url_full_ru": "Full course checkout button - Russian course",
-        "course_checkout_url_autotrading_lv": "Autotrading course checkout button - Latvian course",
-        "course_checkout_url_autotrading_en": "Autotrading course checkout button - English course",
-        "course_checkout_url_autotrading_ru": "Autotrading course checkout button - Russian course",
-        "course_checkout_url_vip_lv": "VIP mentoring course checkout button - Latvian course",
-        "course_checkout_url_vip_en": "VIP mentoring course checkout button - English course",
-        "course_checkout_url_vip_ru": "VIP mentoring course checkout button - Russian course",
-    }
+    labels = checkout_link_labels()
     await state.set_state(EditState.waiting_checkout_url)
     await state.update_data(edit_key=key)
     await render(
@@ -825,7 +813,8 @@ async def save_link(message: Message, state: FSMContext):
     data = await state.get_data()
     await db.set_setting(data["edit_key"], (message.text or "").strip())
     await state.clear()
-    await message.answer(f"Saved `{data['edit_key']}`", parse_mode="Markdown", reply_markup=back_kb("adm_edit_prices"))
+    text, kb = await build_checkout_links_panel(f"<b>Saved</b> <code>{h(data['edit_key'])}</code>")
+    await message.answer(trim(text), parse_mode="HTML", reply_markup=kb)
 
 
 @router.callback_query(F.data.startswith("adm_price_"))
@@ -868,7 +857,8 @@ async def save_price(message: Message, state: FSMContext):
     data = await state.get_data()
     await db.set_setting(data["edit_key"], raw)
     await state.clear()
-    await message.answer(f"Saved `{data['edit_key']}` = `{raw}`", parse_mode="Markdown", reply_markup=back_kb("adm_edit_prices"))
+    text, kb = await build_checkout_links_panel(f"<b>Saved</b> <code>{h(data['edit_key'])}</code> = <code>{h(raw)}</code>")
+    await message.answer(trim(text), parse_mode="HTML", reply_markup=kb)
 
 
 @router.callback_query(F.data == "adm_export_excel")
@@ -961,21 +951,25 @@ async def adm_unban(callback: CallbackQuery):
 async def adm_payments_menu(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
-    s = await db.get_detailed_stats()
-    pending_crypto = await db.get_all_pending_payments()
     pending_email = await db.get_all_pending_email_subscriptions()
     pending_withdrawals = await db.get_pending_withdrawals()
+    webhook_ready = bool(config.WEBHOOK_SECRET)
     text = (
-        "<b>Payments overview</b>\n\n"
-        f"Total revenue: <b>{s.get('total_revenue', 0):.2f}</b> USDT\n"
-        f"Total purchases: <b>{s.get('total_purchases', 0)}</b>\n"
-        f"Today revenue: <b>{s.get('today_revenue', 0):.2f}</b> USDT\n"
-        f"Today purchases: <b>{s.get('today_purchases', 0)}</b>\n"
-        f"Pending old crypto payments: <b>{len(pending_crypto)}</b>\n"
+        "<b>Website payments</b>\n\n"
+        "Bot-side payment checking is disabled. Purchases are controlled by the website checkout webhook.\n\n"
+        f"Webhook secret set: <b>{'Yes' if webhook_ready else 'No'}</b>\n"
+        f"Webhook path: <code>{h(config.WEBHOOK_PATH)}</code>\n"
         f"Pending purchases without TG: <b>{len(pending_email)}</b>\n"
-        f"Pending withdrawals: <b>{len(pending_withdrawals)}</b>"
+        f"Pending withdrawals: <b>{len(pending_withdrawals)}</b>\n\n"
+        "Use Pending Purchases to see paid e-mails that have not pressed /start yet."
     )
-    await render(callback, text, back_kb())
+    b = InlineKeyboardBuilder()
+    b.button(text="Pending Purchases", callback_data="adm_pending_email_users")
+    b.button(text="Checkout Links", callback_data="adm_edit_prices")
+    b.button(text="Settings", callback_data="adm_settings")
+    b.button(text="Back", callback_data="adm_main")
+    b.adjust(1)
+    await render(callback, text, b.as_markup())
     await callback.answer()
 
 
