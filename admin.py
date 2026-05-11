@@ -686,7 +686,10 @@ async def adm_edit_prices(callback: CallbackQuery):
         "checkout_url_lv": "VIP chat button - Latvian",
         "checkout_url_en": "VIP chat button - English",
         "checkout_url_ru": "VIP chat button - Russian",
-        "checkout_url_scanner_chat": "PRO Market Scanner/AI Signals button",
+        "checkout_url_scanner_chat": "PRO Market Scanner/AI Signals button - fallback",
+        "checkout_url_scanner_chat_lv": "PRO Market Scanner/AI Signals button - Latvian",
+        "checkout_url_scanner_chat_en": "PRO Market Scanner/AI Signals button - English",
+        "checkout_url_scanner_chat_ru": "PRO Market Scanner/AI Signals button - Russian",
         "price_monthly": "VIP 1 month price",
         "course_price_mini": "Mini course price",
         "course_checkout_url_mini_lv": "Mini course checkout button - Latvian course",
@@ -710,7 +713,16 @@ async def adm_edit_prices(callback: CallbackQuery):
         "course_checkout_url_vip_ru": "VIP mentoring course checkout button - Russian course",
     }
     rows = []
-    for key in ("checkout_url_lv", "checkout_url_en", "checkout_url_ru", "checkout_url_scanner_chat", "price_monthly"):
+    for key in (
+        "checkout_url_lv",
+        "checkout_url_en",
+        "checkout_url_ru",
+        "checkout_url_scanner_chat_lv",
+        "checkout_url_scanner_chat_en",
+        "checkout_url_scanner_chat_ru",
+        "checkout_url_scanner_chat",
+        "price_monthly",
+    ):
         rows.append(f"<b>{h(labels.get(key, key))}</b>\n<code>{h(key)}</code> = <code>{h(await db.get_setting(key) or '(empty)')}</code>")
     for course_key in config.COURSES.keys():
         price_key = f"course_price_{course_key}"
@@ -722,7 +734,9 @@ async def adm_edit_prices(callback: CallbackQuery):
     b.button(text="VIP button LV", callback_data="adm_link_checkout_url_lv")
     b.button(text="VIP button EN", callback_data="adm_link_checkout_url_en")
     b.button(text="VIP button RU", callback_data="adm_link_checkout_url_ru")
-    b.button(text="Scanner button", callback_data="adm_link_checkout_url_scanner_chat")
+    b.button(text="Scanner LV", callback_data="adm_link_checkout_url_scanner_chat_lv")
+    b.button(text="Scanner EN", callback_data="adm_link_checkout_url_scanner_chat_en")
+    b.button(text="Scanner RU", callback_data="adm_link_checkout_url_scanner_chat_ru")
     b.button(text="VIP monthly price", callback_data="adm_price_price_monthly")
     b.button(text="Mini price", callback_data="adm_price_course_price_mini")
     b.button(text="Mini checkout LV", callback_data="adm_link_course_checkout_url_mini_lv")
@@ -753,7 +767,7 @@ async def adm_edit_prices(callback: CallbackQuery):
         "- VIP chat button - Latvian = link for the Latvian VIP chat purchase button\n"
         "- VIP chat button - English = link for the English VIP chat purchase button\n"
         "- VIP chat button - Russian = link for the Russian VIP chat purchase button\n"
-        "- PRO Market Scanner/AI Signals button = link for the scanner product button\n"
+        "- PRO Market Scanner/AI Signals button - Latvian/English/Russian = scanner checkout for that user language\n"
         "- Course checkout button - Latvian/English/Russian = link for that exact course language button after the user chooses the course language\n\n"
         + "\n".join(rows),
         b.as_markup(),
@@ -770,7 +784,10 @@ async def adm_link_edit(callback: CallbackQuery, state: FSMContext):
         "checkout_url_lv": "VIP chat button - Latvian",
         "checkout_url_en": "VIP chat button - English",
         "checkout_url_ru": "VIP chat button - Russian",
-        "checkout_url_scanner_chat": "PRO Market Scanner/AI Signals button",
+        "checkout_url_scanner_chat": "PRO Market Scanner/AI Signals button - fallback",
+        "checkout_url_scanner_chat_lv": "PRO Market Scanner/AI Signals button - Latvian",
+        "checkout_url_scanner_chat_en": "PRO Market Scanner/AI Signals button - English",
+        "checkout_url_scanner_chat_ru": "PRO Market Scanner/AI Signals button - Russian",
         "course_checkout_url_mini_lv": "Mini course checkout button - Latvian course",
         "course_checkout_url_mini_en": "Mini course checkout button - English course",
         "course_checkout_url_mini_ru": "Mini course checkout button - Russian course",

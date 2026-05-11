@@ -535,6 +535,13 @@ async def checkout_url_for_subscription_product(product_key: str, user_lang: str
         return (await db.get_setting("checkout_url_lv")) or ""
     if key == "vip_chat_ru":
         return (await db.get_setting("checkout_url_ru")) or ""
+    if key == "scanner_chat":
+        lang = user_lang if user_lang in {"lv", "en", "ru"} else DEFAULT_LANG
+        return (
+            (await db.get_setting(f"checkout_url_scanner_chat_{lang}"))
+            or (await db.get_setting("checkout_url_scanner_chat"))
+            or ""
+        )
     return (await db.get_setting(f"checkout_url_{key}")) or ""
 
 
