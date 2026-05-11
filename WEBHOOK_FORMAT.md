@@ -23,16 +23,51 @@ Example JSON sent by the website:
 }
 ```
 
-Required fields:
+Required fields for one purchase:
 
-- `email`: must match the e-mail registered in the bot.
+- `email`: client e-mail. If the user has not registered in the bot yet, the purchase is saved as pending and will be attached after `/start` + e-mail registration.
 - `payment_system`: payment provider used on the website, for example `stripe`, `paypal`, `bank`, `crypto`.
 - `product_key`: use `monthly` for the 1-month VIP subscription, or a custom key if `subscription_days` is provided.
 - `subscription_days`: how many access days should be added. If `product_key` is a known bot plan and this field is missing, the bot uses the configured plan duration.
 
+Bulk import / migration:
+
+Send all old subscriber e-mails in one request. Top-level fields are used as defaults for every subscriber, and each item can override them.
+
+```json
+{
+  "batch_id": "legacy_import_2026_05",
+  "payment_system": "legacy_import",
+  "product_key": "vip_chat_lv",
+  "expires_at": "2026-06-15",
+  "subscribers": [
+    {
+      "email": "client1@example.com",
+      "amount": 10.0
+    },
+    {
+      "email": "client2@example.com",
+      "product_key": "scanner_chat",
+      "expires_at": "2026-07-01",
+      "amount": 25.0
+    }
+  ]
+}
+```
+
+Accepted bulk array keys: `subscribers`, `users`, `items`, `purchases`.
+
+Recommended migration product keys:
+
+- `vip_chat_lv`: Latvian VIP chat.
+- `vip_chat_ru`: Russian VIP chat.
+- `scanner_chat`: PRO Market Scanner / AI Signals.
+- `monthly`: legacy one-month VIP plan. Prefer explicit chat product keys for imports when possible.
+
 Idempotency:
 
 - Send a stable `event_id` or `order_id`. Repeated webhooks with the same `payment_system + event_id` are ignored as duplicates.
+- For bulk imports, send a stable `batch_id`. If an item has no own `event_id`, the bot creates a stable item event id from `batch_id + item index + item data`.
 
 Security:
 

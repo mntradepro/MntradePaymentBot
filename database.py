@@ -117,6 +117,7 @@ class Database:
                     email         TEXT NOT NULL,
                     product_key   TEXT NOT NULL,
                     product_name  TEXT,
+                    amount_usdt   REAL DEFAULT 0,
                     chat_id       INTEGER,
                     chat_link     TEXT,
                     activated_at  TEXT NOT NULL,
@@ -219,6 +220,7 @@ class Database:
                 "ALTER TABLE users ADD COLUMN email_registered_at TEXT",
                 "ALTER TABLE users ADD COLUMN last_seen_at TEXT",
                 "ALTER TABLE user_subscriptions ADD COLUMN grace_reminder_sent_at TEXT",
+                "ALTER TABLE pending_email_subscriptions ADD COLUMN amount_usdt REAL DEFAULT 0",
             ]:
                 try:
                     await conn.execute(col_sql)
@@ -408,6 +410,17 @@ class Database:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
+    async def get_other_user_by_email(self, user_id: int, email: str) -> Optional[Dict]:
+        normalized = email.strip().lower()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute(
+                "SELECT * FROM users WHERE LOWER(email) = ? AND user_id != ? LIMIT 1",
+                (normalized, user_id),
+            ) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
     async def register_user(self, user_id: int, username: Optional[str], first_name: Optional[str], lang: str = "ru"):
         now = datetime.utcnow().isoformat()
         async with aiosqlite.connect(self.db_path) as conn:
@@ -478,16 +491,17 @@ class Database:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
-    async def activate_pending_email_subscription(self, email: str, product_key: str, product_name: str, expires_at, tx_hash: str, chat_id=0, chat_link="", payment_system=""):
+    async def activate_pending_email_subscription(self, email: str, product_key: str, product_name: str, expires_at, tx_hash: str, chat_id=0, chat_link="", payment_system="", amount_usdt=0.0):
         normalized = email.strip().lower()
         now = datetime.utcnow().isoformat()
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("""
                 INSERT INTO pending_email_subscriptions
-                    (email, product_key, product_name, chat_id, chat_link, activated_at, expires_at, is_active, tx_hash, payment_system)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    (email, product_key, product_name, amount_usdt, chat_id, chat_link, activated_at, expires_at, is_active, tx_hash, payment_system)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                 ON CONFLICT(email, product_key) DO UPDATE SET
                     product_name = excluded.product_name,
+                    amount_usdt = COALESCE(pending_email_subscriptions.amount_usdt, 0) + COALESCE(excluded.amount_usdt, 0),
                     chat_id = excluded.chat_id,
                     chat_link = excluded.chat_link,
                     activated_at = excluded.activated_at,
@@ -499,6 +513,7 @@ class Database:
                 normalized,
                 product_key,
                 product_name,
+                float(amount_usdt or 0),
                 chat_id or 0,
                 chat_link or "",
                 now,

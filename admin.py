@@ -420,7 +420,12 @@ async def adm_pending_email_users(callback: CallbackQuery):
     rows = await db.get_all_pending_email_subscriptions()
     uniq = len({(x.get("email") or "").lower() for x in rows if x.get("email")})
     text_rows = "\n\n".join(
-        f"<b>{h(x.get('email') or '-')}</b>\nProduct: {h(x.get('product_key') or '-')}\nPayment: {h(x.get('payment_system') or '-')}\nBought: {fmt_dt(x.get('created_at'))}\nActive until: {fmt_dt(x.get('expires_at'), True)}"
+        f"<b>{h(x.get('email') or '-')}</b>\n"
+        f"Product: {h(x.get('product_key') or '-')}\n"
+        f"Payment: {h(x.get('payment_system') or '-')}\n"
+        f"Amount: {float(x.get('amount_usdt') or 0):.2f}\n"
+        f"Bought: {fmt_dt(x.get('activated_at'))}\n"
+        f"Active until: {fmt_dt(x.get('expires_at'), True)}"
         for x in rows[:25]
     ) or "No pending purchases."
     text = f"<b>Purchases without Telegram account</b>\n\nUnique e-mails: <b>{uniq}</b>\nActive pending purchases: <b>{len(rows)}</b>\n\n{text_rows}"
@@ -1075,12 +1080,24 @@ async def save_grant_sub(message: Message, state: FSMContext):
     if days <= 0:
         await message.answer("Days must be greater than 0.", reply_markup=back_kb("adm_main"))
         return
-    expires_at = datetime.utcnow() + timedelta(days=days)
+    product_key = parts[1].lower()
+    now = datetime.utcnow()
+    base_exp = now
+    for sub in await db.get_active_user_subscriptions(user["user_id"]):
+        if sub.get("product_key") != product_key or not sub.get("expires_at"):
+            continue
+        try:
+            current_exp = datetime.fromisoformat(sub["expires_at"])
+        except Exception:
+            continue
+        if current_exp > base_exp:
+            base_exp = current_exp
+    expires_at = base_exp + timedelta(days=days)
     name, chat_id, chat_link = meta
-    tx_hash = f"admin_grant_{user['user_id']}_{parts[1].lower()}_{int(datetime.utcnow().timestamp())}"
-    await db.activate_product_subscription(user["user_id"], user.get("username"), parts[1].lower(), name, expires_at, tx_hash, 0.0, chat_id, chat_link, "admin")
+    tx_hash = f"admin_grant_{user['user_id']}_{product_key}_{int(now.timestamp())}"
+    await db.activate_product_subscription(user["user_id"], user.get("username"), product_key, name, expires_at, tx_hash, 0.0, chat_id, chat_link, "admin")
     await state.clear()
-    await message.answer(f"Granted `{parts[1].lower()}` to `{user['user_id']}` until `{expires_at.strftime('%Y-%m-%d')}`", parse_mode="Markdown", reply_markup=back_kb("adm_main"))
+    await message.answer(f"Granted `{product_key}` to `{user['user_id']}` until `{expires_at.strftime('%Y-%m-%d')}`", parse_mode="Markdown", reply_markup=back_kb("adm_main"))
 
 
 @router.callback_query(F.data == "adm_stub")

@@ -470,6 +470,31 @@ def md_escape(text):
     for ch in ['*','_','`','[',']']: text = text.replace(ch, f'\\{ch}')
     return text
 
+
+async def email_claim_is_blocked(message, email: str, lang: str) -> bool:
+    existing = await db.get_other_user_by_email(message.from_user.id, email)
+    if not existing:
+        return False
+
+    current_uname = f"@{message.from_user.username}" if message.from_user.username else f"ID {message.from_user.id}"
+    owner_uname = f"@{existing.get('username')}" if existing.get("username") else f"ID {existing.get('user_id')}"
+    await notify_admins(
+        "⚠️ *Duplicate e-mail claim blocked*\n\n"
+        f"📧 `{email}`\n"
+        f"👤 Tried: {md_escape(current_uname)} (`{message.from_user.id}`)\n"
+        f"🔒 Already linked: {md_escape(owner_uname)} (`{existing.get('user_id')}`)"
+    )
+    await message.answer(
+        ui_text(
+            lang,
+            "⚠️ Šis e-pasts jau ir piesaistīts citam Telegram kontam. Ja tas ir tavs e-pasts, raksti atbalstam.",
+            "⚠️ Этот e-mail уже привязан к другому Telegram аккаунту. Если это твой e-mail, напиши в поддержку.",
+            "⚠️ This e-mail is already linked to another Telegram account. If it is yours, contact support.",
+        )
+    )
+    return True
+
+
 def chat_id_for_lang(lang):
     return config.chat_id_for_lang(lang) if hasattr(config, "chat_id_for_lang") else config.CHAT_ID
 
@@ -651,7 +676,7 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
             product_name=sub.get("product_name") or sub.get("product_key") or "Website Purchase",
             expires_at=expires_at,
             tx_hash=sub.get("tx_hash") or f"claimed:{sub.get('id')}",
-            amount_usdt=0.0,
+            amount_usdt=float(sub.get("amount_usdt") or 0),
             chat_id=target_chat_id,
             chat_link=target_chat_link,
             payment_system=sub.get("payment_system", "") or "webhook",
@@ -841,6 +866,8 @@ async def registration_receive_email(message: Message, state: FSMContext):
     name = data.get("reg_name", md_escape(message.from_user.first_name))
     if "@" not in email or "." not in email or len(email) < 5:
         await message.answer("❌ " + ("Nepareizs e-pasta formāts. Pamēģini vēlreiz:" if lang == "lv" else ("Неверный e-mail. Попробуй ещё:" if lang == "ru" else "Invalid e-mail. Try again:")))
+        return
+    if await email_claim_is_blocked(message, email, lang):
         return
     await db.set_user_lang(message.from_user.id, lang)
     await db.set_user_email(message.from_user.id, email)
@@ -1733,14 +1760,14 @@ async def settings_email(callback: CallbackQuery, state: FSMContext):
         )
     elif lang == "ru":
         text = (
-            "ðŸ“§ *Ð£ÐºÐ°Ð¶Ð¸ ÑÐ²Ð¾Ð¹ e-mail:*\n\n"
+            "📧 *Укажи свой e-mail:*\n\n"
             f"{email_binding_notice(lang)}\n\n"
-            "_ÐžÑ‚Ð¿Ñ€Ð°Ð²ÑŒ ÑÐ²Ð¾Ð¹ e-mail ÑÐ¾Ð¾Ð±Ñ‰ÐµÐ½Ð¸ÐµÐ¼:_\n\n"
-            "/cancel Ð´Ð»Ñ Ð¾Ñ‚Ð¼ÐµÐ½Ñ‹"
+            "_Отправь свой e-mail сообщением:_\n\n"
+            "/cancel для отмены"
         )
     else:
         text = (
-            "ðŸ“§ *Enter your e-mail:*\n\n"
+            "📧 *Enter your e-mail:*\n\n"
             f"{email_binding_notice(lang)}\n\n"
             "_Send your e-mail as a message:_\n\n"
             "/cancel to cancel"
@@ -1752,34 +1779,42 @@ async def settings_email(callback: CallbackQuery, state: FSMContext):
 
 @dp.message(UserSettingsState.waiting_email)
 async def receive_email(message: Message, state: FSMContext):
+    user = await db.get_user(message.from_user.id)
+    lang = user.get("lang", "ru") if user else "ru"
     if message.text == "/cancel":
         await state.clear()
-        user = await db.get_user(message.from_user.id)
-        lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("âŒ " + ui_text(lang, "Atcelts", "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", "Cancelled"))
+        await message.answer("❌ " + ui_text(lang, "Atcelts", "Отменено", "Cancelled"))
         return
-    email = message.text.strip()
+    email = (message.text or "").strip().lower()
     # VienkÄrÅ¡a validÄcija
     if "@" not in email or "." not in email or len(email) < 5:
-        user = await db.get_user(message.from_user.id)
-        lang = user.get("lang", "ru") if user else "ru"
-        await message.answer("âŒ " + ("Nepareizs e-pasta formÄts. PamÄ“Ä£ini vÄ“lreiz:" if lang == "lv" else ("ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÐµÑ‰Ñ‘:" if lang == "ru" else "Invalid e-mail format. Try again:")))
+        await message.answer("❌ " + ui_text(lang, "Nepareizs e-pasta formāts. Pamēģini vēlreiz:", "Неверный формат e-mail. Попробуй ещё:", "Invalid e-mail format. Try again:"))
+        return
+    if await email_claim_is_blocked(message, email, lang):
         return
     await state.clear()
     await db.set_user_email(message.from_user.id, email)
-    claimed = await attach_pending_email_purchases(message.from_user.id, email, "lv", message.from_user.username or "")
+    claimed = await attach_pending_email_purchases(message.from_user.id, email, lang, message.from_user.username or "")
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     if lang == "lv":
-        await message.answer(f"âœ… E-pasts saglabÄts: *{email}*", parse_mode="Markdown")
+        await message.answer(f"✅ E-pasts saglabāts: *{email}*", parse_mode="Markdown")
     elif lang == "ru":
-        await message.answer(f"âœ… E-mail ÑÐ¾Ñ…Ñ€Ð°Ð½Ñ‘Ð½: *{email}*", parse_mode="Markdown")
+        await message.answer(f"✅ E-mail сохранён: *{email}*", parse_mode="Markdown")
     else:
-        await message.answer(f"âœ… E-mail saved: *{email}*", parse_mode="Markdown")
+        await message.answer(f"✅ E-mail saved: *{email}*", parse_mode="Markdown")
 
 
     if claimed:
-        await message.answer(ui_text(lang, f"Ã¢Å“â€¦ Atrasti ieprÃ…Â¡Ã„â€œji pirkumi pÃ„â€œc e-pasta. AktivizÃ„â€œtas {len(claimed)} piekÃ„Â¼uves.", f"Ã¢Å“â€¦ ÃÂÃÂ°ÃÂ¹ÃÂ´ÃÂµÃÂ½Ã‘â€¹ Ã‘â‚¬ÃÂ°ÃÂ½ÃÂµÃÂµ ÃÂ¾ÃÂ¿ÃÂ»ÃÂ°Ã‘â€¡ÃÂµÃÂ½ÃÂ½Ã‘â€¹ÃÂµ ÃÂ¿ÃÂ¾ÃÂºÃ‘Æ’ÃÂ¿ÃÂºÃÂ¸ ÃÂ¿ÃÂ¾ e-mail. ÃÂÃÂºÃ‘â€šÃÂ¸ÃÂ²ÃÂ¸Ã‘â‚¬ÃÂ¾ÃÂ²ÃÂ°ÃÂ½ÃÂ¾ ÃÂ´ÃÂ¾Ã‘ÂÃ‘â€šÃ‘Æ’ÃÂ¿ÃÂ¾ÃÂ²: {len(claimed)}.", f"Ã¢Å“â€¦ Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}."), parse_mode="Markdown")
+        await message.answer(
+            ui_text(
+                lang,
+                f"✅ Atrasti iepriekšēji pirkumi pēc e-pasta. Aktivizētas piekļuves: {len(claimed)}.",
+                f"✅ Найдены предыдущие покупки по e-mail. Активировано доступов: {len(claimed)}.",
+                f"✅ Previous purchases were found for this e-mail. Activated accesses: {len(claimed)}.",
+            ),
+            parse_mode="Markdown",
+        )
 
 @dp.callback_query(F.data == "settings_back")
 async def settings_back(callback: CallbackQuery):
@@ -1816,7 +1851,8 @@ async def _giveaway_settings():
 @dp.callback_query(F.data == "giveaway_join")
 async def giveaway_join(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    lang = await user_lang(callback.from_user.id)
+    user = await db.get_user(callback.from_user.id)
+    lang = user.get("lang", "ru") if user else "ru"
     await callback.answer(
         ui_text(
             lang,
@@ -1983,11 +2019,15 @@ async def giveaway_receive_email(message: Message, state: FSMContext):
         lang = user.get("lang", "ru") if user else "ru"
         await message.answer("âŒ " + ui_text(lang, "Atcelts", "ÐžÑ‚Ð¼ÐµÐ½ÐµÐ½Ð¾", "Cancelled"))
         return
-    email = message.text.strip()
+    email = (message.text or "").strip().lower()
     if "@" not in email or "." not in email or len(email) < 5:
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
         await message.answer("âŒ " + ui_text(lang, "Nepareizs e-pasta formÄts. PamÄ“Ä£ini vÄ“lreiz:", "ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹ ÐµÑ‰Ñ‘:", "Invalid e-mail format. Try again:"))
+        return
+    user = await db.get_user(message.from_user.id)
+    lang = user.get("lang", "ru") if user else "ru"
+    if await email_claim_is_blocked(message, email, lang):
         return
 
     data = await state.get_data()
@@ -1996,7 +2036,7 @@ async def giveaway_receive_email(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     await db.set_user_email(user_id, email)
-    await attach_pending_email_purchases(user_id, email, "lv", message.from_user.username or "")
+    await attach_pending_email_purchases(user_id, email, lang, message.from_user.username or "")
     await db.enter_giveaway(user_id, month)
     count = await db.get_giveaway_count(month)
     _, prize_days = await _giveaway_settings()
@@ -2588,11 +2628,15 @@ async def course_receive_email(message: Message, state: FSMContext):
         await message.answer("âŒ")
         return
     
-    email = message.text.strip()
+    email = (message.text or "").strip().lower()
     if "@" not in email or "." not in email or len(email) < 5:
         user = await db.get_user(message.from_user.id)
         lang = user.get("lang", "ru") if user else "ru"
         await message.answer("âŒ " + ("Nepareizs e-pasts. PamÄ“Ä£ini vÄ“lreiz:" if lang == "lv" else ("ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ e-mail. ÐŸÐ¾Ð¿Ñ€Ð¾Ð±ÑƒÐ¹:" if lang == "ru" else "Invalid e-mail. Try:")))
+        return
+    user = await db.get_user(message.from_user.id)
+    lang = user.get("lang", "ru") if user else "ru"
+    if await email_claim_is_blocked(message, email, lang):
         return
     
     data = await state.get_data()
@@ -2600,7 +2644,7 @@ async def course_receive_email(message: Message, state: FSMContext):
     await state.clear()
     
     await db.set_user_email(message.from_user.id, email)
-    await attach_pending_email_purchases(message.from_user.id, email, "lv", message.from_user.username or "")
+    await attach_pending_email_purchases(message.from_user.id, email, lang, message.from_user.username or "")
     user = await db.get_user(message.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     
@@ -2945,7 +2989,7 @@ async def check_payment_cb(callback: CallbackQuery):
 async def _do_activate(user_id, plan_key, plan, lang, username, tx_hash, amount, explicit_expires_at=None):
     now = datetime.utcnow()
     product_meta = resolve_subscription_product(plan_key, lang)
-    canonical_key = product_meta.get("product_key", plan_key)
+    canonical_key = product_meta.get("product_key", plan_key) if product_meta else plan_key
     plan_name_save = plan['name']['ru'] if isinstance(plan['name'], dict) else plan['name']
     if product_meta and isinstance(product_meta.get("name"), dict):
         plan_name_save = product_meta["name"].get("ru", plan_name_save)
@@ -4351,30 +4395,54 @@ def _webhook_expiry_from_payload(payload: dict):
     return None
 
 
-async def website_purchase_webhook(request: web.Request):
-    raw_body = await request.read()
-    if not _verify_webhook_request(raw_body, request):
-        return web.json_response({
+_BULK_WEBHOOK_KEYS = ("subscribers", "users", "items", "purchases")
+
+
+def _bulk_webhook_items(payload):
+    if isinstance(payload, list):
+        return {}, payload
+    if not isinstance(payload, dict):
+        return None, None
+    for key in _BULK_WEBHOOK_KEYS:
+        items = payload.get(key)
+        if isinstance(items, list):
+            defaults = {k: v for k, v in payload.items() if k not in _BULK_WEBHOOK_KEYS}
+            return defaults, items
+    return None, None
+
+
+async def _process_website_purchase_payload(payload: dict, raw_body: bytes):
+    if not isinstance(payload, dict):
+        return {
             "ok": False,
-            "status": "unauthorized",
-            "error": "unauthorized",
-            "message": "Webhook signature check failed.",
-        }, status=401)
-    try:
-        payload = json.loads(raw_body.decode("utf-8"))
-    except Exception:
-        return web.json_response({
-            "ok": False,
-            "status": "invalid_json",
-            "error": "invalid_json",
-            "message": "Request body is not valid JSON.",
-        }, status=400)
+            "status": "invalid_payload",
+            "error": "invalid_payload",
+            "message": "Webhook payload must be a JSON object.",
+        }, 400
 
     email = str(payload.get("email") or payload.get("user_email") or "").strip().lower()
     payment_system = str(payload.get("payment_system") or payload.get("payment_method") or "").strip()
     event_id = str(payload.get("event_id") or payload.get("order_id") or payload.get("payment_id") or "").strip()
-    amount = float(payload.get("amount") or payload.get("amount_usd") or payload.get("amount_usdt") or 0)
-    product_key, plan, plan_error = _webhook_plan_from_payload(payload)
+    try:
+        amount = float(payload.get("amount") or payload.get("amount_usd") or payload.get("amount_usdt") or 0)
+    except (TypeError, ValueError):
+        return {
+            "ok": False,
+            "status": "invalid_amount",
+            "error": "invalid_amount",
+            "message": "Webhook amount must be numeric when provided.",
+            "email": email,
+        }, 400
+    try:
+        product_key, plan, plan_error = _webhook_plan_from_payload(payload)
+    except (TypeError, ValueError):
+        return {
+            "ok": False,
+            "status": "invalid_product",
+            "error": "invalid_product",
+            "message": "Webhook product/subscription_days could not be parsed.",
+            "email": email,
+        }, 400
     explicit_expires_at = _webhook_expiry_from_payload(payload)
     raw_expires_value = (
         payload.get("expires_at")
@@ -4386,27 +4454,30 @@ async def website_purchase_webhook(request: web.Request):
     )
 
     if not email or "@" not in email:
-        return web.json_response({
+        return {
             "ok": False,
             "status": "email_required",
             "error": "email_required",
             "message": "A valid e-mail is required in webhook payload.",
-        }, status=400)
+        }, 400
     if plan_error:
-        return web.json_response({
+        return {
             "ok": False,
             "status": "invalid_product",
             "error": plan_error,
             "message": f"Webhook payload could not be mapped to a valid product: {plan_error}.",
-        }, status=400)
+            "email": email,
+        }, 400
     if raw_expires_value and explicit_expires_at is None:
-        return web.json_response({
+        return {
             "ok": False,
             "status": "invalid_expires_at",
             "error": "invalid_expires_at",
             "message": "Webhook expires_at/expires_date format could not be parsed.",
             "received_value": str(raw_expires_value),
-        }, status=400)
+            "email": email,
+            "product_key": product_key,
+        }, 400
     if not event_id:
         event_id = hashlib.sha256(raw_body).hexdigest()
     event_key = f"{payment_system or 'website'}:{event_id}"
@@ -4429,7 +4500,7 @@ async def website_purchase_webhook(request: web.Request):
             response["telegram_user_id"] = user["user_id"]
             if user.get("username"):
                 response["telegram_username"] = user["username"]
-        return web.json_response(response)
+        return response, 200
 
     user = await db.get_user_by_email(email)
     if not user:
@@ -4458,6 +4529,7 @@ async def website_purchase_webhook(request: web.Request):
                 chat_id=product_meta.get("chat_id", 0) if product_meta else 0,
                 chat_link=product_meta.get("chat_link", "") if product_meta else "",
                 payment_system=payment_system or "webhook",
+                amount_usdt=amount,
             )
         except Exception:
             await notify_admins_error(f"webhook_pending_save {email} {product_key}", "Failed to save pending e-mail purchase")
@@ -4468,7 +4540,7 @@ async def website_purchase_webhook(request: web.Request):
                 await bot.send_message(aid, f"⚠️ *Webhook purchase without bot user*\n\n📧 `{email}`\n📦 `{product_key}`\n💳 `{payment_system}`", parse_mode="Markdown")
             except Exception:
                 pass
-        return web.json_response({
+        return {
             "ok": True,
             "status": "pending_email_claim",
             "message": "Purchase was received and saved by e-mail. It will be attached when the user registers in the bot with this e-mail.",
@@ -4476,8 +4548,9 @@ async def website_purchase_webhook(request: web.Request):
             "email": email,
             "product_key": product_key,
             "event_id": event_id,
+            "amount": amount,
             "expires_at": pending_expires.isoformat(),
-        })
+        }, 200
 
     lang = user.get("lang", "ru")
     username = user.get("username") or ""
@@ -4518,7 +4591,7 @@ async def website_purchase_webhook(request: web.Request):
         logger.warning(f"Failed to notify webhook buyer {user['user_id']}: {e}")
         await notify_admins_error(f"webhook_notify_user user={user['user_id']} product={product_key}", e)
 
-    return web.json_response({
+    return {
         "ok": True,
         "status": "processed",
         "message": "Webhook received and purchase processed successfully.",
@@ -4528,8 +4601,122 @@ async def website_purchase_webhook(request: web.Request):
         "email": email,
         "product_key": product_key,
         "event_id": event_id,
+        "amount": amount,
         "expires_at": new_exp.isoformat(),
-    })
+    }, 200
+
+
+async def _process_bulk_website_purchase_payload(defaults: dict, items: list, raw_body: bytes):
+    batch_id = str(
+        defaults.get("batch_id")
+        or defaults.get("event_id")
+        or defaults.get("order_id")
+        or hashlib.sha256(raw_body).hexdigest()[:16]
+    )
+    results = []
+    success_count = 0
+    failed_count = 0
+    duplicate_count = 0
+
+    for index, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            failed_count += 1
+            results.append({
+                "index": index,
+                "ok": False,
+                "status": "invalid_item",
+                "message": "Each bulk item must be a JSON object.",
+            })
+            continue
+
+        item_has_event_id = bool(item.get("event_id") or item.get("order_id") or item.get("payment_id"))
+        merged = dict(defaults)
+        merged.update(item)
+        if not item_has_event_id:
+            merged.pop("event_id", None)
+            merged.pop("order_id", None)
+            merged.pop("payment_id", None)
+            item_fingerprint = hashlib.sha256(
+                json.dumps(merged, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            ).hexdigest()[:12]
+            merged["event_id"] = f"{batch_id}:{index}:{item_fingerprint}"
+
+        item_body = json.dumps(merged, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        try:
+            result, status_code = await _process_website_purchase_payload(merged, item_body)
+        except Exception as e:
+            failed_count += 1
+            email = str(merged.get("email") or merged.get("user_email") or "").strip().lower()
+            await notify_admins_error(f"bulk_webhook_item index={index} email={email or '-'}", e)
+            results.append({
+                "index": index,
+                "ok": False,
+                "status": "internal_error",
+                "message": str(e)[:300],
+                "email": email,
+            })
+            continue
+
+        compact = {
+            "index": index,
+            "ok": bool(result.get("ok")),
+            "status": result.get("status"),
+            "email": result.get("email"),
+            "product_key": result.get("product_key"),
+            "telegram_linked": result.get("telegram_linked", False),
+            "event_id": result.get("event_id"),
+        }
+        if result.get("telegram_user_id"):
+            compact["telegram_user_id"] = result.get("telegram_user_id")
+        if result.get("expires_at"):
+            compact["expires_at"] = result.get("expires_at")
+        results.append(compact)
+
+        if result.get("status") == "duplicate":
+            duplicate_count += 1
+        elif status_code >= 400 or not result.get("ok"):
+            failed_count += 1
+        else:
+            success_count += 1
+
+    return web.json_response({
+        "ok": failed_count == 0,
+        "status": "bulk_processed",
+        "batch_id": batch_id,
+        "total": len(items),
+        "processed": success_count,
+        "duplicates": duplicate_count,
+        "failed": failed_count,
+        "results": results[:200],
+        "results_truncated": len(results) > 200,
+    }, status=200 if failed_count < len(items) else 400)
+
+
+async def website_purchase_webhook(request: web.Request):
+    raw_body = await request.read()
+    if not _verify_webhook_request(raw_body, request):
+        return web.json_response({
+            "ok": False,
+            "status": "unauthorized",
+            "error": "unauthorized",
+            "message": "Webhook signature check failed.",
+        }, status=401)
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        return web.json_response({
+            "ok": False,
+            "status": "invalid_json",
+            "error": "invalid_json",
+            "message": "Request body is not valid JSON.",
+        }, status=400)
+
+    defaults, bulk_items = _bulk_webhook_items(payload)
+    if bulk_items is not None:
+        return await _process_bulk_website_purchase_payload(defaults, bulk_items, raw_body)
+
+    response, status_code = await _process_website_purchase_payload(payload, raw_body)
+    return web.json_response(response, status=status_code)
 
 
 async def webhook_health(request: web.Request):
