@@ -24,10 +24,12 @@ REFERRAL_BONUS_DAYS = 0
 SUPPORTED_LANGS = ("ru", "en", "lv")
 DEFAULT_LANG = "lv"
 SUBSCRIPTION_GRACE_DAYS = 5
+VIP_CHAT_PRICE_LABEL = "9.90 EUR"
+SCANNER_PRICE_LABEL = "15 EUR"
 VIP_CHANNEL_LANGS = ("lv", "ru")
 VIP_CHANNEL_LABELS = {
-    "lv": "ðŸ‡±ðŸ‡» LatvieÅ¡u",
-    "ru": "ðŸ‡·ðŸ‡º Ð ÑƒÑÑÐºÐ¸Ð¹",
+    "lv": f"🇱🇻 Latviešu — {VIP_CHAT_PRICE_LABEL}",
+    "ru": f"🇷🇺 Русский — {VIP_CHAT_PRICE_LABEL}",
 }
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -455,7 +457,20 @@ def menu_button(emoji, label):
     return f"{emoji}  {label}"
 
 def market_scanner_label(lang):
-    return ui_text(lang, "PRO Tirgus Skaneris/AI Signāli", "PRO Сканер рынка/AI сигналы", "PRO Market Scanner/AI Signals")
+    return ui_text(
+        lang,
+        f"PRO Tirgus Skaneris/AI Signāli — {SCANNER_PRICE_LABEL}",
+        f"PRO Сканер рынка/AI сигналы — {SCANNER_PRICE_LABEL}",
+        f"PRO Market Scanner/AI Signals — {SCANNER_PRICE_LABEL}",
+    )
+
+def vip_chat_menu_label(lang):
+    return ui_text(
+        lang,
+        f"VIP Treideru čats — {VIP_CHAT_PRICE_LABEL}",
+        f"VIP чат трейдеров — {VIP_CHAT_PRICE_LABEL}",
+        f"VIP Traders Chat — {VIP_CHAT_PRICE_LABEL}",
+    )
 
 def email_binding_notice(lang):
     return ui_text(
@@ -1106,19 +1121,19 @@ async def _send_referral_reminder(user_id, lang):
 def main_menu_keyboard(lang):
     b = InlineKeyboardBuilder()
     if lang == "lv":
-        b.button(text=menu_button("💎", "VIP Treideru čats"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", vip_chat_menu_label(lang)), callback_data="vip_chat_plans")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "MNtradepro kursi"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Iestatījumi"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Atbalsts"), callback_data="user_support")
     elif lang == "ru":
-        b.button(text=menu_button("💎", "VIP чат трейдеров"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", vip_chat_menu_label(lang)), callback_data="vip_chat_plans")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "Курсы MNtradepro Academy"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Настройки"), callback_data="user_settings")
         b.button(text=menu_button("📩", "Поддержка"), callback_data="user_support")
     else:
-        b.button(text=menu_button("💎", "VIP Traders Chat"), callback_data="vip_chat_plans")
+        b.button(text=menu_button("💎", vip_chat_menu_label(lang)), callback_data="vip_chat_plans")
         b.button(text=menu_button("📡", market_scanner_label(lang)), callback_data="market_scanner")
         b.button(text=menu_button("📚", "MNtradepro Courses"), callback_data="courses_menu")
         b.button(text=menu_button("⚙️", "Settings"), callback_data="user_settings")
@@ -1445,16 +1460,16 @@ async def cb_market_scanner(callback: CallbackQuery):
     checkout_url = await checkout_url_for_subscription_product("scanner_chat", lang)
     default_text = ui_text(
         lang,
-        "📡 *Tirgus Skaneris/AI signāli*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski iedos jaunu piekļuvi.",
-        "📡 *Сканер рынка/AI сигналы*\n\nПокупка происходит на сайте. После оплаты бот автоматически выдаст доступ.",
-        "📡 *Market Scanner/AI Signals*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
+        f"📡 *Tirgus Skaneris/AI signāli — {SCANNER_PRICE_LABEL}*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski iedos jaunu piekļuvi.",
+        f"📡 *Сканер рынка/AI сигналы — {SCANNER_PRICE_LABEL}*\n\nПокупка происходит на сайте. После оплаты бот автоматически выдаст доступ.",
+        f"📡 *Market Scanner/AI Signals — {SCANNER_PRICE_LABEL}*\n\nPurchase happens on the website. After payment the bot will grant access automatically.",
     )
     text = await override_text("scanner_text", lang, default_text)
     b = InlineKeyboardBuilder()
     if checkout_url:
-        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), url=checkout_url)
+        b.button(text=ui_text(lang, f"💳 Maksāt — {SCANNER_PRICE_LABEL}", f"💳 Оплатить — {SCANNER_PRICE_LABEL}", f"💳 Pay — {SCANNER_PRICE_LABEL}"), url=checkout_url)
     else:
-        b.button(text=ui_text(lang, "💳 Maksāt ar karti / banku / crypto", "💳 Оплатить картой / банком / crypto", "💳 Pay with card / bank / crypto"), callback_data="scanner_checkout_missing")
+        b.button(text=ui_text(lang, f"💳 Maksāt — {SCANNER_PRICE_LABEL}", f"💳 Оплатить — {SCANNER_PRICE_LABEL}", f"💳 Pay — {SCANNER_PRICE_LABEL}"), callback_data="scanner_checkout_missing")
     b.button(text=back_button_text(lang), callback_data="back_to_main")
     b.adjust(1)
     await callback.message.answer(text, reply_markup=b.as_markup(), parse_mode="Markdown")
@@ -2270,15 +2285,7 @@ async def courses_menu(callback: CallbackQuery):
     b = InlineKeyboardBuilder()
     # RÄdÄm visus kursus
     for key, course in config.COURSES.items():
-        saved_price = await db.get_setting(f"course_price_{key}")
-        if saved_price:
-            try:
-                p = float(saved_price)
-                price_str = _format_eur_price(p)
-            except:
-                price_str = course['price_usd']
-        else:
-            price_str = course['price_usd']
+        price_str = course['price_usd']
         name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
         b.button(text=f"{course['emoji']} {name} — {price_str}", callback_data=f"course_info_{key}")
     
@@ -2302,8 +2309,7 @@ async def course_info_menu(callback: CallbackQuery):
     lang = user.get("lang", "ru") if user else "ru"
     ui_lang = _course_ui_lang(lang)
     
-    saved_price = await db.get_setting(f"course_price_{course_key}")
-    price = float(saved_price) if saved_price else course['price_usdt']
+    price = course['price_usdt']
     price_str = _format_eur_price(price)
     
     name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
@@ -2358,8 +2364,7 @@ async def course_language_selected(callback: CallbackQuery):
     user = await db.get_user(callback.from_user.id)
     lang = user.get("lang", "ru") if user else "ru"
     ui_lang = _course_ui_lang(lang)
-    saved_price = await db.get_setting(f"course_price_{course_key}")
-    price = float(saved_price) if saved_price else course['price_usdt']
+    price = course['price_usdt']
     price_str = _format_eur_price(price)
     name = course['name'][ui_lang] if isinstance(course['name'], dict) else course['name']
     selected_lang_label = {"lv": "🇱🇻 Latviešu", "en": "🇬🇧 English", "ru": "🇷🇺 Русский"}[course_lang]
@@ -3131,11 +3136,11 @@ async def show_vip_chat_plans(callback: CallbackQuery):
         await callback.answer()
         return
     default_text = (
-        "💎 *Izvēlies VIP čatu:*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski piesaistīs piekļuvi pēc tava e-pasta."
+        f"💎 *Izvēlies VIP čatu — {VIP_CHAT_PRICE_LABEL}:*\n\nPirkums notiek mājaslapā. Pēc apmaksas bots automātiski piesaistīs piekļuvi pēc tava e-pasta."
         if lang == "lv" else
-        ("💎 *Выбери VIP чат:*\n\nПокупка происходит на сайте. После оплаты бот автоматически привяжет доступ по твоему e-mail."
+        (f"💎 *Выбери VIP чат — {VIP_CHAT_PRICE_LABEL}:*\n\nПокупка происходит на сайте. После оплаты бот автоматически привяжет доступ по твоему e-mail."
          if lang == "ru" else
-         "💎 *Choose VIP chat:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
+         f"💎 *Choose VIP chat — {VIP_CHAT_PRICE_LABEL}:*\n\nPurchase happens on the website. After payment the bot will link access by your e-mail.")
     )
     text = await override_text("vip_intro", lang, default_text)
     await callback.message.edit_text(text, reply_markup=await vip_channel_keyboard(lang), parse_mode="Markdown")
@@ -4749,6 +4754,13 @@ async def main():
     # Admins are always in the friend list.
     for admin_id in config.ADMIN_IDS:
         await db.register_user_as_friend(admin_id)
+    old_monthly_price = await db.get_setting("price_monthly")
+    if old_monthly_price:
+        try:
+            if float(old_monthly_price) == 10.0:
+                await db.set_setting("price_monthly", "9.9")
+        except Exception:
+            pass
     for pk, plan in config.PLANS.items():
         sp = await db.get_setting(f"price_{pk}")
         if sp:

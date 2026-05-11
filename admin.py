@@ -693,24 +693,18 @@ def checkout_link_labels():
         "checkout_url_scanner_chat_lv": "PRO Market Scanner/AI Signals button - Latvian",
         "checkout_url_scanner_chat_en": "PRO Market Scanner/AI Signals button - English",
         "checkout_url_scanner_chat_ru": "PRO Market Scanner/AI Signals button - Russian",
-        "price_monthly": "VIP 1 month price",
-        "course_price_mini": "Mini course price",
         "course_checkout_url_mini_lv": "Mini course checkout button - Latvian course",
         "course_checkout_url_mini_en": "Mini course checkout button - English course",
         "course_checkout_url_mini_ru": "Mini course checkout button - Russian course",
-        "course_price_basic": "Basic course price",
         "course_checkout_url_basic_lv": "Basic course checkout button - Latvian course",
         "course_checkout_url_basic_en": "Basic course checkout button - English course",
         "course_checkout_url_basic_ru": "Basic course checkout button - Russian course",
-        "course_price_full": "Full course price",
         "course_checkout_url_full_lv": "Full course checkout button - Latvian course",
         "course_checkout_url_full_en": "Full course checkout button - English course",
         "course_checkout_url_full_ru": "Full course checkout button - Russian course",
-        "course_price_autotrading": "Autotrading course price",
         "course_checkout_url_autotrading_lv": "Autotrading course checkout button - Latvian course",
         "course_checkout_url_autotrading_en": "Autotrading course checkout button - English course",
         "course_checkout_url_autotrading_ru": "Autotrading course checkout button - Russian course",
-        "course_price_vip": "VIP mentoring course price",
         "course_checkout_url_vip_lv": "VIP mentoring course checkout button - Latvian course",
         "course_checkout_url_vip_en": "VIP mentoring course checkout button - English course",
         "course_checkout_url_vip_ru": "VIP mentoring course checkout button - Russian course",
@@ -728,15 +722,9 @@ async def build_checkout_links_panel(prefix: str = ""):
         "checkout_url_scanner_chat_en",
         "checkout_url_scanner_chat_ru",
         "checkout_url_scanner_chat",
-        "price_monthly",
     ):
-        value = await db.get_setting(key)
-        shown = value if key.startswith("price_") and value else setting_status(value)
-        rows.append(f"<b>{h(labels.get(key, key))}</b>: <code>{h(shown)}</code>")
+        rows.append(f"<b>{h(labels.get(key, key))}</b>: <code>{h(setting_status(await db.get_setting(key)))}</code>")
     for course_key in config.COURSES.keys():
-        price_key = f"course_price_{course_key}"
-        price_value = await db.get_setting(price_key)
-        rows.append(f"<b>{h(labels.get(price_key, price_key))}</b>: <code>{h(price_value or 'default')}</code>")
         for lang_code in ("lv", "en", "ru"):
             checkout_key = f"course_checkout_url_{course_key}_{lang_code}"
             rows.append(f"<b>{h(labels.get(checkout_key, checkout_key))}</b>: <code>{h(setting_status(await db.get_setting(checkout_key)))}</code>")
@@ -747,31 +735,25 @@ async def build_checkout_links_panel(prefix: str = ""):
     b.button(text="Scanner LV", callback_data="adm_link_checkout_url_scanner_chat_lv")
     b.button(text="Scanner EN", callback_data="adm_link_checkout_url_scanner_chat_en")
     b.button(text="Scanner RU", callback_data="adm_link_checkout_url_scanner_chat_ru")
-    b.button(text="VIP monthly price", callback_data="adm_price_price_monthly")
-    b.button(text="Mini price", callback_data="adm_price_course_price_mini")
     b.button(text="Mini checkout LV", callback_data="adm_link_course_checkout_url_mini_lv")
     b.button(text="Mini checkout EN", callback_data="adm_link_course_checkout_url_mini_en")
     b.button(text="Mini checkout RU", callback_data="adm_link_course_checkout_url_mini_ru")
-    b.button(text="Basic price", callback_data="adm_price_course_price_basic")
     b.button(text="Basic checkout LV", callback_data="adm_link_course_checkout_url_basic_lv")
     b.button(text="Basic checkout EN", callback_data="adm_link_course_checkout_url_basic_en")
     b.button(text="Basic checkout RU", callback_data="adm_link_course_checkout_url_basic_ru")
-    b.button(text="Full price", callback_data="adm_price_course_price_full")
     b.button(text="Full checkout LV", callback_data="adm_link_course_checkout_url_full_lv")
     b.button(text="Full checkout EN", callback_data="adm_link_course_checkout_url_full_en")
     b.button(text="Full checkout RU", callback_data="adm_link_course_checkout_url_full_ru")
-    b.button(text="Autotrading price", callback_data="adm_price_course_price_autotrading")
     b.button(text="Autotrading checkout LV", callback_data="adm_link_course_checkout_url_autotrading_lv")
     b.button(text="Autotrading checkout EN", callback_data="adm_link_course_checkout_url_autotrading_en")
     b.button(text="Autotrading checkout RU", callback_data="adm_link_course_checkout_url_autotrading_ru")
-    b.button(text="VIP mentoring price", callback_data="adm_price_course_price_vip")
     b.button(text="VIP mentoring checkout LV", callback_data="adm_link_course_checkout_url_vip_lv")
     b.button(text="VIP mentoring checkout EN", callback_data="adm_link_course_checkout_url_vip_en")
     b.button(text="VIP mentoring checkout RU", callback_data="adm_link_course_checkout_url_vip_ru")
     b.button(text="Back", callback_data="adm_main")
     b.adjust(2)
     text = (
-        "<b>Checkout links and prices</b>\n\n"
+        "<b>Checkout links</b>\n\n"
         "Status shows whether a checkout URL is saved. Open a button to view or replace the full URL.\n\n"
         + "\n".join(rows)
     )

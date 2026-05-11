@@ -42,8 +42,8 @@ class Config:
     PLANS: Dict[str, Any] = field(default_factory=lambda: {
         "monthly": {
             "name": {"ru": "1 месяц", "en": "1 Month", "lv": "1 mēnesis"},
-            "price_usd": "10 EUR",
-            "price_usdt": 10.0,
+            "price_usd": "9.90 EUR",
+            "price_usdt": 9.9,
             "days": 30,
             "emoji": "📅",
         },
