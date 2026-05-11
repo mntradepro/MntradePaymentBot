@@ -156,6 +156,17 @@ def setting_status(value, empty_label="empty") -> str:
     return "set"
 
 
+async def checkout_effective_status(primary_key: str, fallback_key: str = None) -> str:
+    primary = await db.get_setting(primary_key)
+    if primary and str(primary).strip():
+        return "set"
+    if fallback_key:
+        fallback = await db.get_setting(fallback_key)
+        if fallback and str(fallback).strip():
+            return "fallback"
+    return "empty"
+
+
 def back_kb(cb: str = "adm_main"):
     b = InlineKeyboardBuilder()
     b.button(text="Back", callback_data=cb)
@@ -723,11 +734,13 @@ async def build_checkout_links_panel(prefix: str = ""):
         "checkout_url_scanner_chat_ru",
         "checkout_url_scanner_chat",
     ):
-        rows.append(f"<b>{h(labels.get(key, key))}</b>: <code>{h(setting_status(await db.get_setting(key)))}</code>")
+        fallback_key = "checkout_url_scanner_chat" if key.startswith("checkout_url_scanner_chat_") else None
+        rows.append(f"<b>{h(labels.get(key, key))}</b>: <code>{h(await checkout_effective_status(key, fallback_key))}</code>")
     for course_key in config.COURSES.keys():
         for lang_code in ("lv", "en", "ru"):
             checkout_key = f"course_checkout_url_{course_key}_{lang_code}"
-            rows.append(f"<b>{h(labels.get(checkout_key, checkout_key))}</b>: <code>{h(setting_status(await db.get_setting(checkout_key)))}</code>")
+            fallback_key = f"course_checkout_url_{course_key}"
+            rows.append(f"<b>{h(labels.get(checkout_key, checkout_key))}</b>: <code>{h(await checkout_effective_status(checkout_key, fallback_key))}</code>")
     b = InlineKeyboardBuilder()
     b.button(text="VIP button LV", callback_data="adm_link_checkout_url_lv")
     b.button(text="VIP button EN", callback_data="adm_link_checkout_url_en")
