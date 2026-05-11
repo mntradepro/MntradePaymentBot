@@ -150,6 +150,12 @@ def trim(text: str, limit: int = 3900) -> str:
     return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
 
 
+def setting_status(value, empty_label="empty") -> str:
+    if value is None or str(value).strip() == "":
+        return empty_label
+    return "set"
+
+
 def back_kb(cb: str = "adm_main"):
     b = InlineKeyboardBuilder()
     b.button(text="Back", callback_data=cb)
@@ -724,13 +730,16 @@ async def build_checkout_links_panel(prefix: str = ""):
         "checkout_url_scanner_chat",
         "price_monthly",
     ):
-        rows.append(f"<b>{h(labels.get(key, key))}</b>\n<code>{h(key)}</code> = <code>{h(await db.get_setting(key) or '(empty)')}</code>")
+        value = await db.get_setting(key)
+        shown = value if key.startswith("price_") and value else setting_status(value)
+        rows.append(f"<b>{h(labels.get(key, key))}</b>: <code>{h(shown)}</code>")
     for course_key in config.COURSES.keys():
         price_key = f"course_price_{course_key}"
-        rows.append(f"<b>{h(labels.get(price_key, price_key))}</b>\n<code>{h(price_key)}</code> = <code>{h(await db.get_setting(price_key) or '(default)')}</code>")
+        price_value = await db.get_setting(price_key)
+        rows.append(f"<b>{h(labels.get(price_key, price_key))}</b>: <code>{h(price_value or 'default')}</code>")
         for lang_code in ("lv", "en", "ru"):
             checkout_key = f"course_checkout_url_{course_key}_{lang_code}"
-            rows.append(f"<b>{h(labels.get(checkout_key, checkout_key))}</b>\n<code>{h(checkout_key)}</code> = <code>{h(await db.get_setting(checkout_key) or '(empty)')}</code>")
+            rows.append(f"<b>{h(labels.get(checkout_key, checkout_key))}</b>: <code>{h(setting_status(await db.get_setting(checkout_key)))}</code>")
     b = InlineKeyboardBuilder()
     b.button(text="VIP button LV", callback_data="adm_link_checkout_url_lv")
     b.button(text="VIP button EN", callback_data="adm_link_checkout_url_en")
@@ -763,12 +772,7 @@ async def build_checkout_links_panel(prefix: str = ""):
     b.adjust(2)
     text = (
         "<b>Checkout links and prices</b>\n\n"
-        "Use the labels below exactly like this:\n"
-        "- VIP chat button - Latvian = link for the Latvian VIP chat purchase button\n"
-        "- VIP chat button - English = link for the English VIP chat purchase button\n"
-        "- VIP chat button - Russian = link for the Russian VIP chat purchase button\n"
-        "- PRO Market Scanner/AI Signals button - Latvian/English/Russian = scanner checkout for that user language\n"
-        "- Course checkout button - Latvian/English/Russian = link for that exact course language button after the user chooses the course language\n\n"
+        "Status shows whether a checkout URL is saved. Open a button to view or replace the full URL.\n\n"
         + "\n".join(rows)
     )
     if prefix:
