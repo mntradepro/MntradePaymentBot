@@ -229,28 +229,17 @@ def menu_kb():
 
 
 def configured_chat_rows():
-    rows = [
-        ("VIP Default", "monthly / vip_chat_lv", config.CHAT_ID, config.CHAT_LINK),
-        ("VIP LV", "vip_chat_lv", config.CHAT_IDS.get("lv", 0), config.CHAT_LINKS.get("lv", "")),
-        ("VIP EN", "vip_chat_en", config.CHAT_IDS.get("en", 0), config.CHAT_LINKS.get("en", "")),
-        ("VIP RU", "vip_chat_ru", config.CHAT_IDS.get("ru", 0), config.CHAT_LINKS.get("ru", "")),
-        ("Scanner", "scanner_chat", getattr(config, "SCANNER_CHAT_ID", 0), getattr(config, "SCANNER_CHAT_LINK", "")),
+    return [
+        ("LV VIP čats", "vip_chat_lv", config.CHAT_IDS.get("lv", config.CHAT_ID), config.CHAT_LINKS.get("lv", config.CHAT_LINK)),
+        ("EN VIP čats", "vip_chat_en", config.CHAT_IDS.get("en", config.CHAT_ID), config.CHAT_LINKS.get("en", config.CHAT_LINK)),
+        ("RU VIP čats", "vip_chat_ru", config.CHAT_IDS.get("ru", config.CHAT_ID), config.CHAT_LINKS.get("ru", config.CHAT_LINK)),
+        ("Scanner čats", "scanner_chat", getattr(config, "SCANNER_CHAT_ID", 0), getattr(config, "SCANNER_CHAT_LINK", "")),
     ]
-    seen, out = set(), []
-    for label, webhook_key, chat_id, link in rows:
-        if chat_id and chat_id not in seen:
-            seen.add(chat_id)
-            out.append((label, webhook_key, int(chat_id), link or ""))
-    return out
 
 
 def managed_chat_webhook_key(item: dict) -> str:
-    raw = item.get("title") or item.get("username") or str(item.get("chat_id") or "")
-    slug = "".join(ch for ch in str(raw).strip().lower() if ch.isalnum())
     chat_id = str(item.get("chat_id") or "").strip()
-    if slug and chat_id and slug != chat_id.lstrip("-"):
-        return f"{slug} / {chat_id}"
-    return slug or chat_id or "-"
+    return chat_id or "-"
 
 
 def subscription_products():
@@ -466,7 +455,7 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
     counts = await db.get_active_subscription_counts_by_chat()
     managed = await db.get_managed_chats()
     rows = list(configured_chat_rows())
-    seen = {chat_id for _, _, chat_id, _ in rows}
+    seen = {int(chat_id) for _, _, chat_id, _ in rows if chat_id}
     for item in managed:
         chat_id = int(item.get("chat_id") or 0)
         if not chat_id or chat_id in seen:
@@ -474,6 +463,10 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
         seen.add(chat_id)
         label = f"Managed: {item.get('title') or item.get('username') or chat_id}"
         rows.append((label, managed_chat_webhook_key(item), chat_id, item.get("invite_link") or ""))
+    key_rows = "\n".join(
+        f"<code>{h(webhook_key)}</code> = {h(label)} | TG ID: <code>{h(str(chat_id or '-'))}</code>"
+        for label, webhook_key, chat_id, _ in configured_chat_rows()
+    )
     lines = []
     for label, webhook_key, chat_id, link in rows:
         joined, title = "No", "Unknown"
@@ -492,7 +485,14 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
             f"Active subs: <b>{counts.get(chat_id, 0)}</b>\n"
             f"Link: <code>{h(link or '-')}</code>"
         )
-    await render(callback, "<b>Configured chats</b>\n\n" + ("\n\n".join(lines) or "No chats configured."), back_kb())
+    await render(
+        callback,
+        "<b>Webhook product keys</b>\n"
+        f"{key_rows}\n\n"
+        "<b>Configured chats</b>\n\n"
+        + ("\n\n".join(lines) or "No chats configured."),
+        back_kb(),
+    )
     await callback.answer()
 
 
