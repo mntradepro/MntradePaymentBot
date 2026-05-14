@@ -548,6 +548,8 @@ async def checkout_url_for_subscription_product(product_key: str, user_lang: str
     key = normalize_subscription_product_key(product_key, user_lang)
     if key == "vip_chat_lv":
         return (await db.get_setting("checkout_url_lv")) or ""
+    if key == "vip_chat_en":
+        return (await db.get_setting("checkout_url_en")) or ""
     if key == "vip_chat_ru":
         return (await db.get_setting("checkout_url_ru")) or ""
     if key == "scanner_chat":
@@ -567,10 +569,12 @@ def normalize_subscription_product_key(product_key: str, user_lang: str) -> str:
         "vip_chat_lv": "vip_chat_lv",
         "vip_ru": "vip_chat_ru",
         "vip_chat_ru": "vip_chat_ru",
+        "vip_en": "vip_chat_en",
+        "vip_chat_en": "vip_chat_en",
         "scanner": "scanner_chat",
         "scanner_chat": "scanner_chat",
         "market_scanner": "scanner_chat",
-        "monthly": "vip_chat_ru" if user_lang == "ru" else "vip_chat_lv",
+        "monthly": "vip_chat_ru" if user_lang == "ru" else ("vip_chat_en" if user_lang == "en" else "vip_chat_lv"),
     }
     return aliases.get(key, key)
 
@@ -587,6 +591,11 @@ def resolve_subscription_product(product_key: str, user_lang: str) -> dict:
             "chat_id": config.CHAT_IDS.get("ru", config.CHAT_ID),
             "chat_link": config.CHAT_LINKS.get("ru", config.CHAT_LINK),
             "name": {"lv": "VIP Treideru Äats (RU)", "ru": "VIP Ñ‡Ð°Ñ‚ Ñ‚Ñ€ÐµÐ¹Ð´ÐµÑ€Ð¾Ð²", "en": "VIP Traders Chat (RU)"},
+        },
+        "vip_chat_en": {
+            "chat_id": config.CHAT_IDS.get("en", config.CHAT_ID),
+            "chat_link": config.CHAT_LINKS.get("en", config.CHAT_LINK),
+            "name": {"lv": "VIP Treideru chats (EN)", "ru": "VIP chat traders (EN)", "en": "VIP Traders Chat"},
         },
         "scanner_chat": {
             "chat_id": getattr(config, "SCANNER_CHAT_ID", 0),

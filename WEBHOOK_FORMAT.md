@@ -60,6 +60,7 @@ Accepted bulk array keys: `subscribers`, `users`, `items`, `purchases`.
 Recommended migration product keys:
 
 - `vip_chat_lv`: Latvian VIP chat.
+- `vip_chat_en`: English VIP chat, if configured.
 - `vip_chat_ru`: Russian VIP chat.
 - `scanner_chat`: PRO Market Scanner / AI Signals.
 - `monthly`: legacy one-month VIP plan. Prefer explicit chat product keys for imports when possible.
