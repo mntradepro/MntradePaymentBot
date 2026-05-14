@@ -463,10 +463,7 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
         seen.add(chat_id)
         label = f"Managed: {item.get('title') or item.get('username') or chat_id}"
         rows.append((label, managed_chat_webhook_key(item), chat_id, item.get("invite_link") or ""))
-    key_rows = "\n".join(
-        f"<code>{h(webhook_key)}</code> = {h(label)} | TG ID: <code>{h(str(chat_id or '-'))}</code>"
-        for label, webhook_key, chat_id, _ in configured_chat_rows()
-    )
+    chat_titles = {}
     lines = []
     for label, webhook_key, chat_id, link in rows:
         joined, title = "No", "Unknown"
@@ -476,6 +473,7 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
             title = getattr(chat, "title", None) or getattr(chat, "username", None) or "OK"
         except Exception as e:
             title = str(e)[:80]
+        chat_titles[int(chat_id or 0)] = title
         lines.append(
             f"<b>{h(label)}</b>\n"
             f"ID: <code>{chat_id}</code>\n"
@@ -485,6 +483,14 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
             f"Active subs: <b>{counts.get(chat_id, 0)}</b>\n"
             f"Link: <code>{h(link or '-')}</code>"
         )
+    key_rows = "\n\n".join(
+        (
+            f"<code>{h(webhook_key)}</code> = {h(label)}\n"
+            f"TG ID: <code>{h(str(chat_id or '-'))}</code>\n"
+            f"Chat: {h(chat_titles.get(int(chat_id or 0), '-'))}"
+        )
+        for label, webhook_key, chat_id, _ in configured_chat_rows()
+    )
     await render(
         callback,
         "<b>Webhook product keys</b>\n"
