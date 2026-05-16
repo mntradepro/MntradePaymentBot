@@ -524,11 +524,9 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("adm_chat_delete_"))
+@router.callback_query(F.data.startswith("adm_chat_delete_") & ~F.data.startswith("adm_chat_delete_confirm_"))
 async def adm_chat_delete(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
-        return
-    if callback.data.startswith("adm_chat_delete_confirm_"):
         return
     chat_id = callback.data.replace("adm_chat_delete_", "")
     text = (
