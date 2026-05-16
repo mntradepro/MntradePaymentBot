@@ -615,13 +615,27 @@ def _slugify_chat_key(value: str) -> str:
 
 
 async def resolve_subscription_product_any(product_key: str, user_lang: str) -> dict:
+    normalized_key = normalize_subscription_product_key(product_key, user_lang)
+    try:
+        managed_by_key = await db.get_managed_chat_by_webhook_key(normalized_key)
+    except Exception:
+        managed_by_key = None
+    if managed_by_key:
+        label = str(managed_by_key.get("title") or managed_by_key.get("username") or normalized_key or "Managed Chat")
+        return {
+            "product_key": normalized_key,
+            "chat_id": int(managed_by_key.get("chat_id") or 0),
+            "chat_link": str(managed_by_key.get("invite_link") or ""),
+            "name": {"lv": label, "ru": label, "en": label},
+        }
+
     meta = resolve_subscription_product(product_key, user_lang)
-    if meta:
+    if meta and (int(meta.get("chat_id") or 0) or str(meta.get("chat_link") or "").strip()):
         return meta
 
-    wanted = _slugify_chat_key(product_key)
+    wanted = _slugify_chat_key(normalized_key or product_key)
     if not wanted:
-        return {}
+        return meta or {}
 
     try:
         managed_chats = await db.get_managed_chats(active_only=True)
@@ -632,16 +646,18 @@ async def resolve_subscription_product_any(product_key: str, user_lang: str) -> 
         title = str(chat.get("title") or "")
         username = str(chat.get("username") or "")
         invite_link = str(chat.get("invite_link") or "")
+        webhook_key = str(chat.get("webhook_product_key") or "")
         candidates = {
             _slugify_chat_key(title),
             _slugify_chat_key(username),
             _slugify_chat_key(invite_link),
             _slugify_chat_key(str(chat.get("chat_id") or "")),
+            _slugify_chat_key(webhook_key),
         }
         if wanted in candidates:
             label = title or username or product_key or "Managed Chat"
             return {
-                "product_key": product_key,
+                "product_key": webhook_key or normalized_key or product_key,
                 "chat_id": int(chat.get("chat_id") or 0),
                 "chat_link": invite_link,
                 "name": {
@@ -650,7 +666,31 @@ async def resolve_subscription_product_any(product_key: str, user_lang: str) -> 
                     "en": label,
                 },
             }
-    return {}
+    return meta or {}
+
+
+def paid_invite_message(lang: str, product_name: str, expires_at: datetime, invite_text: str) -> str:
+    clean_invite = (invite_text or "").strip()
+    if lang == "lv":
+        return (
+            f"✅ *Paldies par apmaksu!*\n\n"
+            f"📦 Produkts: *{product_name}*\n"
+            f"📅 Aktīvs līdz: *{expires_at.strftime('%d.%m.%Y')}*\n\n"
+            f"🔗 Tavs links uz *{product_name}* ir:\n{clean_invite}"
+        )
+    if lang == "ru":
+        return (
+            f"✅ *Спасибо за оплату!*\n\n"
+            f"📦 Продукт: *{product_name}*\n"
+            f"📅 Активно до: *{expires_at.strftime('%d.%m.%Y')}*\n\n"
+            f"🔗 Твоя ссылка в *{product_name}*:\n{clean_invite}"
+        )
+    return (
+        f"✅ *Thank you for your payment!*\n\n"
+        f"📦 Product: *{product_name}*\n"
+        f"📅 Active until: *{expires_at.strftime('%d.%m.%Y')}*\n\n"
+        f"🔗 Your link to *{product_name}* is:\n{clean_invite}"
+    )
 
 
 async def invite_text_for_product(user_id: int, lang: str, product_meta: dict, expires_at: datetime, debug_source: str = "") -> str:
@@ -734,12 +774,7 @@ async def attach_pending_email_purchases(user_id: int, email: str, lang: str, us
             )
             if invite:
                 product_name = sub.get("product_name") or sub.get("product_key") or "Access"
-                invite_text = ui_text(
-                    lang,
-                    f"âœ… Atrasta iepriekÅ¡Ä“ja apmaksa: *{product_name}*\nðŸ“… AktÄ«vs lÄ«dz: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-                    f"âœ… ÐÐ°Ð¹Ð´ÐµÐ½Ð° Ð¿Ñ€ÐµÐ´Ñ‹Ð´ÑƒÑ‰Ð°Ñ Ð¾Ð¿Ð»Ð°Ñ‚Ð°: *{product_name}*\nðŸ“… ÐÐºÑ‚Ð¸Ð²Ð½Ð¾ Ð´Ð¾: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-                    f"âœ… Previous purchase found: *{product_name}*\nðŸ“… Active until: *{expires_at.strftime('%d.%m.%Y')}*{invite}",
-                )
+                invite_text = paid_invite_message(lang, product_name, expires_at, invite)
                 await bot.send_message(user_id, invite_text, parse_mode="Markdown")
         except Exception as e:
             logger.warning(f"Failed to send claimed invite to user {user_id}: {e}")
@@ -1405,6 +1440,8 @@ async def cmd_startpayment(message: Message):
     if not await user_is_chat_admin(message.chat.id, message.from_user.id):
         await message.answer("Only a chat admin can use this command here.")
         return
+    parts = (message.text or "").strip().split(maxsplit=1)
+    webhook_product_key = normalize_subscription_product_key(parts[1], "lv") if len(parts) > 1 else str(message.chat.id)
     chat = await bot.get_chat(message.chat.id)
     await db.register_managed_chat(
         chat_id=message.chat.id,
@@ -1413,8 +1450,9 @@ async def cmd_startpayment(message: Message):
         chat_type=message.chat.type,
         invite_link=chat_public_link(chat),
         added_by_user_id=message.from_user.id,
+        webhook_product_key=webhook_product_key,
     )
-    await message.answer("This chat is now registered as a managed payment chat.")
+    await message.answer(f"This chat is now registered as a managed payment chat.\nWebhook product key: `{webhook_product_key}`", parse_mode="Markdown")
 
 
 @dp.message(Command(commands=["DELETEPAYMENT", "deletepayment"]))
@@ -4599,15 +4637,18 @@ async def _process_website_purchase_payload(payload: dict, raw_body: bytes):
             new_exp,
             debug_source=f"webhook_paid email={email} product={product_key}",
         )
-        paid_text = await override_text(
-            "payment_success",
-            lang,
-            t(lang, "paid_ok", name=plan_name, expires=new_exp.strftime("%d.%m.%Y"), tx=event_id[:20]),
-            name=plan_name,
-            expires=new_exp.strftime("%d.%m.%Y"),
-            tx=event_id[:20],
-        )
-        await bot.send_message(user["user_id"], paid_text + invite, parse_mode="Markdown")
+        if invite:
+            paid_text = paid_invite_message(lang, plan_name, new_exp, invite)
+        else:
+            paid_text = await override_text(
+                "payment_success",
+                lang,
+                t(lang, "paid_ok", name=plan_name, expires=new_exp.strftime("%d.%m.%Y"), tx=event_id[:20]),
+                name=plan_name,
+                expires=new_exp.strftime("%d.%m.%Y"),
+                tx=event_id[:20],
+            )
+        await bot.send_message(user["user_id"], paid_text, parse_mode="Markdown")
     except Exception as e:
         logger.warning(f"Failed to notify webhook buyer {user['user_id']}: {e}")
         await notify_admins_error(f"webhook_notify_user user={user['user_id']} product={product_key}", e)

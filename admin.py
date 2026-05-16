@@ -238,6 +238,9 @@ def configured_chat_rows():
 
 
 def managed_chat_webhook_key(item: dict) -> str:
+    key = str(item.get("webhook_product_key") or "").strip()
+    if key:
+        return key
     chat_id = str(item.get("chat_id") or "").strip()
     return chat_id or "-"
 
@@ -454,18 +457,10 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
         return
     counts = await db.get_active_subscription_counts_by_chat()
     managed = await db.get_managed_chats()
-    rows = list(configured_chat_rows())
-    seen = {int(chat_id) for _, _, chat_id, _ in rows if chat_id}
-    for item in managed:
-        chat_id = int(item.get("chat_id") or 0)
-        if not chat_id or chat_id in seen:
-            continue
-        seen.add(chat_id)
-        label = f"Managed: {item.get('title') or item.get('username') or chat_id}"
-        rows.append((label, managed_chat_webhook_key(item), chat_id, item.get("invite_link") or ""))
+    configured = list(configured_chat_rows())
     chat_titles = {}
-    lines = []
-    for label, webhook_key, chat_id, link in rows:
+    configured_lines = []
+    for label, webhook_key, chat_id, link in configured:
         joined, title = "No", "Unknown"
         try:
             chat = await bot.get_chat(chat_id)
@@ -474,7 +469,7 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
         except Exception as e:
             title = str(e)[:80]
         chat_titles[int(chat_id or 0)] = title
-        lines.append(
+        configured_lines.append(
             f"<b>{h(label)}</b>\n"
             f"ID: <code>{chat_id}</code>\n"
             f"Webhook product_key: <code>{h(webhook_key)}</code>\n"
@@ -483,6 +478,31 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
             f"Active subs: <b>{counts.get(chat_id, 0)}</b>\n"
             f"Link: <code>{h(link or '-')}</code>"
         )
+    managed_lines = []
+    b = InlineKeyboardBuilder()
+    if managed:
+        for item in managed[:12]:
+            chat_id = int(item.get("chat_id") or 0)
+            joined, title = "No", str(item.get("title") or item.get("username") or chat_id or "Unknown")
+            try:
+                chat = await bot.get_chat(chat_id)
+                joined = "Yes"
+                title = getattr(chat, "title", None) or getattr(chat, "username", None) or title
+            except Exception as e:
+                title = str(item.get("title") or title or str(e)[:80])
+            managed_lines.append(
+                f"<b>{h(str(item.get('title') or item.get('username') or chat_id))}</b>\n"
+                f"ID: <code>{chat_id}</code>\n"
+                f"Webhook product_key: <code>{h(managed_chat_webhook_key(item))}</code>\n"
+                f"Bot joined: <b>{joined}</b>\n"
+                f"Chat: {h(title)}\n"
+                f"Active subs: <b>{counts.get(chat_id, 0)}</b>\n"
+                f"Link: <code>{h(item.get('invite_link') or '-')}</code>"
+            )
+            b.button(text=f"Delete {chat_id}", callback_data=f"adm_chat_delete_{chat_id}")
+        b.button(text="Delete All Managed Chats", callback_data="adm_chat_delete_all")
+    b.button(text="Back", callback_data="adm_main")
+    b.adjust(1)
     key_rows = "\n\n".join(
         (
             f"<code>{h(webhook_key)}</code> = {h(label)}\n"
@@ -495,11 +515,74 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
         callback,
         "<b>Webhook product keys</b>\n"
         f"{key_rows}\n\n"
-        "<b>Configured chats</b>\n\n"
-        + ("\n\n".join(lines) or "No chats configured."),
-        back_kb(),
+        "<b>Configured chats (.env)</b>\n\n"
+        + ("\n\n".join(configured_lines) or "No configured chats.")
+        + "\n\n<b>Managed chat DB</b>\n\n"
+        + ("\n\n".join(managed_lines) or "No managed chats in DB."),
+        b.as_markup(),
     )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_chat_delete_"))
+async def adm_chat_delete(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    if callback.data.startswith("adm_chat_delete_confirm_"):
+        return
+    chat_id = callback.data.replace("adm_chat_delete_", "")
+    text = (
+        "<b>Delete managed chat?</b>\n\n"
+        f"Chat ID: <code>{h(chat_id)}</code>\n\n"
+        "This removes the chat from the managed chat DB only. Configured .env chats will stay unchanged."
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="Yes, delete", callback_data=f"adm_chat_delete_confirm_{chat_id}")
+    b.button(text="Cancel", callback_data="adm_chats")
+    b.adjust(1)
+    await render(callback, text, b.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_chat_delete_confirm_"))
+async def adm_chat_delete_confirm(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+    chat_id_raw = callback.data.replace("adm_chat_delete_confirm_", "")
+    try:
+        chat_id = int(chat_id_raw)
+    except ValueError:
+        await callback.answer("Invalid chat id", show_alert=True)
+        return
+    await db.delete_managed_chat(chat_id)
+    await callback.answer("Managed chat deleted")
+    await adm_chats(callback, bot)
+
+
+@router.callback_query(F.data == "adm_chat_delete_all")
+async def adm_chat_delete_all(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    text = (
+        "<b>Delete all managed chats?</b>\n\n"
+        "This will clear the managed chat DB list and keep only configured .env chats.\n\n"
+        "Are you sure?"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="Yes, delete all", callback_data="adm_chat_delete_all_confirm")
+    b.button(text="Cancel", callback_data="adm_chats")
+    b.adjust(1)
+    await render(callback, text, b.as_markup())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "adm_chat_delete_all_confirm")
+async def adm_chat_delete_all_confirm(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+    await db.delete_all_managed_chats()
+    await callback.answer("All managed chats deleted")
+    await adm_chats(callback, bot)
 
 
 @router.callback_query(F.data == "adm_edit_welcome")

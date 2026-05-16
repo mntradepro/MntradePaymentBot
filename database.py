@@ -159,6 +159,7 @@ class Database:
                     title              TEXT,
                     username           TEXT,
                     chat_type          TEXT,
+                    webhook_product_key TEXT,
                     invite_link        TEXT,
                     added_by_user_id   INTEGER,
                     is_active          INTEGER DEFAULT 1,
@@ -221,6 +222,7 @@ class Database:
                 "ALTER TABLE users ADD COLUMN last_seen_at TEXT",
                 "ALTER TABLE user_subscriptions ADD COLUMN grace_reminder_sent_at TEXT",
                 "ALTER TABLE pending_email_subscriptions ADD COLUMN amount_usdt REAL DEFAULT 0",
+                "ALTER TABLE managed_chats ADD COLUMN webhook_product_key TEXT",
             ]:
                 try:
                     await conn.execute(col_sql)
@@ -753,22 +755,23 @@ class Database:
             )
             await conn.commit()
 
-    async def register_managed_chat(self, chat_id: int, title: str, username: str, chat_type: str, invite_link: str, added_by_user_id: int):
+    async def register_managed_chat(self, chat_id: int, title: str, username: str, chat_type: str, invite_link: str, added_by_user_id: int, webhook_product_key: str = ""):
         now = datetime.utcnow().isoformat()
         async with aiosqlite.connect(self.db_path) as conn:
             await conn.execute("""
-                INSERT INTO managed_chats (chat_id, title, username, chat_type, invite_link, added_by_user_id, is_active, added_at, removed_at)
-                VALUES (?, ?, ?, ?, ?, ?, 1, ?, NULL)
+                INSERT INTO managed_chats (chat_id, title, username, chat_type, webhook_product_key, invite_link, added_by_user_id, is_active, added_at, removed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, NULL)
                 ON CONFLICT(chat_id) DO UPDATE SET
                     title = excluded.title,
                     username = excluded.username,
                     chat_type = excluded.chat_type,
+                    webhook_product_key = excluded.webhook_product_key,
                     invite_link = excluded.invite_link,
                     added_by_user_id = excluded.added_by_user_id,
                     is_active = 1,
                     added_at = excluded.added_at,
                     removed_at = NULL
-            """, (chat_id, title, username, chat_type, invite_link, added_by_user_id, now))
+            """, (chat_id, title, username, chat_type, webhook_product_key or "", invite_link, added_by_user_id, now))
             await conn.commit()
 
     async def delete_managed_chat(self, chat_id: int):
@@ -779,6 +782,28 @@ class Database:
                 (now, chat_id),
             )
             await conn.commit()
+
+    async def delete_all_managed_chats(self):
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute(
+                "UPDATE managed_chats SET is_active = 0, removed_at = ? WHERE is_active = 1",
+                (now,),
+            )
+            await conn.commit()
+
+    async def get_managed_chat_by_webhook_key(self, webhook_product_key: str) -> Optional[Dict]:
+        key = (webhook_product_key or "").strip().lower()
+        if not key:
+            return None
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute(
+                "SELECT * FROM managed_chats WHERE is_active = 1 AND LOWER(COALESCE(webhook_product_key, '')) = ? ORDER BY added_at DESC LIMIT 1",
+                (key,),
+            ) as cur:
+                row = await cur.fetchone()
+                return dict(row) if row else None
 
     async def get_managed_chats(self, active_only: bool = True) -> List[Dict]:
         async with aiosqlite.connect(self.db_path) as conn:
