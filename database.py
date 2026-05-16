@@ -734,6 +734,19 @@ class Database:
                 rows = await cur.fetchall()
                 return {int(row["chat_id"]): int(row["total"]) for row in rows}
 
+    async def get_active_subscription_counts_by_product_key(self) -> Dict[str, int]:
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT product_key, COUNT(*) as total
+                FROM user_subscriptions
+                WHERE is_active = 1 AND expires_at > ? AND COALESCE(product_key, '') != ''
+                GROUP BY product_key
+            """, (now,)) as cur:
+                rows = await cur.fetchall()
+                return {str(row["product_key"] or "").strip().lower(): int(row["total"]) for row in rows}
+
     async def get_expired_chat_subscriptions(self) -> List[Dict]:
         now = datetime.utcnow().isoformat()
         async with aiosqlite.connect(self.db_path) as conn:

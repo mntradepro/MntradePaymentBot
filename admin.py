@@ -245,6 +245,19 @@ def managed_chat_webhook_key(item: dict) -> str:
     return chat_id or "-"
 
 
+def managed_chat_language(item: dict) -> str:
+    key = managed_chat_webhook_key(item).lower()
+    if key == "vip_chat_lv":
+        return "LV"
+    if key == "vip_chat_ru":
+        return "RU"
+    if key == "vip_chat_en":
+        return "EN"
+    if key == "scanner_chat":
+        return "MULTI"
+    return "-"
+
+
 def subscription_products():
     return {
         "vip_chat_lv": ("VIP Chat LV", config.CHAT_IDS.get("lv", config.CHAT_ID), config.CHAT_LINKS.get("lv", config.CHAT_LINK)),
@@ -456,12 +469,16 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
     if not is_admin(callback.from_user.id):
         return
     counts = await db.get_active_subscription_counts_by_chat()
+    counts_by_key = await db.get_active_subscription_counts_by_product_key()
     managed = await db.get_managed_chats()
     managed_lines = []
     b = InlineKeyboardBuilder()
     if managed:
         for item in managed[:12]:
             chat_id = int(item.get("chat_id") or 0)
+            hook_id = managed_chat_webhook_key(item)
+            hook_count = counts_by_key.get(hook_id.lower(), 0)
+            active_count = hook_count or counts.get(chat_id, 0)
             joined, title = "No", str(item.get("title") or item.get("username") or chat_id or "Unknown")
             try:
                 chat = await bot.get_chat(chat_id)
@@ -472,11 +489,11 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
             managed_lines.append(
                 f"<b>{h(str(item.get('title') or item.get('username') or chat_id))}</b>\n"
                 f"ID: <code>{chat_id}</code>\n"
-                f"Hook ID: <code>{h(managed_chat_webhook_key(item))}</code>\n"
-                f"Webhook product_key: <code>{h(managed_chat_webhook_key(item))}</code>\n"
+                f"Hook ID: <code>{h(hook_id)}</code>\n"
+                f"Valoda: <b>{h(managed_chat_language(item))}</b>\n"
                 f"Bot joined: <b>{joined}</b>\n"
                 f"Chat: {h(title)}\n"
-                f"Active subs: <b>{counts.get(chat_id, 0)}</b>\n"
+                f"Active subs: <b>{active_count}</b>\n"
                 f"Link: <code>{h(item.get('invite_link') or '-')}</code>"
             )
             b.button(text=f"Delete {chat_id}", callback_data=f"adm_chat_delete_{chat_id}")
