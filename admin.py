@@ -472,6 +472,7 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
             managed_lines.append(
                 f"<b>{h(str(item.get('title') or item.get('username') or chat_id))}</b>\n"
                 f"ID: <code>{chat_id}</code>\n"
+                f"Hook ID: <code>{h(managed_chat_webhook_key(item))}</code>\n"
                 f"Webhook product_key: <code>{h(managed_chat_webhook_key(item))}</code>\n"
                 f"Bot joined: <b>{joined}</b>\n"
                 f"Chat: {h(title)}\n"
