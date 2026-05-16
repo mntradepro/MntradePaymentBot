@@ -457,27 +457,6 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
         return
     counts = await db.get_active_subscription_counts_by_chat()
     managed = await db.get_managed_chats()
-    configured = list(configured_chat_rows())
-    chat_titles = {}
-    configured_lines = []
-    for label, webhook_key, chat_id, link in configured:
-        joined, title = "No", "Unknown"
-        try:
-            chat = await bot.get_chat(chat_id)
-            joined = "Yes"
-            title = getattr(chat, "title", None) or getattr(chat, "username", None) or "OK"
-        except Exception as e:
-            title = str(e)[:80]
-        chat_titles[int(chat_id or 0)] = title
-        configured_lines.append(
-            f"<b>{h(label)}</b>\n"
-            f"ID: <code>{chat_id}</code>\n"
-            f"Webhook product_key: <code>{h(webhook_key)}</code>\n"
-            f"Bot joined: <b>{joined}</b>\n"
-            f"Chat: {h(title)}\n"
-            f"Active subs: <b>{counts.get(chat_id, 0)}</b>\n"
-            f"Link: <code>{h(link or '-')}</code>"
-        )
     managed_lines = []
     b = InlineKeyboardBuilder()
     if managed:
@@ -503,22 +482,10 @@ async def adm_chats(callback: CallbackQuery, bot: Bot):
         b.button(text="Delete All Managed Chats", callback_data="adm_chat_delete_all")
     b.button(text="Back", callback_data="adm_main")
     b.adjust(1)
-    key_rows = "\n\n".join(
-        (
-            f"<code>{h(webhook_key)}</code> = {h(label)}\n"
-            f"TG ID: <code>{h(str(chat_id or '-'))}</code>\n"
-            f"Chat: {h(chat_titles.get(int(chat_id or 0), '-'))}"
-        )
-        for label, webhook_key, chat_id, _ in configured_chat_rows()
-    )
     await render(
         callback,
-        "<b>Webhook product keys</b>\n"
-        f"{key_rows}\n\n"
-        "<b>Configured chats (.env)</b>\n\n"
-        + ("\n\n".join(configured_lines) or "No configured chats.")
-        + "\n\n<b>Managed chat DB</b>\n\n"
-        + ("\n\n".join(managed_lines) or "No managed chats in DB."),
+        "<b>Managed chat DB</b>\n\n"
+        + ("\n\n".join(managed_lines) or "No managed chats in DB.\n\nUse /STARTPAYMENT inside a target chat to add it here."),
         b.as_markup(),
     )
     await callback.answer()
