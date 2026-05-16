@@ -376,14 +376,36 @@ async def adm_users(callback: CallbackQuery):
     active = await db.get_users_with_active_subscriptions()
     registered = await db.get_registered_users()
     friends = await db.get_all_friends()
+    pending_email_subs = await db.get_all_pending_email_subscriptions()
+    pending_by_email = {}
+    for row in pending_email_subs:
+        email = str(row.get("email") or "").strip().lower()
+        if not email:
+            continue
+        pending_by_email.setdefault(email, []).append(str(row.get("product_key") or "-"))
+    active_products_by_user = {}
+    for u in active[:20]:
+        subs = await db.get_active_user_subscriptions(u["user_id"])
+        active_products_by_user[u["user_id"]] = [str(s.get("product_key") or "-") for s in subs]
     reg = "\n".join(
-        f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | {h(u.get('email') or '-')} | reg. {fmt_dt(u.get('email_registered_at') or u.get('created_at'), True)} | exp. {fmt_dt(u.get('expires_at'), True)}"
+        (
+            f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | "
+            f"{h(u.get('email') or '-')} | "
+            f"reg. {fmt_dt(u.get('email_registered_at') or u.get('created_at'), True)} | "
+            f"exp. {fmt_dt(u.get('expires_at'), True)}"
+            + (
+                f" | pending: {h(', '.join(pending_by_email.get(str(u.get('email') or '').strip().lower(), [])))}"
+                if pending_by_email.get(str(u.get('email') or '').strip().lower())
+                else ""
+            )
+        )
         for u in registered[:12]
     ) or "-"
     act = "\n".join(
         (
             f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | "
             f"subs: {int(u.get('active_subscription_count') or 0)} | "
+            f"products: {h(', '.join(active_products_by_user.get(u['user_id'], [])) or '-')} | "
             f"nearest exp. {fmt_dt(u.get('nearest_subscription_expires_at'), True)}"
         )
         for u in active[:20]
