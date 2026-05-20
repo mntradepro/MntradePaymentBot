@@ -389,18 +389,27 @@ async def adm_users(callback: CallbackQuery):
         if not email:
             continue
         pending_by_email.setdefault(email, []).append(str(row.get("product_key") or "-"))
+    active_subs_by_user = {}
     active_products_by_user = {}
-    for u in active[:20]:
+    active_until_by_user = {}
+    for u in active:
         subs = await db.get_active_user_subscriptions(u["user_id"])
+        active_subs_by_user[u["user_id"]] = subs
         active_products_by_user[u["user_id"]] = [str(s.get("product_key") or "-") for s in subs]
+        expires = [str(s.get("expires_at") or "") for s in subs if s.get("expires_at")]
+        active_until_by_user[u["user_id"]] = min(expires) if expires else ""
     reg = "\n".join(
         (
             f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | "
             f"{h(u.get('email') or '-')} | "
-            f"reg. {fmt_dt(u.get('email_registered_at') or u.get('created_at'), True)} | "
-            f"exp. {fmt_dt(u.get('expires_at'), True)}"
+            f"bot reg. {fmt_dt(u.get('email_registered_at') or u.get('created_at'), True)} | "
             + (
-                f" | pending: {h(', '.join(pending_by_email.get(str(u.get('email') or '').strip().lower(), [])))}"
+                f"sub: active until {fmt_dt(active_until_by_user.get(u['user_id']), True)}"
+                if active_subs_by_user.get(u["user_id"])
+                else "sub: none"
+            )
+            + (
+                f" | pending paid: {h(', '.join(pending_by_email.get(str(u.get('email') or '').strip().lower(), [])))}"
                 if pending_by_email.get(str(u.get('email') or '').strip().lower())
                 else ""
             )
@@ -433,7 +442,9 @@ async def adm_users(callback: CallbackQuery):
     b.button(text="Back", callback_data="adm_main")
     b.adjust(2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
     text = (
-        f"<b>Registered users ({len(registered)})</b>\n{reg}\n\n"
+        f"<b>Registered bot users ({len(registered)})</b>\n"
+        "These users have linked an e-mail in the bot. This does not mean they have paid.\n\n"
+        f"{reg}\n\n"
         f"<b>Users with active subscriptions ({len(active)})</b>\n{act}\n\n"
         f"<b>Friends ({len(friends)})</b>\n{fr}\n\n"
         f"<b>Friend e-mails ({len(friend_emails)})</b>\n{friend_email_rows}"
