@@ -323,6 +323,27 @@ def audit_is_friend_or_protected(row: dict) -> bool:
 
 async def refresh_audit_members(bot: Bot, chat_id: int):
     refreshed = []
+    for user in await db.get_all_users_stats():
+        user_id = int(user.get("user_id") or 0)
+        if not user_id:
+            continue
+        try:
+            member = await bot.get_chat_member(chat_id, user_id)
+            status = getattr(member.status, "value", str(member.status or ""))
+            if status in {"left", "kicked"}:
+                await db.mark_chat_member_left(chat_id, user_id, status)
+                continue
+            tg_user = member.user
+            await db.upsert_chat_member(
+                chat_id=chat_id,
+                user_id=user_id,
+                username=getattr(tg_user, "username", "") or user.get("username") or "",
+                first_name=getattr(tg_user, "first_name", "") or user.get("first_name") or "",
+                status=status,
+                is_member=bool(getattr(member, "is_member", True)),
+            )
+        except Exception:
+            continue
     for row in await db.get_chat_audit_members(chat_id):
         user_id = int(row.get("user_id") or 0)
         try:
@@ -391,7 +412,7 @@ async def build_audit_report(bot: Bot, chat_id: int):
         f"<b>PAYED sample</b>\n{paid_rows}\n\n"
         f"<b>Friends/protected sample</b>\n{friend_rows}\n\n"
         f"<b>NOTPAYED</b>\n{notpaid_rows}\n\n"
-        "Note: Telegram does not let bots export the full member list on demand. This report uses members the bot has already seen/tracked."
+        "Note: Telegram does not let bots export the full member list on demand. This report checks all DB users against this chat and also uses tracked chat members."
     )
     b = InlineKeyboardBuilder()
     if notpaid:
@@ -516,74 +537,102 @@ async def adm_users(callback: CallbackQuery):
     friends = await db.get_all_friends()
     friend_emails = await db.get_all_friend_emails()
     pending_email_subs = await db.get_all_pending_email_subscriptions()
-    pending_by_email = {}
-    for row in pending_email_subs:
-        email = str(row.get("email") or "").strip().lower()
-        if not email:
-            continue
-        pending_by_email.setdefault(email, []).append(str(row.get("product_key") or "-"))
-    active_subs_by_user = {}
-    active_products_by_user = {}
-    active_until_by_user = {}
-    for u in active:
-        subs = await db.get_active_user_subscriptions(u["user_id"])
-        active_subs_by_user[u["user_id"]] = subs
-        active_products_by_user[u["user_id"]] = [str(s.get("product_key") or "-") for s in subs]
-        expires = [str(s.get("expires_at") or "") for s in subs if s.get("expires_at")]
-        active_until_by_user[u["user_id"]] = min(expires) if expires else ""
-    reg = "\n".join(
-        (
-            f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | "
-            f"{h(u.get('email') or '-')} | "
-            f"bot reg. {fmt_dt(u.get('email_registered_at') or u.get('created_at'), True)} | "
-            + (
-                f"sub: active until {fmt_dt(active_until_by_user.get(u['user_id']), True)}"
-                if active_subs_by_user.get(u["user_id"])
-                else "sub: none"
-            )
-            + (
-                f" | pending paid: {h(', '.join(pending_by_email.get(str(u.get('email') or '').strip().lower(), [])))}"
-                if pending_by_email.get(str(u.get('email') or '').strip().lower())
-                else ""
-            )
-        )
-        for u in registered[:12]
-    ) or "-"
-    act = "\n".join(
-        (
-            f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | "
-            f"subs: {int(u.get('active_subscription_count') or 0)} | "
-            f"products: {h(', '.join(active_products_by_user.get(u['user_id'], [])) or '-')} | "
-            f"nearest exp. {fmt_dt(u.get('nearest_subscription_expires_at'), True)}"
-        )
-        for u in active[:20]
-    ) or "-"
-    fr = "\n".join(
-        f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | {h(u.get('email') or '-')}"
-        for u in friends[:10]
-    ) or "-"
-    friend_email_rows = "\n".join(
-        f"- {h(x.get('email') or '-')}"
-        for x in friend_emails[:10]
-    ) or "-"
     b = InlineKeyboardBuilder()
+    b.button(text="ALL registered users", callback_data="adm_users_list_registered")
+    b.button(text="ALL payed users", callback_data="adm_users_list_paid")
+    b.button(text="ALL friends", callback_data="adm_users_list_friends")
     b.button(text="Add Friend", callback_data="adm_add_friend")
     b.button(text="Remove Friend", callback_data="adm_remove_friend")
     b.button(text="Revoke Subscription", callback_data="adm_revoke_sub")
-    for u in registered[:8]:
-        b.button(text=f"@{u['username']}" if u.get("username") else str(u["user_id"]), callback_data=f"adm_user_view_{u['user_id']}")
     b.button(text="Back", callback_data="adm_main")
-    b.adjust(2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+    b.adjust(1)
     text = (
-        f"<b>Registered bot users ({len(registered)})</b>\n"
-        "These users have linked an e-mail in the bot. This does not mean they have paid.\n\n"
-        f"{reg}\n\n"
-        f"<b>Users with active subscriptions ({len(active)})</b>\n{act}\n\n"
-        f"<b>Friends ({len(friends)})</b>\n{fr}\n\n"
-        f"<b>Friend e-mails ({len(friend_emails)})</b>\n{friend_email_rows}"
+        "<b>Users overview</b>\n\n"
+        f"Registered bot users: <b>{len(registered)}</b>\n"
+        f"Active subscribers: <b>{len(active)}</b>\n"
+        f"Friends by TG: <b>{len(friends)}</b>\n"
+        f"Friend e-mails: <b>{len(friend_emails)}</b>\n"
+        f"Pending paid e-mails without TG: <b>{len(pending_email_subs)}</b>\n\n"
+        "Registered means the user linked an e-mail in the bot. It does not mean they paid."
     )
     await render(callback, text, b.as_markup())
     await callback.answer()
+
+
+def user_label(row: dict) -> str:
+    if row.get("username"):
+        return "@" + str(row["username"])
+    return str(row.get("user_id") or "-")
+
+
+async def send_long_admin_list(message: Message, title: str, rows: list[str]):
+    if not rows:
+        await message.answer(f"<b>{h(title)}</b>\n\n-", parse_mode="HTML")
+        return
+    header = f"<b>{h(title)} ({len(rows)})</b>\n\n"
+    chunk = header
+    for index, row in enumerate(rows, 1):
+        line = f"{index}. {row}\n"
+        if len(chunk) + len(line) > 3600:
+            await message.answer(chunk, parse_mode="HTML")
+            chunk = ""
+        chunk += line
+    if chunk:
+        await message.answer(chunk, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "adm_users_list_registered")
+async def adm_users_list_registered(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    users = await db.get_registered_users()
+    active = await db.get_users_with_active_subscriptions()
+    active_ids = {int(u.get("user_id") or 0) for u in active}
+    rows = [
+        (
+            f"{h(user_label(u))} | TG: <code>{int(u.get('user_id') or 0)}</code> | "
+            f"email: <code>{h(u.get('email') or '-')}</code> | "
+            f"reg: {fmt_dt(u.get('email_registered_at') or u.get('created_at'), True)} | "
+            f"sub: {'active' if int(u.get('user_id') or 0) in active_ids else 'none'}"
+        )
+        for u in users
+    ]
+    await callback.answer("Sending registered users...")
+    await send_long_admin_list(callback.message, "ALL registered bot users", rows)
+
+
+@router.callback_query(F.data == "adm_users_list_paid")
+async def adm_users_list_paid(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    users = await db.get_users_with_active_subscriptions()
+    rows = []
+    for u in users:
+        subs = await db.get_active_user_subscriptions(u["user_id"])
+        products = ", ".join(str(s.get("product_key") or "-") for s in subs) or "-"
+        rows.append(
+            f"{h(user_label(u))} | TG: <code>{int(u.get('user_id') or 0)}</code> | "
+            f"email: <code>{h(u.get('email') or '-')}</code> | "
+            f"subs: {int(u.get('active_subscription_count') or 0)} | "
+            f"products: {h(products)} | nearest exp: {fmt_dt(u.get('nearest_subscription_expires_at'), True)}"
+        )
+    await callback.answer("Sending payed users...")
+    await send_long_admin_list(callback.message, "ALL payed users", rows)
+
+
+@router.callback_query(F.data == "adm_users_list_friends")
+async def adm_users_list_friends(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    friends = await db.get_all_friends()
+    friend_emails = await db.get_all_friend_emails()
+    rows = [
+        f"{h(user_label(u))} | TG: <code>{int(u.get('user_id') or 0)}</code> | email: <code>{h(u.get('email') or '-')}</code>"
+        for u in friends
+    ]
+    rows.extend(f"email whitelist: <code>{h(x.get('email') or '-')}</code>" for x in friend_emails)
+    await callback.answer("Sending friends...")
+    await send_long_admin_list(callback.message, "ALL friends", rows)
 
 
 @router.callback_query(F.data.startswith("adm_user_view_"))
