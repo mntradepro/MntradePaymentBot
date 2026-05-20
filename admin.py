@@ -146,6 +146,11 @@ def fmt_dt(value, short=False) -> str:
         return str(value)[:10 if short else 16]
 
 
+def looks_like_email(value: str) -> bool:
+    value = (value or "").strip()
+    return "@" in value and "." in value.rsplit("@", 1)[-1]
+
+
 def trim(text: str, limit: int = 3900) -> str:
     return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
 
@@ -376,6 +381,7 @@ async def adm_users(callback: CallbackQuery):
     active = await db.get_users_with_active_subscriptions()
     registered = await db.get_registered_users()
     friends = await db.get_all_friends()
+    friend_emails = await db.get_all_friend_emails()
     pending_email_subs = await db.get_all_pending_email_subscriptions()
     pending_by_email = {}
     for row in pending_email_subs:
@@ -414,6 +420,10 @@ async def adm_users(callback: CallbackQuery):
         f"- {h('@' + u['username']) if u.get('username') else u['user_id']} | {h(u.get('email') or '-')}"
         for u in friends[:10]
     ) or "-"
+    friend_email_rows = "\n".join(
+        f"- {h(x.get('email') or '-')}"
+        for x in friend_emails[:10]
+    ) or "-"
     b = InlineKeyboardBuilder()
     b.button(text="Add Friend", callback_data="adm_add_friend")
     b.button(text="Remove Friend", callback_data="adm_remove_friend")
@@ -425,7 +435,8 @@ async def adm_users(callback: CallbackQuery):
     text = (
         f"<b>Registered users ({len(registered)})</b>\n{reg}\n\n"
         f"<b>Users with active subscriptions ({len(active)})</b>\n{act}\n\n"
-        f"<b>Friends ({len(friends)})</b>\n{fr}"
+        f"<b>Friends ({len(friends)})</b>\n{fr}\n\n"
+        f"<b>Friend e-mails ({len(friend_emails)})</b>\n{friend_email_rows}"
     )
     await render(callback, text, b.as_markup())
     await callback.answer()
@@ -1104,7 +1115,7 @@ async def adm_add_friend(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
     await state.set_state(FriendState.waiting_id)
-    await render(callback, "<b>Add friend</b>\n\nSend a Telegram user id or @username.", back_kb("adm_users"))
+    await render(callback, "<b>Add friend</b>\n\nSend a Telegram user id, @username, or e-mail.", back_kb("adm_users"))
     await callback.answer()
 
 
@@ -1113,6 +1124,23 @@ async def save_friend_add(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
     raw_target = (message.text or "").strip()
+    if looks_like_email(raw_target):
+        affected = await db.add_friend_email(raw_target, message.from_user.id)
+        user = await db.get_user_by_email(raw_target)
+        await state.clear()
+        if user:
+            await message.answer(
+                f"Friend e-mail added and user marked friend: `{raw_target.lower()}` -> `{user['user_id']}`",
+                parse_mode="Markdown",
+                reply_markup=back_kb("adm_users"),
+            )
+        else:
+            await message.answer(
+                f"Friend e-mail added: `{raw_target.lower()}`\nExisting users updated: `{affected}`\nWhen a user registers this e-mail, they will become friend automatically.",
+                parse_mode="Markdown",
+                reply_markup=back_kb("adm_users"),
+            )
+        return
     user = await get_user_from_target(raw_target)
     if not user and raw_target.lstrip("-").isdigit():
         await db.register_user_as_friend(int(raw_target))
@@ -1131,7 +1159,7 @@ async def adm_remove_friend(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
     await state.set_state(FriendState.waiting_remove_id)
-    await render(callback, "<b>Remove friend</b>\n\nSend a Telegram user id or @username.", back_kb("adm_users"))
+    await render(callback, "<b>Remove friend</b>\n\nSend a Telegram user id, @username, or e-mail.", back_kb("adm_users"))
     await callback.answer()
 
 
@@ -1139,7 +1167,17 @@ async def adm_remove_friend(callback: CallbackQuery, state: FSMContext):
 async def save_friend_remove(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
-    user = await get_user_from_target(message.text or "")
+    raw_target = (message.text or "").strip()
+    if looks_like_email(raw_target):
+        affected = await db.remove_friend_email(raw_target)
+        await state.clear()
+        await message.answer(
+            f"Friend e-mail removed: `{raw_target.lower()}`\nExisting users updated: `{affected}`",
+            parse_mode="Markdown",
+            reply_markup=back_kb("adm_users"),
+        )
+        return
+    user = await get_user_from_target(raw_target)
     if not user:
         await message.answer("User not found.", reply_markup=back_kb("adm_users"))
         return

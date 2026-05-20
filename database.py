@@ -154,6 +154,13 @@ class Database:
                 )
             """)
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS friend_emails (
+                    email      TEXT PRIMARY KEY,
+                    added_at   TEXT DEFAULT (datetime('now')),
+                    added_by   INTEGER
+                )
+            """)
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS managed_chats (
                     chat_id            INTEGER PRIMARY KEY,
                     title              TEXT,
@@ -454,7 +461,11 @@ class Database:
                 ON CONFLICT(user_id) DO UPDATE SET
                     email = excluded.email,
                     email_registered_at = COALESCE(email_registered_at, excluded.email_registered_at),
-                    last_seen_at = excluded.last_seen_at
+                    last_seen_at = excluded.last_seen_at,
+                    is_friend = CASE
+                        WHEN EXISTS (SELECT 1 FROM friend_emails WHERE LOWER(friend_emails.email) = LOWER(excluded.email)) THEN 1
+                        ELSE is_friend
+                    END
             """, (user_id, email, now, now))
             await conn.commit()
 
@@ -675,6 +686,38 @@ class Database:
                 ON CONFLICT(user_id) DO UPDATE SET is_friend = 1, username = COALESCE(excluded.username, username)
             """, (user_id, username))
             await conn.commit()
+
+    async def add_friend_email(self, email: str, added_by: Optional[int] = None) -> int:
+        normalized = email.strip().lower()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT INTO friend_emails (email, added_by)
+                VALUES (?, ?)
+                ON CONFLICT(email) DO UPDATE SET added_by = COALESCE(excluded.added_by, added_by)
+            """, (normalized, added_by))
+            cur = await conn.execute(
+                "UPDATE users SET is_friend = 1 WHERE LOWER(email) = ?",
+                (normalized,),
+            )
+            await conn.commit()
+            return cur.rowcount or 0
+
+    async def remove_friend_email(self, email: str) -> int:
+        normalized = email.strip().lower()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("DELETE FROM friend_emails WHERE LOWER(email) = ?", (normalized,))
+            cur = await conn.execute(
+                "UPDATE users SET is_friend = 0 WHERE LOWER(email) = ?",
+                (normalized,),
+            )
+            await conn.commit()
+            return cur.rowcount or 0
+
+    async def get_all_friend_emails(self) -> List[Dict]:
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("SELECT * FROM friend_emails ORDER BY added_at DESC, email ASC") as cur:
+                return [dict(row) for row in await cur.fetchall()]
 
     async def is_user_friend(self, user_id: int) -> bool:
         async with aiosqlite.connect(self.db_path) as conn:
