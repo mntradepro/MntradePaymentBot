@@ -229,6 +229,7 @@ def menu_kb():
         ("🏅 Loyalty Stats", "adm_stub"),
     ]:
         b.button(text=text, callback_data=cb)
+    b.button(text="Check Chat Users", callback_data="adm_audit_chats")
     b.adjust(2)
     return b.as_markup()
 
@@ -270,6 +271,138 @@ def subscription_products():
         "vip_chat_ru": ("VIP Chat RU", config.CHAT_IDS.get("ru", config.CHAT_ID), config.CHAT_LINKS.get("ru", config.CHAT_LINK)),
         "scanner_chat": ("Scanner Chat", getattr(config, "SCANNER_CHAT_ID", 0), getattr(config, "SCANNER_CHAT_LINK", "")),
     }
+
+
+async def audit_chat_choices(bot: Bot):
+    by_chat = {}
+    for label, product_key, chat_id, link in configured_chat_rows():
+        if not chat_id:
+            continue
+        item = by_chat.setdefault(int(chat_id), {"chat_id": int(chat_id), "labels": [], "keys": [], "link": link or ""})
+        item["labels"].append(label)
+        item["keys"].append(product_key)
+        if link and not item.get("link"):
+            item["link"] = link
+    for item in await db.get_managed_chats():
+        chat_id = int(item.get("chat_id") or 0)
+        if not chat_id:
+            continue
+        row = by_chat.setdefault(chat_id, {"chat_id": chat_id, "labels": [], "keys": [], "link": item.get("invite_link") or ""})
+        row["labels"].append(item.get("title") or item.get("username") or str(chat_id))
+        row["keys"].append(item.get("webhook_product_key") or str(chat_id))
+        if item.get("invite_link") and not row.get("link"):
+            row["link"] = item.get("invite_link")
+    choices = []
+    for row in by_chat.values():
+        title = "Unknown"
+        try:
+            chat = await bot.get_chat(row["chat_id"])
+            title = getattr(chat, "title", None) or getattr(chat, "username", None) or "OK"
+        except Exception as e:
+            title = str(e)[:80]
+        row["title"] = title
+        choices.append(row)
+    choices.sort(key=lambda x: x.get("title") or str(x["chat_id"]))
+    return choices
+
+
+def audit_member_name(row: dict) -> str:
+    username = row.get("username")
+    first_name = row.get("first_name")
+    if username:
+        return "@" + str(username)
+    if first_name:
+        return str(first_name)
+    return "ID " + str(row.get("user_id"))
+
+
+def audit_is_friend_or_protected(row: dict) -> bool:
+    status = str(row.get("status") or "").lower()
+    return bool(row.get("is_friend")) or int(row.get("user_id") or 0) in config.ADMIN_IDS or status in {"administrator", "creator"}
+
+
+async def refresh_audit_members(bot: Bot, chat_id: int):
+    refreshed = []
+    for row in await db.get_chat_audit_members(chat_id):
+        user_id = int(row.get("user_id") or 0)
+        try:
+            member = await bot.get_chat_member(chat_id, user_id)
+            status = getattr(member.status, "value", str(member.status or ""))
+            if status in {"left", "kicked"}:
+                await db.mark_chat_member_left(chat_id, user_id, status)
+                continue
+            tg_user = member.user
+            await db.upsert_chat_member(
+                chat_id=chat_id,
+                user_id=user_id,
+                username=getattr(tg_user, "username", "") or row.get("username") or "",
+                first_name=getattr(tg_user, "first_name", "") or row.get("first_name") or "",
+                status=status,
+                is_member=bool(getattr(member, "is_member", True)),
+            )
+        except Exception:
+            pass
+    for row in await db.get_chat_audit_members(chat_id):
+        if row.get("has_paid"):
+            row["bucket"] = "paid"
+        elif audit_is_friend_or_protected(row):
+            row["bucket"] = "friend"
+        else:
+            row["bucket"] = "notpaid"
+        refreshed.append(row)
+    return refreshed
+
+
+async def build_audit_report(bot: Bot, chat_id: int):
+    rows = await refresh_audit_members(bot, chat_id)
+    paid = [r for r in rows if r["bucket"] == "paid"]
+    friends = [r for r in rows if r["bucket"] == "friend"]
+    notpaid = [r for r in rows if r["bucket"] == "notpaid"]
+    try:
+        chat = await bot.get_chat(chat_id)
+        title = getattr(chat, "title", None) or getattr(chat, "username", None) or str(chat_id)
+    except Exception:
+        title = str(chat_id)
+    try:
+        tg_count = await bot.get_chat_member_count(chat_id)
+    except Exception:
+        tg_count = "-"
+    notpaid_rows = "\n".join(
+        f"- {h(audit_member_name(r))} | <code>{int(r.get('user_id') or 0)}</code> | {h(r.get('email') or '-')}"
+        for r in notpaid[:15]
+    ) or "-"
+    paid_rows = "\n".join(
+        f"- {h(audit_member_name(r))} | until {fmt_dt(r.get('paid_until'), True)}"
+        for r in paid[:5]
+    ) or "-"
+    friend_rows = "\n".join(
+        f"- {h(audit_member_name(r))}"
+        for r in friends[:5]
+    ) or "-"
+    text = (
+        f"<b>Chat user audit</b>\n"
+        f"Chat: <b>{h(title)}</b>\n"
+        f"TG ID: <code>{chat_id}</code>\n"
+        f"Telegram member count: <b>{h(tg_count)}</b>\n"
+        f"Known/scanned by bot: <b>{len(rows)}</b>\n\n"
+        f"PAYED: <b>{len(paid)}</b>\n"
+        f"Friends: <b>{len(friends)}</b>\n"
+        f"NOTPAYED: <b>{len(notpaid)}</b>\n\n"
+        f"<b>PAYED sample</b>\n{paid_rows}\n\n"
+        f"<b>Friends/protected sample</b>\n{friend_rows}\n\n"
+        f"<b>NOTPAYED</b>\n{notpaid_rows}\n\n"
+        "Note: Telegram does not let bots export the full member list on demand. This report uses members the bot has already seen/tracked."
+    )
+    b = InlineKeyboardBuilder()
+    if notpaid:
+        b.button(text=f"KICK OUT ALL NOTPAYED ({len(notpaid)})", callback_data=f"adm_audit_kickall:{chat_id}")
+        for row in notpaid[:20]:
+            b.button(text=f"Kick {audit_member_name(row)[:24]}", callback_data=f"adm_audit_kick:{chat_id}:{int(row.get('user_id') or 0)}")
+    b.button(text="Refresh", callback_data=f"adm_audit_scan:{chat_id}")
+    b.button(text="Choose another chat", callback_data="adm_audit_chats")
+    b.button(text="Back", callback_data="adm_main")
+    b.adjust(1)
+    return text, b.as_markup(), {"paid": paid, "friends": friends, "notpaid": notpaid}
 
 
 async def get_user_from_target(token: str):
@@ -610,6 +743,83 @@ async def adm_chat_delete_all_confirm(callback: CallbackQuery, bot: Bot):
     await db.delete_all_managed_chats()
     await callback.answer("All managed chats deleted")
     await adm_chats(callback, bot)
+
+
+@router.callback_query(F.data == "adm_audit_chats")
+async def adm_audit_chats(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+    choices = await audit_chat_choices(bot)
+    b = InlineKeyboardBuilder()
+    for row in choices:
+        label = f"{row.get('title') or row['chat_id']} | {', '.join(row.get('keys') or [])}"
+        b.button(text=label[:60], callback_data=f"adm_audit_scan:{row['chat_id']}")
+    b.button(text="Back", callback_data="adm_main")
+    b.adjust(1)
+    await render(
+        callback,
+        "<b>Check chat users</b>\n\nChoose which chat to scan.\n\n"
+        "The scan compares known Telegram chat members against active subscriptions and friends.",
+        b.as_markup(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_audit_scan:"))
+async def adm_audit_scan(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+    chat_id = int(callback.data.split(":", 1)[1])
+    await callback.answer("Scanning chat users...")
+    text, kb, _ = await build_audit_report(bot, chat_id)
+    await render(callback, text, kb)
+
+
+async def kick_audit_user(bot: Bot, chat_id: int, user_id: int) -> bool:
+    rows = await refresh_audit_members(bot, chat_id)
+    target = next((r for r in rows if int(r.get("user_id") or 0) == user_id), None)
+    if not target or target.get("bucket") != "notpaid":
+        return False
+    try:
+        await bot.ban_chat_member(chat_id, user_id)
+        await bot.unban_chat_member(chat_id, user_id)
+        await db.mark_chat_member_left(chat_id, user_id, "kicked_by_audit")
+        await db.log_bot_event("audit_kick", user_id, meta=f"chat_id={chat_id}")
+        return True
+    except Exception:
+        return False
+
+
+@router.callback_query(F.data.startswith("adm_audit_kick:"))
+async def adm_audit_kick(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+    _, chat_raw, user_raw = callback.data.split(":", 2)
+    chat_id = int(chat_raw)
+    user_id = int(user_raw)
+    ok = await kick_audit_user(bot, chat_id, user_id)
+    await callback.answer("Kicked" if ok else "Not kicked: user is paid/friend/admin or no longer in chat", show_alert=not ok)
+    text, kb, _ = await build_audit_report(bot, chat_id)
+    await render(callback, text, kb)
+
+
+@router.callback_query(F.data.startswith("adm_audit_kickall:"))
+async def adm_audit_kickall(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+    chat_id = int(callback.data.split(":", 1)[1])
+    await callback.answer("Kicking NOTPAYED users...")
+    _, _, buckets = await build_audit_report(bot, chat_id)
+    kicked = 0
+    failed = 0
+    for row in buckets["notpaid"]:
+        ok = await kick_audit_user(bot, chat_id, int(row.get("user_id") or 0))
+        if ok:
+            kicked += 1
+        else:
+            failed += 1
+    text, kb, _ = await build_audit_report(bot, chat_id)
+    await render(callback, f"<b>Kick all finished</b>\nKicked: <b>{kicked}</b>\nSkipped/failed: <b>{failed}</b>\n\n{text}", kb)
 
 
 @router.callback_query(F.data == "adm_edit_welcome")

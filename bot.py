@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import ChatMemberUpdated, Message, CallbackQuery
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -528,9 +528,58 @@ def chat_public_link(chat) -> str:
 async def user_is_chat_admin(chat_id: int, user_id: int) -> bool:
     try:
         member = await bot.get_chat_member(chat_id, user_id)
-        return getattr(member, "status", "") in {"administrator", "creator"}
+        return member_status_value(getattr(member, "status", "")) in {"administrator", "creator"}
     except Exception:
         return False
+
+
+def member_status_value(status) -> str:
+    return getattr(status, "value", str(status or ""))
+
+
+async def track_chat_user(chat_id: int, tg_user, status: str = "member", is_member: bool = True):
+    if not tg_user or getattr(tg_user, "is_bot", False):
+        return
+    try:
+        await db.upsert_chat_member(
+            chat_id=chat_id,
+            user_id=tg_user.id,
+            username=getattr(tg_user, "username", "") or "",
+            first_name=getattr(tg_user, "first_name", "") or "",
+            status=status,
+            is_member=is_member,
+        )
+    except Exception as e:
+        logger.warning(f"chat_member_track_failed chat={chat_id} user={getattr(tg_user, 'id', '-')}: {e}")
+
+
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.from_user, F.text, ~F.text.startswith("/"))
+async def track_group_message_user(message: Message):
+    await track_chat_user(message.chat.id, message.from_user, "member", True)
+
+
+@dp.message(F.new_chat_members)
+async def track_new_chat_members(message: Message):
+    for tg_user in message.new_chat_members or []:
+        await track_chat_user(message.chat.id, tg_user, "member", True)
+
+
+@dp.message(F.left_chat_member)
+async def track_left_chat_member(message: Message):
+    tg_user = message.left_chat_member
+    if tg_user and not getattr(tg_user, "is_bot", False):
+        await db.mark_chat_member_left(message.chat.id, tg_user.id, "left")
+
+
+@dp.chat_member()
+async def track_chat_member_update(event: ChatMemberUpdated):
+    tg_user = event.new_chat_member.user
+    status = member_status_value(event.new_chat_member.status)
+    if status in {"left", "kicked"}:
+        await db.mark_chat_member_left(event.chat.id, tg_user.id, status)
+        return
+    is_member = getattr(event.new_chat_member, "is_member", True)
+    await track_chat_user(event.chat.id, tg_user, status, bool(is_member))
 
 async def checkout_url_for_lang(lang):
     return (await db.get_setting(f"checkout_url_{lang}")) or ""

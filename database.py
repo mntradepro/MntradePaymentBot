@@ -175,6 +175,21 @@ class Database:
                 )
             """)
             await conn.execute("""
+                CREATE TABLE IF NOT EXISTS chat_members (
+                    chat_id       INTEGER NOT NULL,
+                    user_id       INTEGER NOT NULL,
+                    username      TEXT,
+                    first_name    TEXT,
+                    status        TEXT,
+                    is_member     INTEGER DEFAULT 1,
+                    first_seen_at TEXT DEFAULT (datetime('now')),
+                    last_seen_at  TEXT DEFAULT (datetime('now')),
+                    updated_at    TEXT DEFAULT (datetime('now')),
+                    PRIMARY KEY (chat_id, user_id)
+                )
+            """)
+            await conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_members_chat_active ON chat_members(chat_id, is_member)")
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS marketing_sends (
                     user_id   INTEGER,
                     campaign  TEXT,
@@ -461,12 +476,14 @@ class Database:
                 ON CONFLICT(user_id) DO UPDATE SET
                     email = excluded.email,
                     email_registered_at = COALESCE(email_registered_at, excluded.email_registered_at),
-                    last_seen_at = excluded.last_seen_at,
-                    is_friend = CASE
-                        WHEN EXISTS (SELECT 1 FROM friend_emails WHERE LOWER(friend_emails.email) = LOWER(excluded.email)) THEN 1
-                        ELSE is_friend
-                    END
+                    last_seen_at = excluded.last_seen_at
             """, (user_id, email, now, now))
+            await conn.execute("""
+                UPDATE users
+                SET is_friend = 1
+                WHERE user_id = ?
+                  AND EXISTS (SELECT 1 FROM friend_emails WHERE LOWER(friend_emails.email) = ?)
+            """, (user_id, email))
             await conn.commit()
 
     async def get_pending_email_subscriptions(self, email: str) -> List[Dict]:
@@ -871,6 +888,83 @@ class Database:
                 query = "SELECT * FROM managed_chats ORDER BY added_at DESC"
                 params = ()
             async with conn.execute(query, params) as cur:
+                return [dict(row) for row in await cur.fetchall()]
+
+    async def upsert_chat_member(self, chat_id: int, user_id: int, username: str = "", first_name: str = "", status: str = "member", is_member: bool = True):
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT INTO users (user_id, username, first_name, is_active, last_seen_at)
+                VALUES (?, ?, ?, 0, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username = COALESCE(NULLIF(excluded.username, ''), username),
+                    first_name = COALESCE(NULLIF(excluded.first_name, ''), first_name),
+                    last_seen_at = excluded.last_seen_at
+            """, (user_id, username or "", first_name or "", now))
+            await conn.execute("""
+                INSERT INTO chat_members (chat_id, user_id, username, first_name, status, is_member, first_seen_at, last_seen_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                    username = COALESCE(NULLIF(excluded.username, ''), username),
+                    first_name = COALESCE(NULLIF(excluded.first_name, ''), first_name),
+                    status = excluded.status,
+                    is_member = excluded.is_member,
+                    last_seen_at = excluded.last_seen_at,
+                    updated_at = excluded.updated_at
+            """, (chat_id, user_id, username or "", first_name or "", status or "", 1 if is_member else 0, now, now, now))
+            await conn.commit()
+
+    async def mark_chat_member_left(self, chat_id: int, user_id: int, status: str = "left"):
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            await conn.execute("""
+                INSERT INTO chat_members (chat_id, user_id, status, is_member, first_seen_at, last_seen_at, updated_at)
+                VALUES (?, ?, ?, 0, ?, ?, ?)
+                ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                    status = excluded.status,
+                    is_member = 0,
+                    last_seen_at = excluded.last_seen_at,
+                    updated_at = excluded.updated_at
+            """, (chat_id, user_id, status or "left", now, now, now))
+            await conn.commit()
+
+    async def get_chat_audit_members(self, chat_id: int) -> List[Dict]:
+        now = datetime.utcnow().isoformat()
+        async with aiosqlite.connect(self.db_path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute("""
+                SELECT
+                    cm.*,
+                    u.email,
+                    COALESCE(u.is_friend, 0) AS is_friend,
+                    EXISTS (
+                        SELECT 1 FROM user_subscriptions us
+                        WHERE us.user_id = cm.user_id
+                          AND us.chat_id = cm.chat_id
+                          AND us.is_active = 1
+                          AND us.expires_at > ?
+                    ) AS has_paid,
+                    (
+                        SELECT GROUP_CONCAT(us.product_key, ', ')
+                        FROM user_subscriptions us
+                        WHERE us.user_id = cm.user_id
+                          AND us.chat_id = cm.chat_id
+                          AND us.is_active = 1
+                          AND us.expires_at > ?
+                    ) AS paid_products,
+                    (
+                        SELECT MIN(us.expires_at)
+                        FROM user_subscriptions us
+                        WHERE us.user_id = cm.user_id
+                          AND us.chat_id = cm.chat_id
+                          AND us.is_active = 1
+                          AND us.expires_at > ?
+                    ) AS paid_until
+                FROM chat_members cm
+                LEFT JOIN users u ON u.user_id = cm.user_id
+                WHERE cm.chat_id = ? AND cm.is_member = 1
+                ORDER BY has_paid DESC, is_friend DESC, cm.last_seen_at DESC
+            """, (now, now, now, chat_id)) as cur:
                 return [dict(row) for row in await cur.fetchall()]
 
     async def mark_subscription_inactive(self, subscription_id: int):
