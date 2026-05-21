@@ -444,14 +444,20 @@ async def render(callback: CallbackQuery, text: str, reply_markup=None):
 
 @router.message(Command("admin"))
 async def admin_panel(message: Message):
-    if is_admin(message.from_user.id):
-        await message.answer("*Admin Panel*", reply_markup=menu_kb(), parse_mode="Markdown")
+    if not is_admin(message.from_user.id):
+        return
+    if message.chat.type != "private":
+        return
+    await message.answer("*Admin Panel*", reply_markup=menu_kb(), parse_mode="Markdown")
 
 
 @router.message(Command("helpadmin"))
 async def admin_help(message: Message):
-    if is_admin(message.from_user.id):
-        await message.answer("Use /admin to open the English admin panel.")
+    if not is_admin(message.from_user.id):
+        return
+    if message.chat.type != "private":
+        return
+    await message.answer("Use /admin to open the English admin panel.")
 
 
 @router.callback_query(F.data == "adm_main")

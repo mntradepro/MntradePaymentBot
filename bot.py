@@ -4,7 +4,7 @@ import hmac
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from aiogram import Bot, Dispatcher, F
+from aiogram import BaseMiddleware, Bot, Dispatcher, F
 from aiogram.types import ChatMemberUpdated, Message, CallbackQuery
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
@@ -34,6 +34,33 @@ VIP_CHANNEL_LABELS = {
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 scheduler = AsyncIOScheduler()
+
+
+class PublicChatPrivacyGuard(BaseMiddleware):
+    allowed_group_commands = {"startpayment", "deletepayment"}
+
+    async def __call__(self, handler, event, data):
+        if isinstance(event, Message):
+            chat = getattr(event, "chat", None)
+            text = (getattr(event, "text", None) or "").strip()
+            if chat and getattr(chat, "type", "private") != "private" and text.startswith("/"):
+                command = text.split(maxsplit=1)[0].split("@", 1)[0].lstrip("/").lower()
+                if command not in self.allowed_group_commands:
+                    return
+        elif isinstance(event, CallbackQuery):
+            message = getattr(event, "message", None)
+            chat = getattr(message, "chat", None) if message else None
+            if chat and getattr(chat, "type", "private") != "private":
+                try:
+                    await event.answer("Open the bot in private chat.", show_alert=True)
+                except Exception:
+                    pass
+                return
+        return await handler(event, data)
+
+
+dp.message.middleware(PublicChatPrivacyGuard())
+dp.callback_query.middleware(PublicChatPrivacyGuard())
 
 TEXTS = {
     "ru": {
@@ -1486,6 +1513,8 @@ async def cmd_startpayment(message: Message):
     if message.chat.type == "private":
         await message.answer("Use this command inside the target group or channel discussion chat.")
         return
+    if message.from_user.id not in config.ADMIN_IDS:
+        return
     if not await user_is_chat_admin(message.chat.id, message.from_user.id):
         await message.answer("Only a chat admin can use this command here.")
         return
@@ -1508,6 +1537,8 @@ async def cmd_startpayment(message: Message):
 async def cmd_deletepayment(message: Message):
     if message.chat.type == "private":
         await message.answer("Use this command inside the target group or channel discussion chat.")
+        return
+    if message.from_user.id not in config.ADMIN_IDS:
         return
     if not await user_is_chat_admin(message.chat.id, message.from_user.id):
         await message.answer("Only a chat admin can use this command here.")
